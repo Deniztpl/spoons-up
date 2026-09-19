@@ -11,6 +11,7 @@ erDiagram
     users ||--o{ devices : has
     users ||--o{ reminders : has
     users ||--o{ period_results : has
+    users ||--o{ refresh_tokens : has
 
     areas ||--o{ habits : contains
     areas ||--o{ goals : contains
@@ -24,8 +25,20 @@ erDiagram
 
     users {
         bigint id PK
+        text email
+        text password_hash
         text timezone
         smallint week_start_day
+        timestamptz created_at
+    }
+
+    refresh_tokens {
+        bigint id PK
+        bigint user_id FK
+        text token_hash
+        timestamptz expires_at
+        timestamptz revoked_at
+        timestamptz created_at
     }
 
     areas {
@@ -125,8 +138,26 @@ erDiagram
 | column | type | note |
 |---|---|---|
 | id | bigint | PK |
+| email | text | unique |
+| password_hash | text | |
 | timezone | text | IANA, e.g. Europe/Istanbul |
 | week_start_day | smallint | 1 = Monday |
+| created_at | timestamptz | |
+
+### refresh_tokens
+
+| column | type | note |
+|---|---|---|
+| id | bigint | PK |
+| user_id | bigint | FK -> users |
+| token_hash | text | unique, sha256 of the token |
+| expires_at | timestamptz | issued_at + 30 days |
+| revoked_at | timestamptz | nullable |
+| created_at | timestamptz | |
+
+```sql
+CREATE INDEX ON refresh_tokens (user_id) WHERE revoked_at IS NULL;
+```
 
 ### areas
 
@@ -253,6 +284,18 @@ CREATE INDEX ON reminders (scheduled_at) WHERE status = 'PENDING';
 | created_at | timestamptz | |
 
 ## Mechanics
+
+### Auth
+
+The access token is a JWT carrying `sub` and `exp`, valid 15 minutes. It is never stored; the signature is the only check.
+
+The refresh token is a random string valid 30 days. Only its sha256 hash is stored. Login inserts a row; it does not touch existing rows, so several devices can hold live tokens at once.
+
+`/auth/refresh` rotates: the presented row is read `FOR UPDATE`, marked `revoked_at`, and a new row is issued. Both tokens are returned. A row is accepted only when the hash matches, `revoked_at` is NULL and `now() < expires_at`; any failure returns 401 and the client goes back to login.
+
+A presented token that is already revoked means a second holder exists, so every live row for that user is revoked and the request returns 401. The client serialises refreshes behind a single in-flight promise so parallel 401s do not trigger this.
+
+`revoked_at` is also written on logout (that row) and on password change (every row for the user).
 
 ### Habit
 
