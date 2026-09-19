@@ -80,6 +80,10 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 | Error response | | | |
 | bigint IDs in JSON | | | |
 
+## Open questions
+
+**week\_start\_day changed mid-week** — tasks already generated carry a `period_start` computed from the old boundary. After the change the open week's quota looks at a different range and stops matching them. Options: apply the change from the next week, recompute `period_start` for the open week's tasks, or only allow the change at a week boundary. Decide in slice 3.
+
 ---
 
 ## Schema
@@ -192,6 +196,7 @@ erDiagram
         date period_start
         text ref_type
         bigint ref_id
+        text title
         int target
         int done
     }
@@ -211,6 +216,7 @@ erDiagram
         bigint user_id FK
         text platform
         text token
+        timestamptz last_seen_at
         timestamptz created_at
     }
 ```
@@ -333,7 +339,8 @@ WHERE occurrence_date IS NOT NULL;
 | area_id | bigint | FK -> areas |
 | period_start | date | |
 | ref_type | text | HABIT \| GOAL |
-| ref_id | bigint | habits.id or goals.id |
+| ref_id | bigint | habits.id or goals.id — not a foreign key |
+| title | text | snapshot of the habit or goal title |
 | target | int | |
 | done | int | |
 
@@ -365,4 +372,5 @@ CREATE INDEX ON reminders (scheduled_at) WHERE status = 'PENDING';
 | user_id | bigint | FK -> users |
 | platform | text | IOS \| ANDROID \| WEB |
 | token | text | FCM / APNs device token |
+| last_seen_at | timestamptz | updated on every device registration |
 | created_at | timestamptz | |
