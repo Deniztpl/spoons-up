@@ -10,13 +10,13 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 0 — Walking skeleton
 
-1. `spoons-up-api`: uv, FastAPI, Postgres compose, Alembic
+1. `apps/api`: uv, FastAPI, Postgres compose, Alembic
 2. Error contract — one exception class per failure kind, rendered as `{ code, message }`
 3. `users` and `refresh_tokens` migration
 4. Auth helpers — password hashing, JWT issue and verify, refresh rotation, `current_user` dependency
 5. `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`
 6. `openapi.json` export command
-7. `spoons-up-app`: pnpm workspace, `apps/web`, `packages/api-client` generated from the contract
+7. `spoons-up`: pnpm workspace, `apps/web`, `packages/api-client` generated from the contract
 8. Web: login and register screens, token storage, refresh interceptor
 9. Shell layout — header, left column, content area
 10. **Done when:** register in the browser, reload the page, still signed in

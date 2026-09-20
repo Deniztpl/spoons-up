@@ -1,8 +1,8 @@
-# Spoons Up API
+# Spoons Up
 
-Backend for a personal habit and task tracker. Areas group what you're trying to be consistent at; habits and goals live under them; weekly results roll up to the area.
+Monorepo for a personal habit and task tracker. Areas group what you're trying to be consistent at; habits and goals live under them; weekly results roll up to the area.
 
-The web and mobile clients live in [`spoons-up-app`](https://github.com/Deniztpl/spoons-up-app).
+The FastAPI backend lives in `apps/api`. Web and mobile clients will live in `apps/web` and `apps/mobile`, with shared code in `packages`.
 
 ## Features
 
@@ -16,10 +16,9 @@ The web and mobile clients live in [`spoons-up-app`](https://github.com/Deniztpl
 
 ## Tech stack
 
-- FastAPI, Python 3.12
-- PostgreSQL, SQLAlchemy 2.0, Alembic
-- JWT auth with rotating refresh tokens
-- uv for dependencies
+- API: FastAPI, Python 3.12, PostgreSQL, SQLAlchemy 2.0, Alembic, uv
+- Web: planned under `apps/web`
+- Mobile: planned under `apps/mobile`
 
 ## Getting started
 
@@ -31,14 +30,15 @@ The web and mobile clients live in [`spoons-up-app`](https://github.com/Deniztpl
 ### Installation
 
 ```bash
-git clone https://github.com/Deniztpl/spoons-up-api
-cd spoons-up-api
+git clone https://github.com/Deniztpl/spoons-up
+cd spoons-up
+docker compose up -d
+cd apps/api
 uv sync
+cp .env.example .env
 ```
 
-### Configuration
-
-Copy `.env.example` to `.env`:
+Configure `apps/api/.env` as needed:
 
 ```env
 DATABASE_URL=postgresql+psycopg://spoons:spoons@localhost:5432/spoons
@@ -48,35 +48,36 @@ REFRESH_TOKEN_DAYS=30
 CORS_ORIGINS=http://localhost:3000
 ```
 
-### Run
+### Run the API
+
+From `apps/api/`:
 
 ```bash
-docker compose up -d                  # postgres
 uv run alembic upgrade head           # migrations
 uv run fastapi dev app/main.py        # server on :8000
 ```
 
-Interactive docs at `http://localhost:8000/docs`.
+Interactive docs are available at `http://localhost:8000/docs`.
 
 ### Tests
 
+From `apps/api/`:
+
 ```bash
+uv run ruff check .
 uv run pytest
 ```
 
 ## Project structure
 
 ```text
-app/
-  api/            HTTP endpoints
-  services/       business logic
-  repositories/   database access
-  models/         SQLAlchemy models
-  schemas/        Pydantic request/response schemas
-  jobs/           worker and scheduler entrypoints
-alembic/
-tests/
-docs/
+apps/
+  api/              FastAPI backend, migrations, and tests
+  web/              planned web client
+  mobile/           planned mobile client
+packages/           planned shared packages
+docs/               shared product and architecture documentation
+compose.yaml        local PostgreSQL service
 ```
 
 ## Documentation
@@ -84,7 +85,8 @@ docs/
 - [`docs/design.md`](docs/design.md) — features, decisions and the database schema
 - [`docs/api-contract.md`](docs/api-contract.md) — request and response shapes
 - [`docs/plan.md`](docs/plan.md) — build order
-- [`AGENTS.md`](AGENTS.md) — rules for coding agents working in this repo
+- [`AGENTS.md`](AGENTS.md) — repository-wide rules for coding agents
+- [`apps/api/AGENTS.md`](apps/api/AGENTS.md) — backend-specific rules for coding agents
 
 ## License
 
