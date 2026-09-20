@@ -3,7 +3,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from app.core.errors import AppError, NotFoundError, ValidationAppError, register_exception_handlers
+from app.core.errors import (
+    AppError,
+    InvalidTokenError,
+    NotFoundError,
+    ValidationAppError,
+    register_exception_handlers,
+)
 
 
 class Profile(BaseModel):
@@ -37,6 +43,10 @@ def create_test_app() -> FastAPI:
     @application.get("/boom")
     def unexpected_error() -> None:
         raise RuntimeError("sensitive detail")
+
+    @application.get("/unauthorized")
+    def unauthorized() -> None:
+        raise InvalidTokenError
 
     return application
 
@@ -107,4 +117,15 @@ def test_unexpected_error_hides_internal_details() -> None:
     assert response.json() == {
         "code": "internal_error",
         "message": "Internal server error",
+    }
+
+
+def test_unauthorized_application_error_sets_bearer_challenge() -> None:
+    response = client.get("/unauthorized")
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert response.json() == {
+        "code": "invalid_token",
+        "message": "Invalid or expired token",
     }

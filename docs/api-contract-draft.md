@@ -48,7 +48,7 @@ Two different things, don't mix them:
 
 ### Auth
 
-The access token is returned in the body and held in memory by the client. The refresh token is returned in the body for mobile and set as an httpOnly cookie for web; the client sends whichever it holds.
+The access token and refresh token are returned in the response body. The same refresh token is also set as an httpOnly cookie. Mobile stores the body value in SecureStore; web ignores the body value and uses the cookie. Returning the refresh token in both places weakens the benefit of httpOnly for web and is a deliberate temporary decision while both clients share one auth surface.
 
 #### POST /auth/register
 

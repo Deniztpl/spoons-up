@@ -16,6 +16,7 @@ class AppError(Exception, ABC):
     status_code: ClassVar[int]
     code: ClassVar[str]
     default_message: ClassVar[str]
+    headers: ClassVar[dict[str, str] | None] = None
 
     def __init__(self, message: str | None = None) -> None:
         if type(self) is AppError:
@@ -28,6 +29,26 @@ class NotFoundError(AppError):
     status_code = 404
     code = "not_found"
     default_message = "Resource not found"
+
+
+class EmailTakenError(AppError):
+    status_code = 409
+    code = "email_taken"
+    default_message = "Email already registered"
+
+
+class InvalidCredentialsError(AppError):
+    status_code = 401
+    code = "invalid_credentials"
+    default_message = "Invalid email or password"
+    headers = {"WWW-Authenticate": "Bearer"}
+
+
+class InvalidTokenError(AppError):
+    status_code = 401
+    code = "invalid_token"
+    default_message = "Invalid or expired token"
+    headers = {"WWW-Authenticate": "Bearer"}
 
 
 class ValidationAppError(AppError):
@@ -50,7 +71,7 @@ def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
     else:
         content = ErrorResponse(code=exc.code, message=exc.message).model_dump()
 
-    return JSONResponse(status_code=exc.status_code, content=content)
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
 
 
 def _validation_error_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:

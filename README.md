@@ -42,11 +42,15 @@ Configure `apps/api/.env` as needed:
 
 ```env
 DATABASE_URL=postgresql+psycopg://spoons:spoons@localhost:5432/spoons
-JWT_SECRET=
+TEST_DATABASE_URL=postgresql+psycopg://spoons:spoons@localhost:5433/spoons_test
+JWT_SECRET=replace-with-at-least-32-random-characters
 ACCESS_TOKEN_MINUTES=15
 REFRESH_TOKEN_DAYS=30
+REFRESH_COOKIE_SECURE=false
 CORS_ORIGINS=http://localhost:3000
 ```
+
+`JWT_SECRET` is required and must contain at least 32 characters. Set `REFRESH_COOKIE_SECURE=true` when the API is served over HTTPS.
 
 ### Run the API
 
@@ -61,11 +65,26 @@ Interactive docs are available at `http://localhost:8000/docs`.
 
 ### Tests
 
-From `apps/api/`:
+Start the dedicated PostgreSQL test service from the repository root:
+
+```bash
+docker compose --profile test up -d --wait test-db
+```
+
+Then run the checks from `apps/api/`:
 
 ```bash
 uv run ruff check .
 uv run pytest
+```
+
+### OpenAPI contract
+
+Generate the tracked API contract from `apps/api/`:
+
+```bash
+uv run python -m app.commands.export_openapi
+git diff --exit-code -- openapi.json
 ```
 
 ## Project structure

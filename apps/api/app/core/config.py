@@ -1,10 +1,15 @@
 from functools import lru_cache
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://spoons:spoons@localhost:5432/spoons"
+    jwt_secret: SecretStr = Field(min_length=32)
+    access_token_minutes: int = Field(default=15, gt=0)
+    refresh_token_days: int = Field(default=30, gt=0)
+    refresh_cookie_secure: bool = False
     cors_origins: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(
