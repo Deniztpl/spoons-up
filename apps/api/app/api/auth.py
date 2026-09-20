@@ -2,11 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Response, status
 
-from app.api.dependencies import CurrentUserDependency, DatabaseSession, SettingsDependency
-from app.core.config import Settings
+from app.api.cookies import clear_refresh_cookie, set_refresh_cookie
+from app.api.deps.auth import CurrentUserDependency
+from app.api.deps.services import AuthServiceDependency
 from app.schemas.auth import LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse
 from app.schemas.errors import ErrorResponse, ValidationErrorResponse
-from app.services.auth import AuthService, TokenPair
+from app.services.auth import TokenPair
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -26,15 +27,10 @@ AUTH_RESPONSES = {
 def register(
     payload: RegisterRequest,
     response: Response,
-    session: DatabaseSession,
-    settings: SettingsDependency,
+    auth_service: AuthServiceDependency,
 ) -> TokenResponse:
-    tokens = AuthService(session, settings).register(
-        email=str(payload.email),
-        password=payload.password,
-        timezone=payload.timezone,
-    )
-    _set_refresh_cookie(response, tokens.refresh_token, settings)
+    tokens = auth_service.register(payload)
+    set_refresh_cookie(response, tokens.refresh_token)
     return _token_response(tokens)
 
 
@@ -46,14 +42,10 @@ def register(
 def login(
     payload: LoginRequest,
     response: Response,
-    session: DatabaseSession,
-    settings: SettingsDependency,
+    auth_service: AuthServiceDependency,
 ) -> TokenResponse:
-    tokens = AuthService(session, settings).login(
-        email=str(payload.email),
-        password=payload.password,
-    )
-    _set_refresh_cookie(response, tokens.refresh_token, settings)
+    tokens = auth_service.login(payload)
+    set_refresh_cookie(response, tokens.refresh_token)
     return _token_response(tokens)
 
 
@@ -64,14 +56,13 @@ def login(
 )
 def refresh(
     response: Response,
-    session: DatabaseSession,
-    settings: SettingsDependency,
+    auth_service: AuthServiceDependency,
     payload: RefreshTokenRequest | None = None,
     refresh_cookie: Annotated[str | None, Cookie(alias="refresh_token")] = None,
 ) -> TokenResponse:
     token = payload.refresh_token if payload is not None else refresh_cookie
-    tokens = AuthService(session, settings).refresh(token)
-    _set_refresh_cookie(response, tokens.refresh_token, settings)
+    tokens = auth_service.refresh(token)
+    set_refresh_cookie(response, tokens.refresh_token)
     return _token_response(tokens)
 
 
@@ -83,33 +74,14 @@ def refresh(
 )
 def logout(
     response: Response,
-    session: DatabaseSession,
-    settings: SettingsDependency,
+    auth_service: AuthServiceDependency,
     current_user: CurrentUserDependency,
     payload: RefreshTokenRequest | None = None,
     refresh_cookie: Annotated[str | None, Cookie(alias="refresh_token")] = None,
 ) -> None:
     token = payload.refresh_token if payload is not None else refresh_cookie
-    AuthService(session, settings).logout(user_id=current_user.id, token=token)
-    response.delete_cookie(
-        key="refresh_token",
-        path="/api/v1/auth",
-        secure=settings.refresh_cookie_secure,
-        httponly=True,
-        samesite="lax",
-    )
-
-
-def _set_refresh_cookie(response: Response, token: str, settings: Settings) -> None:
-    response.set_cookie(
-        key="refresh_token",
-        value=token,
-        max_age=settings.refresh_token_days * 24 * 60 * 60,
-        path="/api/v1/auth",
-        secure=settings.refresh_cookie_secure,
-        httponly=True,
-        samesite="lax",
-    )
+    auth_service.logout(user_id=current_user.id, token=token)
+    clear_refresh_cookie(response)
 
 
 def _token_response(tokens: TokenPair) -> TokenResponse:

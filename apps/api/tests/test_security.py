@@ -4,8 +4,8 @@ import jwt
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.api.dependencies import get_current_user
-from app.core.config import Settings
+from app.api.deps.auth import get_current_user
+from app.core.config.auth import auth_settings
 from app.core.errors import InvalidTokenError
 from app.core.security import (
     create_access_token,
@@ -35,12 +35,14 @@ def test_access_token_round_trip() -> None:
 
 
 def test_current_user_is_derived_without_database_lookup() -> None:
-    token = create_access_token(42, SECRET, 15)
-    settings = Settings(jwt_secret=SECRET)
+    token = create_access_token(
+        42,
+        auth_settings.jwt_secret.get_secret_value(),
+        auth_settings.access_token_minutes,
+    )
 
     current_user = get_current_user(
         HTTPAuthorizationCredentials(scheme="Bearer", credentials=token),
-        settings,
     )
 
     assert current_user.id == 42

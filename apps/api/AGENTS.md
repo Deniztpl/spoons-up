@@ -40,6 +40,8 @@ uv run alembic upgrade head
 ## Architecture rules
 
 - Routes call services; services call repositories. No database access in a route handler.
+- Services take the route-layer Pydantic request schema as a single payload argument. Repositories take explicit keyword arguments.
+- Transaction boundaries live in the service layer: services wrap writes in `with self.session.begin():`. Repositories never commit — they add, query and flush. The session dependency only opens and closes the session. AuthService.refresh is the one exception: it commits the revocation before raising, so the write survives the error.
 - Never return a SQLAlchemy model from an endpoint — always a Pydantic schema.
 - Every query for user-owned data is scoped by the `user_id` from the token. A resource owned by another user returns 404, never 403.
 - `user_id` is never a path or query parameter.
