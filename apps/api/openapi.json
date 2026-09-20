@@ -40,6 +40,21 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "LogoutRequest": {
+        "properties": {
+          "refresh_token": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Refresh Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refresh_token"
+        ],
+        "title": "LogoutRequest",
+        "type": "object"
+      },
       "RefreshTokenRequest": {
         "properties": {
           "refresh_token": {
@@ -234,7 +249,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/RefreshTokenRequest"
+                    "$ref": "#/components/schemas/LogoutRequest"
                   },
                   {
                     "type": "null"

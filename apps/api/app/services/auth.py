@@ -103,14 +103,13 @@ class AuthService:
         if token is None:
             return
 
-        stored_token = self.refresh_token_repository.get_by_hash_for_user_for_update(
-            token_hash=hash_refresh_token(token),
-            user_id=user_id,
-        )
-        if stored_token is not None and stored_token.revoked_at is None:
-            stored_token.revoked_at = datetime.now(UTC)
-            self.session.commit()
-            return
+        with self.session.begin():
+            stored_token = self.refresh_token_repository.get_by_hash_for_user_for_update(
+                token_hash=hash_refresh_token(token),
+                user_id=user_id,
+            )
+            if stored_token is not None and stored_token.revoked_at is None:
+                stored_token.revoked_at = datetime.now(UTC)
 
     def _issue_token_pair(self, user_id: int, *, now: datetime | None = None) -> TokenPair:
         issued_at = now or datetime.now(UTC)

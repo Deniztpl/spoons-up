@@ -50,6 +50,8 @@ Two different things, don't mix them:
 
 The access token and refresh token are returned in the response body. The same refresh token is also set as an httpOnly cookie. Mobile stores the body value in SecureStore; web ignores the body value and uses the cookie. Returning the refresh token in both places weakens the benefit of httpOnly for web and is a deliberate temporary decision while both clients share one auth surface.
 
+Before the web client reaches production, the shared auth surface will be split into web and mobile HTTP contracts. Web endpoints will return refresh tokens only through httpOnly cookies; mobile endpoints will return them in the response body. Both contracts will continue using the same `AuthService` and business logic.
+
 #### POST /auth/register
 
 ```json

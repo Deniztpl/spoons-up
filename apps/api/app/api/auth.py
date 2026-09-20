@@ -5,7 +5,13 @@ from fastapi import APIRouter, Cookie, Response, status
 from app.api.cookies import clear_refresh_cookie, set_refresh_cookie
 from app.api.deps.auth import CurrentUserDependency
 from app.api.deps.services import AuthServiceDependency
-from app.schemas.auth import LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import (
+    LoginRequest,
+    LogoutRequest,
+    RefreshTokenRequest,
+    RegisterRequest,
+    TokenResponse,
+)
 from app.schemas.errors import ErrorResponse, ValidationErrorResponse
 from app.services.auth import TokenPair
 
@@ -76,7 +82,7 @@ def logout(
     response: Response,
     auth_service: AuthServiceDependency,
     current_user: CurrentUserDependency,
-    payload: RefreshTokenRequest | None = None,
+    payload: LogoutRequest | None = None,
     refresh_cookie: Annotated[str | None, Cookie(alias="refresh_token")] = None,
 ) -> None:
     token = payload.refresh_token if payload is not None else refresh_cookie

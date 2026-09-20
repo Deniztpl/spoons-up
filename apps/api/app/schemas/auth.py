@@ -27,6 +27,10 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(min_length=1, max_length=512)
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: str = Field(min_length=1, max_length=512)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
