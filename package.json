@@ -1,0 +1,18 @@
+{
+  "name": "spoons-up",
+  "private": true,
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @spoons-up/web dev",
+    "dev:web": "pnpm --filter @spoons-up/web dev",
+    "build": "pnpm --filter @spoons-up/web build",
+    "lint": "pnpm --filter @spoons-up/web lint",
+    "typecheck": "pnpm --filter @spoons-up/api-client typecheck && pnpm --filter @spoons-up/web typecheck",
+    "test": "pnpm --filter @spoons-up/web test",
+    "api-client:generate": "pnpm --filter @spoons-up/api-client generate",
+    "api-client:check": "pnpm --filter @spoons-up/api-client check"
+  }
+}

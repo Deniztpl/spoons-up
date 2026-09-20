@@ -62,7 +62,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 | Question | Decision | Rejected | Why not |
 |---|---|---|---|
-| Repo layout | Two repos: `spoons-up-api`, `spoons-up-app` | One monorepo; three repos | The natural boundary is frontend/backend, not web/mobile — web and mobile share the generated client and auth. Python and JS tooling in one workspace buys nothing |
+| Repo layout | One `spoons-up` monorepo: `apps/api`, `apps/web`, `apps/mobile`, and shared `packages` | Separate frontend/backend repos; three repos | Web and mobile share the generated client and auth contract, while atomic contract and consumer changes are easier in one workspace |
 | Visibility | Public | Private | Portfolio project. Data lives in the database, not the repo |
 | Auth | JWT | Opaque token + `sessions` table | Stateless by preference. Logout being 15 minutes late is accepted |
 | Refresh rotation | On | Fixed 30-day refresh token | A stolen token dies the next time the real user opens the app. Costs about 15 lines |
