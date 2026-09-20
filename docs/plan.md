@@ -14,12 +14,12 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 2. Error contract — one exception class per failure kind, rendered as `{ code, message }`
 3. `users` and `refresh_tokens` migration
 4. Auth helpers — password hashing, JWT issue and verify, refresh rotation, `current_user` dependency
-5. `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`
+5. `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`
 6. `openapi.json` export command
 7. `spoons-up-app`: pnpm workspace, `apps/web`, `packages/api-client` generated from the contract
 8. Web: login and register screens, token storage, refresh interceptor
 9. Shell layout — header, left column, content area
-10. **Done when:** register in the browser, reload the page, still signed in, `/auth/me` renders
+10. **Done when:** register in the browser, reload the page, still signed in
 
 ## Slice 1 — Areas
 
@@ -79,8 +79,3 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Architectural work that doesn't fit one slice goes into the slice that needs it first, and the next slice reuses it. Watch for a slice swelling because it is carrying the infrastructure for the ones after it.
 - Aggregate endpoints (`/today`, `/week`) take their shape from the screen. Sketch the screen before writing the endpoint.
 - CRUD endpoints don't. Write them straight from the schema.
-
-## Open
-
-- Error response shape
-- bigint IDs in JSON: number or string
