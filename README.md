@@ -34,7 +34,8 @@ Clone the repository and install the JavaScript workspace from the repository ro
 ```bash
 git clone https://github.com/Deniztpl/spoons-up
 cd spoons-up
-corepack install --global pnpm@12.5.1
+npm install --global pnpm@12.5.1
+pnpm --version
 pnpm install
 ```
 
@@ -63,22 +64,37 @@ CORS_ORIGINS=http://localhost:3000
 
 ## Run locally
 
-Run the API from `apps/api/`:
+The current Compose configuration starts PostgreSQL only. Run PostgreSQL, the API, and the web app in three separate terminals.
+
+Terminal 1, from the repository root, starts PostgreSQL:
 
 ```bash
+docker compose up -d --wait db
+```
+
+Terminal 2 starts the API:
+
+```bash
+cd apps/api
 uv run alembic upgrade head
 uv run fastapi dev app/main.py
 ```
 
 The API is available at `http://localhost:8000`; interactive docs are at `http://localhost:8000/docs`.
 
-Run the web app from the repository root:
+Terminal 3, from the repository root, starts the web app:
 
 ```bash
 pnpm dev
 ```
 
 The web app is available at `http://localhost:3000`. Copy `apps/web/.env.example` to `apps/web/.env.local` to override `VITE_API_URL`; it defaults to `http://localhost:8000`.
+
+### Web authentication
+
+The web client keeps the short-lived access token in memory and sends it as a bearer token. The refresh token stays in the API's `httpOnly` cookie; the client restores the session through `/api/v1/auth/refresh` when the page loads and never writes either token to browser storage.
+
+With all three processes running, open `http://localhost:3000/register`, create an account, reload the shell to confirm the cookie restores the session, then use **Log out** to return to the login screen.
 
 ## API contract and typed client
 
