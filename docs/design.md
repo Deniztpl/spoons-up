@@ -58,28 +58,6 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 ---
 
-## Decisions
-
-| Question | Decision | Rejected | Why not |
-|---|---|---|---|
-| Repo layout | One `spoons-up` monorepo: `apps/api`, `apps/web`, `apps/mobile`, and shared `packages` | Separate frontend/backend repos; three repos | Web and mobile share the generated client and auth contract, while atomic contract and consumer changes are easier in one workspace |
-| Visibility | Public | Private | Portfolio project. Data lives in the database, not the repo |
-| Auth | JWT | Opaque token + `sessions` table | Stateless by preference. Logout being 15 minutes late is accepted |
-| Refresh rotation | On | Fixed 30-day refresh token | A stolen token dies the next time the real user opens the app. Costs about 15 lines |
-| Reuse detection | On | Off | Only meaningful with rotation, and it's what actually ejects an attacker. The race it introduces is handled by a client-side lock plus `FOR UPDATE` |
-| Token lifetimes | Access 15 min, refresh 30 days | Longer access | Access tokens can't be revoked, so the window is the whole exposure |
-| Token storage | SecureStore (mobile), httpOnly cookie (web) | localStorage | Readable by any script on the page |
-| Closed-week results | Snapshot into `period_results` | Live computation; per-field versioning with `effective_from/to` | Changing a target from 3 to 2 rewrote past weeks. Versioning spread across three tables and put a date-range join in every read |
-| Occurrence identity | Separate immutable `occurrence_date` | Derive from `scheduled_date` | A postponed task would be regenerated, since the generator's date moved with it |
-| Quota week | `period_start` fixed at generation | Derive from `scheduled_date` | Moving a task to next Monday must not move its quota with it |
-| Deleting a task | Soft when rule-generated, hard when ad-hoc | Always soft; always hard | A soft row is what stops the generator resurrecting it; nothing would regenerate an ad-hoc task |
-| Concurrency | Synchronous `def` + synchronous SQLAlchemy 2.0 | async | No traffic to justify it, and a half-async codebase is the real cost — one blocking call stalls every request |
-| Database access | SQLAlchemy 2.0 | Raw asyncpg; SQLModel | Raw SQL means hand-writing everything and no migration story. SQLModel adds a layer that leaks back into SQLAlchemy on any complex query |
-| Enums | Python `StrEnum`, `text` + CHECK in the database | Native Postgres enums | Adding a value to a PG enum is a migration; CHECK is not |
-| Contract | Generated `openapi.json` | Hand-written API document | A hand-written endpoint list drifts within a week and then gets trusted over the code |
-| Error response | | | |
-| bigint IDs in JSON | | | |
-
 ## Open questions
 
 **week\_start\_day changed mid-week** — tasks already generated carry a `period_start` computed from the old boundary. After the change the open week's quota looks at a different range and stops matching them. Options: apply the change from the next week, recompute `period_start` for the open week's tasks, or only allow the change at a week boundary. Decide in slice 3.
