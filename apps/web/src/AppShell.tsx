@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { AuthActionResult } from "./auth/AuthContext";
+
 function MenuIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none">
@@ -126,10 +128,26 @@ function WelcomePanel() {
   );
 }
 
-export function AppShell() {
+export function AppShell({
+  onLogout,
+}: {
+  onLogout: () => Promise<AuthActionResult>;
+}) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    const result = await onLogout();
+    if (!result.ok) {
+      setLogoutError(result.message);
+      setIsLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     if (!isDrawerOpen) {
@@ -188,11 +206,32 @@ export function AppShell() {
           </span>
         </div>
 
-        <div className="ml-auto hidden items-center gap-2 rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-medium text-stone-500 sm:flex">
-          <span className="size-2 rounded-full bg-sage-500" />
-          A softer way forward
+        <div className="ml-auto flex items-center gap-3">
+          <div className="hidden items-center gap-2 rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-medium text-stone-500 md:flex">
+            <span className="size-2 rounded-full bg-sage-500" />
+            A softer way forward
+          </div>
+          <button
+            type="button"
+            disabled={isLoggingOut}
+            aria-describedby={logoutError ? "logout-error" : undefined}
+            className="rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 shadow-sm transition hover:border-sage-300 hover:text-sage-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 disabled:cursor-wait disabled:opacity-60 sm:text-sm"
+            onClick={() => void handleLogout()}
+          >
+            {isLoggingOut ? "Logging out…" : "Log out"}
+          </button>
         </div>
       </header>
+
+      {logoutError ? (
+        <div
+          id="logout-error"
+          role="alert"
+          className="fixed right-4 top-20 z-40 max-w-sm rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg"
+        >
+          {logoutError}
+        </div>
+      ) : null}
 
       <div className="flex min-h-[calc(100vh-4rem)]">
         <aside
