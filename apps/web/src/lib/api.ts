@@ -4,7 +4,7 @@ import {
   getAccessToken,
   setAuthenticated,
   setUnauthenticated,
-} from "../auth/session";
+} from "../features/auth/session";
 
 const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 

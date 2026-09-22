@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
-import { setAuthChecking } from "./auth/session";
+import { setAuthChecking } from "../features/auth/session";
 
 function tokenResponse(accessToken = "access-token") {
   return Response.json({
@@ -16,6 +16,10 @@ function tokenResponse(accessToken = "access-token") {
 
 function authError(code: string, message: string, status = 401) {
   return Response.json({ code, message }, { status });
+}
+
+function emptyAreasResponse() {
+  return Response.json({ areas: [] });
 }
 
 function renderApp(path = "/") {
@@ -65,18 +69,28 @@ describe("web authentication", () => {
   });
 
   it("restores the shell and redirects public routes for an authenticated session", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => tokenResponse()));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) =>
+        new URL(request.url).pathname === "/api/v1/areas"
+          ? emptyAreasResponse()
+          : tokenResponse(),
+      ),
+    );
 
     renderApp("/login");
 
     expect(
-      await screen.findByRole("heading", { name: "Welcome to Spoons Up" }),
+      await screen.findByRole("heading", { name: "Create your first area" }),
     ).toBeInTheDocument();
   });
 
   it("signs in and routes to the protected shell", async () => {
     const fetchMock = vi.fn(async (request: Request) => {
       const pathname = new URL(request.url).pathname;
+      if (pathname === "/api/v1/areas") {
+        return emptyAreasResponse();
+      }
       return pathname === "/api/v1/auth/refresh"
         ? authError("invalid_token", "Invalid or expired token")
         : tokenResponse();
@@ -91,7 +105,7 @@ describe("web authentication", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Welcome to Spoons Up" }),
+      await screen.findByRole("heading", { name: "Create your first area" }),
     ).toBeInTheDocument();
     const loginRequest = fetchMock.mock.calls
       .map(([request]) => request)
@@ -118,6 +132,9 @@ describe("web authentication", () => {
       if (pathname === "/api/v1/auth/register") {
         registerPayload = await request.clone().json();
       }
+      if (pathname === "/api/v1/areas") {
+        return emptyAreasResponse();
+      }
       return tokenResponse();
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -131,7 +148,7 @@ describe("web authentication", () => {
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Welcome to Spoons Up" }),
+      await screen.findByRole("heading", { name: "Create your first area" }),
     ).toBeInTheDocument();
     expect(registerPayload).toEqual({
       email: "new@example.com",
@@ -222,6 +239,9 @@ describe("web authentication", () => {
       if (pathname === "/api/v1/auth/refresh") {
         return tokenResponse();
       }
+      if (pathname === "/api/v1/areas") {
+        return emptyAreasResponse();
+      }
       if (pathname === "/api/v1/auth/logout" && failLogout) {
         throw new TypeError("Network unavailable");
       }
@@ -231,13 +251,13 @@ describe("web authentication", () => {
     const user = userEvent.setup();
     renderApp();
 
-    await screen.findByRole("heading", { name: "Welcome to Spoons Up" });
+    await screen.findByRole("heading", { name: "Create your first area" });
     await user.click(screen.getByRole("button", { name: "Log out" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Please try logging out again",
     );
     expect(
-      screen.getByRole("heading", { name: "Welcome to Spoons Up" }),
+      screen.getByRole("heading", { name: "Create your first area" }),
     ).toBeInTheDocument();
 
     failLogout = false;

@@ -5,7 +5,7 @@ import {
   getAuthStatus,
   setAuthenticated,
   setUnauthenticated,
-} from "../auth/session";
+} from "../features/auth/session";
 import { authenticatedFetch } from "./api";
 
 function tokenResponse(accessToken: string) {

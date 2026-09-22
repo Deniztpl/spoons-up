@@ -6,7 +6,12 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { apiClient, authApiClient, refreshSession } from "../lib/api";
+import { refreshSession } from "../../lib/api";
+import {
+  login as loginRequest,
+  logout as logoutRequest,
+  register as registerRequest,
+} from "./api/authApi";
 import {
   AuthContext,
   type AuthActionResult,
@@ -53,9 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (payload: LoginRequest): Promise<AuthActionResult> => {
     try {
-      const { data, error } = await authApiClient.POST("/api/v1/auth/login", {
-        body: payload,
-      });
+      const { data, error } = await loginRequest(payload);
       if (data) {
         setAuthenticated(data.access_token);
         return { ok: true };
@@ -72,9 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (payload: RegisterRequest): Promise<AuthActionResult> => {
       try {
-        const { data, error } = await authApiClient.POST("/api/v1/auth/register", {
-          body: payload,
-        });
+        const { data, error } = await registerRequest(payload);
         if (data) {
           setAuthenticated(data.access_token);
           return { ok: true };
@@ -92,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async (): Promise<AuthActionResult> => {
     try {
-      const { error, response } = await apiClient.POST("/api/v1/auth/logout");
+      const { error, response } = await logoutRequest();
       if (response.status === 204) {
         setUnauthenticated();
         return { ok: true };

@@ -1,9 +1,8 @@
 import { Navigate, Route, Routes } from "react-router";
 
-import { AppShell } from "./AppShell";
-import { AuthPage } from "./auth/AuthPage";
-import { AuthProvider } from "./auth/AuthProvider";
-import { useAuth } from "./auth/useAuth";
+import { useAuth } from "../features/auth/hooks/useAuth";
+import { AreasPage } from "../pages/AreasPage/AreasPage";
+import { AuthPage } from "../pages/AuthPage/AuthPage";
 
 function SessionLoading() {
   return (
@@ -18,7 +17,7 @@ function SessionLoading() {
   );
 }
 
-function AppRoutes() {
+export function AppRouter() {
   const { status, logout } = useAuth();
 
   if (status === "checking") {
@@ -28,8 +27,8 @@ function AppRoutes() {
   if (status === "authenticated") {
     return (
       <Routes>
-        <Route path="/" element={<AppShell onLogout={logout} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/areas" element={<AreasPage onLogout={logout} />} />
+        <Route path="*" element={<Navigate to="/areas" replace />} />
       </Routes>
     );
   }
@@ -45,12 +44,4 @@ function AppRoutes() {
   }
 
   return null;
-}
-
-export function App() {
-  return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
-  );
 }
