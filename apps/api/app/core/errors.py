@@ -37,6 +37,12 @@ class EmailTakenError(AppError):
     default_message = "Email already registered"
 
 
+class AreaNameTakenError(AppError):
+    status_code = 409
+    code = "area_name_taken"
+    default_message = "An area with this name already exists"
+
+
 class InvalidCredentialsError(AppError):
     status_code = 401
     code = "invalid_credentials"

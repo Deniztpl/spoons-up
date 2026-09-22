@@ -12,6 +12,9 @@ def test_openapi_smoke() -> None:
     assert response.status_code == 200
     assert response.json()["info"] == {"title": "Spoons Up API", "version": "0.1.0"}
     assert set(response.json()["paths"]) == {
+        "/api/v1/areas",
+        "/api/v1/areas/{area_id}",
+        "/api/v1/areas/{area_id}/archive",
         "/api/v1/auth/login",
         "/api/v1/auth/logout",
         "/api/v1/auth/refresh",
