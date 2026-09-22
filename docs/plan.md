@@ -23,7 +23,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 1 — Areas
 
-- TODO: complete Docker setup so database, migrations, API and web start with one Compose command.
+- Docker setup: database, migrations, API and web start with one Compose command — DONE
 
 11. `areas` migration, CRUD endpoints scoped to the token's user — DONE
 12. Web: header domain selector with Goals & Habits active and Nutrition/Fitness disabled as coming soon; left-column page navigation for the selected domain with Areas active and future Today/Week pages disabled; area list, create, selection and rename in the Areas page content — DONE

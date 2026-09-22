@@ -22,33 +22,39 @@ Monorepo for a personal habit and task tracker. Areas group what you're trying t
 
 ## Requirements
 
-- Python 3.12
-- Node.js 22.12 or newer
-- pnpm 12.5.1 (pinned by the repository)
-- Docker (for PostgreSQL)
+- Docker with Docker Compose
+- For running services outside Docker: Python 3.12, Node.js 22.12 or newer, pnpm 12.5.1, and uv
 
 ## Installation
 
-Clone the repository and install the JavaScript workspace from the repository root:
+Clone the repository and start the complete development stack:
 
 ```bash
 git clone https://github.com/Deniztpl/spoons-up
 cd spoons-up
+docker compose up --build
+```
+
+Compose starts PostgreSQL, runs every pending Alembic migration, then starts the API and web app. Open the web app at `http://localhost:3000`; the API and its interactive docs are available at `http://localhost:8000` and `http://localhost:8000/docs`.
+
+The Compose defaults are for local development. They can be overridden through a root `.env` file or shell environment, including `JWT_SECRET`, `ACCESS_TOKEN_MINUTES`, `REFRESH_TOKEN_DAYS`, `REFRESH_COOKIE_SECURE`, `CORS_ORIGINS`, and `VITE_API_URL`.
+
+To run the application processes outside Docker instead, install the JavaScript workspace from the repository root:
+
+```bash
 npm install --global pnpm@12.5.1
-pnpm --version
 pnpm install
 ```
 
-Set up the API:
+Then set up and configure the API:
 
 ```bash
-docker compose up -d
 cd apps/api
 uv sync
 cp .env.example .env
 ```
 
-Configure `apps/api/.env` as needed:
+`apps/api/.env` contains:
 
 ```env
 DATABASE_URL=postgresql+psycopg://spoons:spoons@localhost:5432/spoons
@@ -62,9 +68,9 @@ CORS_ORIGINS=http://localhost:3000
 
 `JWT_SECRET` is required and must contain at least 32 characters. Set `REFRESH_COOKIE_SECURE=true` when the API is served over HTTPS.
 
-## Run locally
+## Run services outside Docker
 
-The current Compose configuration starts PostgreSQL only. Run PostgreSQL, the API, and the web app in three separate terminals.
+Compose can still provide only PostgreSQL while the API and web app run directly on the host. Use three terminals.
 
 Terminal 1, from the repository root, starts PostgreSQL:
 
@@ -149,7 +155,7 @@ apps/
 packages/
   api-client/       shared typed OpenAPI client
 docs/               shared product and architecture documentation
-compose.yaml        local PostgreSQL services
+compose.yaml        complete local development stack
 ```
 
 ## Documentation
