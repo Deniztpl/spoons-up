@@ -16,6 +16,7 @@ Monorepo for a personal habit and task tracker.
 - `docs/design.md` — features, decisions with their reasoning, and the database schema. Read before changing behaviour or adding a table.
 - `docs/plan.md` — the slice being built and what comes next.
 - `docs/api-contract.md` — request and response shapes for the current slice.
+- `docs/project-structure.md` — target code placement and rules for growing the repository without empty scaffolding.
 
 ## General rules
 

@@ -8,7 +8,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ---
 
-## Slice 0 — Walking skeleton
+## Slice 0 — Walking skeleton — DONE
 
 1. `apps/api`: uv, FastAPI, Postgres compose, Alembic
 2. Error contract — one exception class per failure kind, rendered as `{ code, message }`
@@ -23,8 +23,11 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 1 — Areas
 
-11. `areas` migration, CRUD endpoints scoped to the token's user
-12. Web: area list in the left column, create and rename
+11. `areas` migration, CRUD endpoints scoped to the token's user — DONE
+12. Web: header domain selector with Goals & Habits active and Nutrition/Fitness disabled as coming soon; left-column page navigation for the selected domain with Areas active and future Today/Week pages disabled; area list, create, selection and rename in the Areas page content — DONE
+
+- TODO: add area archive, restore and confirmed-delete UI before closing Slice 1.
+
 13. **Done when:** areas created in the browser appear after a reload; another user's area returns 404
 
 ## Slice 2 — Habits
