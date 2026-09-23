@@ -21,14 +21,14 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 9. Shell layout — header, left column, content area
 10. **Done when:** register in the browser, reload the page, still signed in
 
-## Slice 1 — Areas
+## Slice 1 — Areas — DONE
 
 - Docker setup: database, migrations, API and web start with one Compose command — DONE
 
 11. `areas` migration, CRUD endpoints scoped to the token's user — DONE
 12. Web: header domain selector with Goals & Habits active and Nutrition/Fitness disabled as coming soon; left-column page navigation for the selected domain with Areas active and future Today/Week pages disabled; area list, create, selection and rename in the Areas page content — DONE
 
-- TODO: add area archive, restore and confirmed-delete UI before closing Slice 1.
+- `unarchived_at`, archive and restore behaviour, and the archive, restore and confirmed-delete UI — DONE
 
 13. **Done when:** areas created in the browser appear after a reload; another user's area returns 404
 
@@ -44,8 +44,8 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 19. `goals` and `goal_rules` migration, CRUD
 20. Period math — timezone + `week_start_day` -> `period_start`. Standalone, no DB, tested.
-21. `tasks` migration
-22. `materialize` — expand rules into dates, insert idempotently, bounded to ~12 weeks back
+21. `tasks` migration; `users.last_seen_at`, refreshed on each authenticated request, so the daily job skips dormant users and their first request back adds the window
+22. `add_tasks(user_id, from, to)` — expand rules into dates, insert idempotently. Called by goal and rule writes for their own range, and by a daily job that advances a rolling 14-day window per user timezone. Reads never call it. A rule change removes that rule's untouched `PENDING` tasks from the open week forward and adds them again
 23. `/today` now returns the day's tasks, ordered by `start_time`
 24. Complete and uncomplete a task
 25. Web: goal form with rules; tasks under the habits on the today screen
@@ -63,7 +63,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 ## Slice 5 — Weekly results
 
 33. `period_results` migration
-34. Live computation for the open week; freeze a closed week on first request
+34. Live computation for the open week; the daily job from slice 3 freezes each closed week at the week turn in the user's timezone. Targets follow active days: `created_at` and the area's `archived_at` / `unarchived_at` bound each requirement, and one with no active day is left out of the week
 35. Area result — every row for that week satisfies `done >= target`
 36. Web: area view showing weekly progress and past weeks
 37. **Done when:** a closed week's outcome does not move after `weekly_target` is changed
@@ -72,7 +72,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 38. `reminders` and `devices` migration, token registration
 39. Write a reminder on task create, update on move, cancel on delete
-40. Background worker — materialize the next 24 hours every 5-15 minutes, per user timezone
+40. Reminders for tasks the slice 3 job generated before this slice existed — backfill once, then generation writes them itself
 41. Scheduler — scan due reminders every minute, fan out to the user's tokens, prune invalid ones
 42. `apps/mobile`: Expo, the same generated client, push registration
 43. **Done when:** a task an hour out produces a notification on a real device

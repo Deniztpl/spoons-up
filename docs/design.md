@@ -26,27 +26,39 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Goal rules** — a goal can have several at once: `{Mon, Wed, Fri} 19:00, 60min` alongside `{Mon, Tue} 07:00, 60min`. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
 
+**Changing a rule redraws the open week** — tasks that rule produced are removed and generated again from the open week forward. Removed means untouched ones only: `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`), because those were the user's decisions. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
+
 **Tasks** — concrete scheduled work with a start time and duration. Belongs to a goal, or stands alone (dentist appointment).
 
-**Lazy task generation** — tasks for a week are created the first time that week is requested. Idempotent through `INSERT ... ON CONFLICT DO NOTHING`; the check is whether a `(rule_id, period_start)` row exists, so no bookkeeping table is needed.
+**Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range and writes each task's reminder with it. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
 
-**Background materialization** — a worker also materializes the next 24 hours every 5-15 minutes so notifications work for users who haven't opened the app. Same `materialize(user_id, from, to)` function, different trigger.
+**Two triggers, no lazy reads** — a write that creates or changes a goal or a rule adds its own tasks in the same request, so a goal saved now has today's task and reminder before the response returns. A daily job then advances a rolling window of 14 days, in each user's own timezone, so tasks and reminders exist without the app being opened. Nothing else calls `add_tasks`.
+
+**Dormant users are skipped** — the daily job only runs for users seen recently; `users.last_seen_at` is refreshed on each authenticated request. Someone away for months has no window being written for them. Their first request back adds the window before anything is read, so they see a full calendar immediately and nothing was generated in the meantime.
+
+**Generated window** — the calendar is generated 14 days ahead. Further out it is empty until the window reaches it.
 
 **Occurrence identity** — `occurrence_date` records the date a rule produced and never changes. `scheduled_date` is where the user actually put it.
 
 **Postpone** — `scheduled_date` moves; `occurrence_date` and `period_start` stay fixed, so a task dragged to next Monday still counts toward the week it belonged to.
 
-**Delete** — rule-generated tasks soft delete (`status = DELETED`); ad-hoc tasks hard delete.
+**Delete** — when the user deletes a task, a rule-generated one soft deletes (`status = DELETED`) so generation doesn't bring it back, and an ad-hoc one hard deletes. Removals the system does itself — a rule change, an area archive — are hard deletes, so the same occurrence can be generated again later.
 
 **Extra tasks** — the user can add beyond the rule (`rule_id` and `occurrence_date` NULL). Outside the unique index, so unlimited; still counts toward the week's quota through `period_start`.
 
-**Catch-up on return** — a user away for five weeks sees all of it: every missing week is materialized, past weeks show what was missed, the current week is live. Bounded to roughly 12 weeks back.
+**Catch-up on return** — nothing to catch up. The daily job runs whether or not the app is opened, so a user away for five weeks comes back to five weeks of generated tasks: past weeks show what was missed, the current week is live.
 
-**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`.
+**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone; reads never write.
+
+**Weekly target follows active days** — a requirement is judged only on the days it was actually active that week. A `DAILY` habit's target is the number of days between `max(week_start, created_at, area.unarchived_at)` and `min(week_end, area.archived_at)`, so a habit added on Wednesday needs 5 of 5, not 7 of 7. `WEEKLY` habits stay 1 as long as one day was active. A requirement with no active day in a week gets no `period_results` row, the week reads empty for it, and the client draws those days as neither done nor missed. The area's two timestamps cannot express more than one archive cycle inside a week; the last one wins.
 
 **Live current week** — the open week is computed from raw rows, so changing a quota mid-week takes effect immediately.
 
-**Archive vs delete** — archiving stops generation and hides from active lists while keeping history; `archived_at` is a timestamp, so past weeks know whether the item existed then. Deleting removes everything, including past results.
+**Only areas archive** — an area is a long-running commitment worth putting down and picking up, so it has `archived_at` and `unarchived_at`. Habits and goals don't: a habit is either tracked or dropped, and dropping one usually means replacing it. They have delete and nothing else.
+
+**Archiving an area touches only the area row** — its habits, goals and rules are untouched; they simply stop being reachable while the area is archived, so restoring brings them all back as they were. Archiving removes the area's future pending tasks and their reminders; restoring does not bring them back, and generation resumes from today forward.
+
+**Delete is hard everywhere** — deleting a habit removes its entries, deleting a goal removes its rules, tasks and reminders, deleting an area removes everything under it. `period_results` rows are never deleted: they carry a snapshotted `title` and a `ref_id` that is not a foreign key, so past weeks keep reading after the thing they describe is gone. What is lost is the detail below the week — a deleted habit's day squares, a deleted goal's blocks on old calendars.
 
 **Push notifications** — a reminder five minutes before a task starts. A `reminders` row is written at task creation with `scheduled_at` in UTC, updated on move, cancelled on delete. A scheduler scans due reminders every minute and pushes to registered tokens through FCM/APNs.
 
@@ -59,6 +71,10 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 ---
 
 ## Open questions
+
+**Goals active for part of a week** — a `DAILY` habit's target can be derived from active days, but a goal's `weekly_target` is a number the user chose, so scaling it is arbitrary. Options: keep the full target, or let the user set a target for the open week only ("2 this week", or 0 to skip it). Decide in slice 5.
+
+**Regenerating into days already past** — when a rule changes mid-week, the new weekdays may fall before today. Options: generate them anyway so the user can still tick them off, or generate from today forward and let the week run short. Decide in slice 3.
 
 **week\_start\_day changed mid-week** — tasks already generated carry a `period_start` computed from the old boundary. After the change the open week's quota looks at a different range and stops matching them. Options: apply the change from the next week, recompute `period_start` for the open week's tasks, or only allow the change at a week boundary. Decide in slice 3.
 
@@ -95,6 +111,7 @@ erDiagram
         text password_hash
         text timezone
         smallint week_start_day
+        timestamptz last_seen_at
         timestamptz created_at
     }
 
@@ -112,6 +129,7 @@ erDiagram
         bigint user_id FK
         text name
         timestamptz archived_at
+        timestamptz unarchived_at
         timestamptz created_at
     }
 
@@ -121,7 +139,6 @@ erDiagram
         bigint area_id FK
         text title
         text mode
-        timestamptz archived_at
         timestamptz created_at
     }
 
@@ -139,7 +156,6 @@ erDiagram
         bigint area_id FK
         text title
         int weekly_target
-        timestamptz archived_at
         timestamptz created_at
     }
 
@@ -210,6 +226,7 @@ erDiagram
 | password_hash | text | |
 | timezone | text | IANA, e.g. Europe/Istanbul |
 | week_start_day | smallint | 1 = Monday |
+| last_seen_at | timestamptz | refreshed on each authenticated request; the daily job skips users who have been away |
 | created_at | timestamptz | |
 
 #### refresh_tokens
@@ -235,6 +252,7 @@ CREATE INDEX ON refresh_tokens (user_id) WHERE revoked_at IS NULL;
 | user_id | bigint | FK -> users |
 | name | text | |
 | archived_at | timestamptz | nullable |
+| unarchived_at | timestamptz | nullable, when the area last came back from the archive |
 | created_at | timestamptz | |
 
 #### habits
@@ -246,7 +264,6 @@ CREATE INDEX ON refresh_tokens (user_id) WHERE revoked_at IS NULL;
 | area_id | bigint | FK -> areas |
 | title | text | |
 | mode | text | DAILY \| WEEKLY |
-| archived_at | timestamptz | nullable |
 | created_at | timestamptz | |
 
 #### habit_entries
@@ -272,7 +289,6 @@ UNIQUE (habit_id, period_type, period_start)
 | area_id | bigint | FK -> areas |
 | title | text | |
 | weekly_target | int | nullable |
-| archived_at | timestamptz | nullable |
 | created_at | timestamptz | |
 
 #### goal_rules

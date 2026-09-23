@@ -160,6 +160,7 @@ An area object:
   "id": "3",
   "name": "SWE",
   "archived_at": null,
+  "unarchived_at": null,
   "created_at": "2026-09-01T09:00:00Z"
 }
 ```
@@ -173,7 +174,7 @@ An area object:
 **200**
 
 ```json
-{ "areas": [ { "id": "3", "name": "SWE", "archived_at": null, "created_at": "..." } ] }
+{ "areas": [ { "id": "3", "name": "SWE", "archived_at": null, "unarchived_at": null, "created_at": "..." } ] }
 ```
 
 Ordered by `created_at`.
@@ -209,13 +210,17 @@ Ordered by `created_at`.
 { "archived": true }
 ```
 
-**200** — the updated area. `archived_at` is set to now, or cleared when `archived: false`.
+**200** — the updated area. `archived: true` sets `archived_at` to now; `archived: false` clears it and sets `unarchived_at` to now.
 
-Archiving stops task generation for every goal under the area and hides it from the default list. History is untouched — past weeks still read `archived_at` to know the area existed then.
+Archiving stops task generation for every goal under the area, hides it and everything under it from the active lists, and removes its future pending tasks and their reminders. The habits, goals and rules themselves are untouched, so restoring brings them back as they were.
+
+Restoring does not bring back the removed tasks. Generation resumes from today forward, so the archived days stay empty. Past weeks are untouched; `archived_at` and `unarchived_at` tell each week which days the area was active.
+
+Areas are the only thing that archives. Habits and goals have delete only.
 
 #### DELETE /areas/{id}
 
-**204** — the area and everything under it: habits with their entries, goals with their rules and tasks, and every `period_results` row. Not recoverable.
+**204** — the area and everything under it: habits with their entries, goals with their rules and tasks. Its `period_results` rows stay, so past weeks keep reading correctly. Not recoverable.
 
 The client asks for confirmation. Archive is the normal action; delete lives in the archive screen.
 
@@ -231,7 +236,6 @@ A habit object:
   "area_id": "3",
   "title": "Read",
   "mode": "DAILY",
-  "archived_at": null,
   "created_at": "2026-09-01T09:00:00Z"
 }
 ```
@@ -243,12 +247,13 @@ A habit object:
 | Query | Default |
 |---|---|
 | `area_id` | all areas |
-| `include_archived` | `false` |
+
+Habits in an archived area are not returned.
 
 **200**
 
 ```json
-{ "habits": [ { "id": "12", "area_id": "3", "title": "Read", "mode": "DAILY", "archived_at": null, "created_at": "..." } ] }
+{ "habits": [ { "id": "12", "area_id": "3", "title": "Read", "mode": "DAILY", "created_at": "..." } ] }
 ```
 
 #### POST /habits
@@ -276,17 +281,11 @@ All fields optional.
 
 Changing `mode` does not touch existing entries: each one carries its own `period_type`, so old rows stay readable at the granularity they were written with.
 
-#### POST /habits/{id}/archive
-
-```json
-{ "archived": true }
-```
-
-**200** — the updated habit.
-
 #### DELETE /habits/{id}
 
-**204** — the habit and all its entries. Its `period_results` rows stay, so past weeks keep reading correctly. Not recoverable.
+**204** — the habit and all its entries. Its `period_results` rows stay, so past weeks keep reading correctly. The day-level history goes with the entries. Not recoverable.
+
+Habits do not archive. Dropping one is a delete.
 
 #### POST /habits/{id}/check
 
@@ -329,7 +328,6 @@ A goal object, with its rules embedded:
   "area_id": "3",
   "title": "CS Block",
   "weekly_target": 3,
-  "archived_at": null,
   "created_at": "2026-09-01T09:00:00Z",
   "rules": [
     { "id": "21", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60 }
@@ -346,7 +344,8 @@ A goal object, with its rules embedded:
 | Query | Default |
 |---|---|
 | `area_id` | all areas |
-| `include_archived` | `false` |
+
+Goals in an archived area are not returned.
 
 **200**
 
@@ -362,7 +361,7 @@ Rules are included on each goal — a goal without them is not useful to display
 { "area_id": "3", "title": "CS Block", "weekly_target": 3 }
 ```
 
-**201** — the created goal, `rules` empty. Rules are added separately.
+**201** — the created goal, `rules` empty. Rules are added separately; a goal without rules generates nothing.
 
 | Error | When |
 |---|---|
@@ -385,17 +384,11 @@ All fields optional. Send `weekly_target: null` to drop the quota.
 
 Lowering `weekly_target` takes effect on the open week immediately. Closed weeks in `period_results` keep the target they were judged against.
 
-#### POST /goals/{id}/archive
-
-```json
-{ "archived": true }
-```
-
-**200** — the updated goal. Task generation stops; tasks already generated stay.
-
 #### DELETE /goals/{id}
 
-**204** — the goal, its rules, all its tasks and their reminders. Its `period_results` rows stay, so past weeks keep reading correctly.
+**204** — the goal, its rules, all its tasks and their reminders. Its `period_results` rows stay, so past weeks keep reading correctly. Old calendars lose the goal's blocks.
+
+Goals do not archive. Dropping one is a delete.
 
 ---
 
@@ -415,6 +408,8 @@ A rule is a pre-fill for generation, not a contract. Once a task exists the rule
 { "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60 }
 ```
 
+The rule adds its tasks and reminders for the current window in the same request, so today's block is on screen as soon as it is saved.
+
 A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`.
 
 | Error | When |
@@ -430,11 +425,11 @@ A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mo
 
 All fields optional.
 
-**200** — the updated rule. Tasks already generated from it are untouched; the change applies to weeks not yet materialized.
+**200** — the updated rule. The tasks it produced are removed from the open week forward and added again in the same request, together with their reminders. `DONE` tasks and tasks the user moved are kept; closed weeks are untouched.
 
 #### DELETE /rules/{id}
 
-**204** — the rule. Tasks it already produced stay, and keep counting toward their weeks.
+**204** — the rule, and its untouched pending tasks from the open week forward. Tasks already done, tasks the user moved, and everything in closed weeks stay and keep counting toward their weeks.
 
 ---
 
@@ -505,7 +500,7 @@ Moving a task also moves its reminder.
 
 **204**
 
-Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so materialize doesn't produce it again. Ad-hoc (`occurrence_date` null) is hard-deleted, since nothing would recreate it.
+Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc (`occurrence_date` null) is hard-deleted, since nothing would recreate it.
 
 Either way the reminder is cancelled.
 
@@ -527,7 +522,7 @@ Completing a task already done is a no-op and returns the task unchanged.
 
 These two take their shape from the screens. Draft until the screens are built.
 
-Both trigger materialization for the range they cover before reading, so a week is generated the first time it's asked for.
+Neither adds anything. Tasks are on screen because a goal or rule write created them, or because the daily job did. Both endpoints read what exists — except for a user returning after the daily job stopped running for them, whose window is added once before the first read.
 
 #### GET /today
 
@@ -566,7 +561,7 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
 
 `done` is derived: an entry exists for that period. `daily_habits` resolves against the date; `weekly_habits` against the week that date falls in.
 
-Tasks are ordered by `start_time`, `DELETED` excluded. Archived habits are excluded.
+Tasks are ordered by `start_time`, `DELETED` excluded. Anything under an archived area is excluded.
 
 #### GET /week
 
@@ -576,7 +571,7 @@ The calendar screen: seven days side by side.
 |---|---|
 | `start` | the current week's `period_start` |
 
-Any date inside the week works — the server resolves it to `period_start`. Weeks more than ~12 back are not materialized; they return whatever exists.
+Any date inside the week works — the server resolves it to `period_start`. Weeks beyond the generated window return empty days until the window reaches them.
 
 **200**
 
@@ -641,9 +636,13 @@ Newest week first.
 
 `title` is snapshotted alongside `target` and `done`, so a week still reads correctly after the habit or goal is renamed or deleted. `ref_id` is not a foreign key — it identifies the row for the unique constraint, nothing more.
 
-A requirement appears for a week only if it existed then — `created_at <= period_start` and it wasn't archived before it. Goals with no `weekly_target` are left out; they have no quota to fail.
+A requirement appears for a week only if it was active for at least one day of it. Active days run from `max(period_start, created_at, area.unarchived_at)` to `min(week_end, area.archived_at)`. A `DAILY` habit's `target` is that day count, so one added mid-week is judged on the remaining days; `WEEKLY` habits stay 1. Goals with no `weekly_target` are left out; they have no quota to fail.
 
-Requesting a closed week that was never snapshotted writes the snapshot on first read.
+A habit or goal deleted mid-week leaves that week with no row for it — it is neither passed nor failed, it is simply not a requirement any more.
+
+A week with no active day for a requirement carries no row for it, and the client draws those days as neither done nor missed.
+
+Closed weeks are snapshotted by the scheduled rollup at the week turn in the user's timezone. Reads never write.
 
 ---
 

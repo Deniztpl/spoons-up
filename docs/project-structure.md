@@ -37,6 +37,7 @@ apps/web/src/
 |       |-- api/
 |       |   `-- areasApi.ts
 |       |-- components/
+|       |   |-- AreaArchiveActions.tsx
 |       |   |-- AreaCreateForm.tsx
 |       |   |-- AreaIcon.tsx
 |       |   |-- AreaList.tsx
