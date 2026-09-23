@@ -1,6 +1,6 @@
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
@@ -32,6 +32,8 @@ class LogoutRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"

@@ -13,7 +13,6 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.schemas.errors import ErrorResponse, ValidationErrorResponse
-from app.services.auth import TokenPair
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,7 +36,7 @@ def register(
 ) -> TokenResponse:
     tokens = auth_service.register(payload)
     set_refresh_cookie(response, tokens.refresh_token)
-    return _token_response(tokens)
+    return TokenResponse.model_validate(tokens)
 
 
 @router.post(
@@ -52,7 +51,7 @@ def login(
 ) -> TokenResponse:
     tokens = auth_service.login(payload)
     set_refresh_cookie(response, tokens.refresh_token)
-    return _token_response(tokens)
+    return TokenResponse.model_validate(tokens)
 
 
 @router.post(
@@ -69,7 +68,7 @@ def refresh(
     token = payload.refresh_token if payload is not None else refresh_cookie
     tokens = auth_service.refresh(token)
     set_refresh_cookie(response, tokens.refresh_token)
-    return _token_response(tokens)
+    return TokenResponse.model_validate(tokens)
 
 
 @router.post(
@@ -88,10 +87,3 @@ def logout(
     token = payload.refresh_token if payload is not None else refresh_cookie
     auth_service.logout(user_id=current_user.id, token=token)
     clear_refresh_cookie(response)
-
-
-def _token_response(tokens: TokenPair) -> TokenResponse:
-    return TokenResponse(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-    )
