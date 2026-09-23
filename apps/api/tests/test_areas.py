@@ -34,6 +34,7 @@ def test_area_crud_and_archive_filter(client: TestClient) -> None:
     assert isinstance(first_area["id"], str)
     assert first_area["name"] == "SWE"
     assert first_area["archived_at"] is None
+    assert first_area["unarchived_at"] is None
     assert first_area["created_at"].endswith("Z")
 
     listed = client.get("/api/v1/areas", headers=headers)
@@ -60,11 +61,37 @@ def test_area_crud_and_archive_filter(client: TestClient) -> None:
 
     assert archived.status_code == 200
     assert archived.json()["archived_at"].endswith("Z")
+    assert archived.json()["unarchived_at"] is None
     assert [area["name"] for area in active_list.json()["areas"]] == ["Finance"]
     assert [area["name"] for area in full_list.json()["areas"]] == [
         "Software",
         "Finance",
     ]
+
+    restored = client.post(
+        f"/api/v1/areas/{first_area['id']}/archive",
+        json={"archived": False},
+        headers=headers,
+    )
+    restored_active_list = client.get("/api/v1/areas", headers=headers)
+
+    assert restored.status_code == 200
+    assert restored.json()["archived_at"] is None
+    assert restored.json()["unarchived_at"].endswith("Z")
+    assert [area["name"] for area in restored_active_list.json()["areas"]] == [
+        "Software",
+        "Finance",
+    ]
+
+    rearchived = client.post(
+        f"/api/v1/areas/{first_area['id']}/archive",
+        json={"archived": True},
+        headers=headers,
+    )
+
+    assert rearchived.status_code == 200
+    assert rearchived.json()["archived_at"].endswith("Z")
+    assert rearchived.json()["unarchived_at"] == restored.json()["unarchived_at"]
 
     deleted = client.delete(f"/api/v1/areas/{first_area['id']}", headers=headers)
     missing = client.get(f"/api/v1/areas/{first_area['id']}", headers=headers)

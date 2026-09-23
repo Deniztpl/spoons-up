@@ -20,7 +20,12 @@ class AreaRepository:
         return self.session.scalar(select(Area).where(Area.id == area_id, Area.user_id == user_id))
 
     def create(self, *, user_id: int, name: str) -> Area:
-        area = Area(user_id=user_id, name=name, archived_at=None)
+        area = Area(
+            user_id=user_id,
+            name=name,
+            archived_at=None,
+            unarchived_at=None,
+        )
         self.session.add(area)
         self.session.flush()
         return area
@@ -30,8 +35,15 @@ class AreaRepository:
         self.session.flush()
         return area
 
-    def set_archived(self, *, area: Area, archived_at: datetime | None) -> Area:
+    def set_archive_timestamps(
+        self,
+        *,
+        area: Area,
+        archived_at: datetime | None,
+        unarchived_at: datetime | None,
+    ) -> Area:
         area.archived_at = archived_at
+        area.unarchived_at = unarchived_at
         self.session.flush()
         return area
 

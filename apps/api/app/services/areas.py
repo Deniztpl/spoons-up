@@ -26,20 +26,22 @@ class AreaService:
                 user_id=user_id,
                 include_archived=include_archived,
             )
-            response = AreaListResponse(areas=[_area_response(area) for area in areas])
+            response = AreaListResponse(
+                areas=[AreaResponse.model_validate(area) for area in areas],
+            )
         return response
 
     def get(self, *, area_id: int, user_id: int) -> AreaResponse:
         with self.session.begin():
             area = self._get_owned_area(area_id=area_id, user_id=user_id)
-            response = _area_response(area)
+            response = AreaResponse.model_validate(area)
         return response
 
     def create(self, payload: CreateAreaRequest, *, user_id: int) -> AreaResponse:
         try:
             with self.session.begin():
                 area = self.area_repository.create(user_id=user_id, name=payload.name)
-                response = _area_response(area)
+                response = AreaResponse.model_validate(area)
         except IntegrityError as exc:
             raise AreaNameTakenError from exc
         return response
@@ -55,7 +57,7 @@ class AreaService:
             with self.session.begin():
                 area = self._get_owned_area(area_id=area_id, user_id=user_id)
                 self.area_repository.rename(area=area, name=payload.name)
-                response = _area_response(area)
+                response = AreaResponse.model_validate(area)
         except IntegrityError as exc:
             raise AreaNameTakenError from exc
         return response
@@ -69,9 +71,15 @@ class AreaService:
     ) -> AreaResponse:
         with self.session.begin():
             area = self._get_owned_area(area_id=area_id, user_id=user_id)
-            archived_at = datetime.now(UTC) if payload.archived else None
-            self.area_repository.set_archived(area=area, archived_at=archived_at)
-            response = _area_response(area)
+            now = datetime.now(UTC)
+            archived_at = now if payload.archived else None
+            unarchived_at = area.unarchived_at if payload.archived else now
+            self.area_repository.set_archive_timestamps(
+                area=area,
+                archived_at=archived_at,
+                unarchived_at=unarchived_at,
+            )
+            response = AreaResponse.model_validate(area)
         return response
 
     def delete(self, *, area_id: int, user_id: int) -> None:
@@ -84,12 +92,3 @@ class AreaService:
         if area is None:
             raise NotFoundError
         return area
-
-
-def _area_response(area: Area) -> AreaResponse:
-    return AreaResponse(
-        id=str(area.id),
-        name=area.name,
-        archived_at=area.archived_at,
-        created_at=area.created_at,
-    )

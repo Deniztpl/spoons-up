@@ -56,12 +56,25 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "unarchived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unarchived At"
           }
         },
         "required": [
           "id",
           "name",
           "archived_at",
+          "unarchived_at",
           "created_at"
         ],
         "title": "AreaResponse",

@@ -153,6 +153,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Unarchived At */
+            unarchived_at: string | null;
         };
         /** CreateAreaRequest */
         CreateAreaRequest: {

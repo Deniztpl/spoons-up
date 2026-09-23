@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 
 def _strip_name(value: str) -> str:
@@ -28,9 +28,15 @@ class ArchiveAreaRequest(BaseModel):
 
 
 class AreaResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        coerce_numbers_to_str=True,
+    )
+
     id: str
     name: str
     archived_at: datetime | None
+    unarchived_at: datetime | None
     created_at: datetime
 
 
