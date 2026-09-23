@@ -50,10 +50,17 @@ export function AreasPage({
             isSaving={areaState.isSaving}
             renameName={areaState.renameName}
             renameError={areaState.renameError}
+            actionError={areaState.actionError}
+            isConfirmingDelete={areaState.isConfirmingDelete}
             onStartRenaming={areaState.startRenaming}
             onCancelRenaming={areaState.cancelRenaming}
             onNameChange={areaState.setRenameName}
             onRename={() => void areaState.renameArea()}
+            onArchive={() => void areaState.archiveArea()}
+            onRestore={() => void areaState.restoreArea()}
+            onStartDeleting={areaState.startDeleting}
+            onCancelDeleting={areaState.cancelDeleting}
+            onDelete={() => void areaState.deleteArea()}
           />
         </div>
       </div>

@@ -30,6 +30,35 @@ export function AreaList({
   onNameChange,
   onCreate,
 }: AreaListProps) {
+  const activeAreas = areas.filter((area) => area.archived_at === null);
+  const archivedAreas = areas.filter((area) => area.archived_at !== null);
+
+  const renderArea = (area: Area) => {
+    const isSelected = area.id === selectedAreaId;
+    const isArchived = area.archived_at !== null;
+    return (
+      <button
+        key={area.id}
+        type="button"
+        aria-label={`${area.name}${isArchived ? " (archived)" : ""}`}
+        aria-current={isSelected ? "page" : undefined}
+        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 ${
+          isSelected
+            ? "border-sage-300 bg-sage-50 font-semibold text-sage-800"
+            : "border-stone-200 bg-white text-stone-700 hover:border-sage-200 hover:bg-sage-50/40"
+        }`}
+        onClick={() => onSelect(area.id)}
+      >
+        <span>{area.name}</span>
+        {isArchived ? (
+          <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-stone-500">
+            Archived
+          </span>
+        ) : null}
+      </button>
+    );
+  };
+
   return (
     <section
       aria-labelledby="area-list-title"
@@ -71,30 +100,22 @@ export function AreaList({
           </p>
         ) : null}
 
-        {!isLoading && areas.length === 0 ? (
+        {!isLoading && activeAreas.length === 0 ? (
           <p className="rounded-xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500">
-            No areas yet.
+            No active areas.
           </p>
         ) : null}
 
-        {areas.map((area) => {
-          const isSelected = area.id === selectedAreaId;
-          return (
-            <button
-              key={area.id}
-              type="button"
-              aria-current={isSelected ? "page" : undefined}
-              className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 ${
-                isSelected
-                  ? "border-sage-300 bg-sage-50 font-semibold text-sage-800"
-                  : "border-stone-200 bg-white text-stone-700 hover:border-sage-200 hover:bg-sage-50/40"
-              }`}
-              onClick={() => onSelect(area.id)}
-            >
-              {area.name}
-            </button>
-          );
-        })}
+        {activeAreas.map(renderArea)}
+
+        {archivedAreas.length > 0 ? (
+          <div className="pt-5">
+            <h3 className="px-1 text-xs font-bold uppercase tracking-[0.16em] text-stone-400">
+              Archived
+            </h3>
+            <div className="mt-2 space-y-2">{archivedAreas.map(renderArea)}</div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

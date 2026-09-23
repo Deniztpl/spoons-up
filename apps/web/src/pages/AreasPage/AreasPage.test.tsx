@@ -9,7 +9,13 @@ const onLogout = vi.fn(async () => ({ ok: true as const }));
 const createdAt = "2026-09-22T09:00:00Z";
 
 function area(id: string, name: string) {
-  return { id, name, archived_at: null, created_at: createdAt };
+  return {
+    id,
+    name,
+    archived_at: null,
+    unarchived_at: null,
+    created_at: createdAt,
+  };
 }
 
 function renderPage() {
@@ -101,6 +107,57 @@ describe("Areas page", () => {
       "page",
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("archives, restores, and permanently deletes an archived area", async () => {
+    const archivedAt = "2026-09-23T09:00:00Z";
+    const unarchivedAt = "2026-09-23T10:00:00Z";
+    const fetchMock = vi.fn(async (request: Request) => {
+      const pathname = new URL(request.url).pathname;
+      if (request.method === "GET" && pathname === "/api/v1/areas") {
+        expect(new URL(request.url).searchParams.get("include_archived")).toBe("true");
+        return Response.json({
+          areas: [
+            { ...area("2", "Old project"), archived_at: archivedAt },
+            area("1", "SWE"),
+          ],
+        });
+      }
+      if (request.method === "POST" && pathname === "/api/v1/areas/1/archive") {
+        const body = await request.clone().json();
+        return body.archived
+          ? Response.json({ ...area("1", "SWE"), archived_at: archivedAt })
+          : Response.json({ ...area("1", "SWE"), unarchived_at: unarchivedAt });
+      }
+      if (request.method === "DELETE" && pathname === "/api/v1/areas/2") {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "SWE" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    expect(
+      await screen.findByText("Restore this area to make it active again, or delete it permanently."),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Restore" }));
+    expect(await screen.findByRole("button", { name: "Archive" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Old project (archived)" }));
+    await user.click(screen.getByRole("button", { name: "Delete permanently" }));
+    expect(screen.getByText("Delete Old project permanently?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete permanently" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "Old project (archived)" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("heading", { name: "SWE" })).toBeInTheDocument();
   });
 
   it("opens and closes the narrow-screen navigation drawer with focus management", async () => {

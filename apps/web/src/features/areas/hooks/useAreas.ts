@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 
 import {
   createArea as createAreaRequest,
+  deleteArea as deleteAreaRequest,
   listAreas,
   renameArea as renameAreaRequest,
+  setAreaArchived,
   type Area,
 } from "../api/areasApi";
 
@@ -40,6 +42,8 @@ export function useAreas() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameName, setRenameName] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const selectedArea = areas.find((area) => area.id === selectedAreaId) ?? null;
@@ -61,7 +65,9 @@ export function useAreas() {
         setSelectedAreaId((current) =>
           current && data.areas.some((area) => area.id === current)
             ? current
-            : (data.areas[0]?.id ?? null),
+            : (data.areas.find((area) => area.archived_at === null)?.id ??
+              data.areas[0]?.id ??
+              null),
         );
       } catch {
         if (!cancelled) {
@@ -83,6 +89,8 @@ export function useAreas() {
   const selectArea = (areaId: string) => {
     setSelectedAreaId(areaId);
     setIsRenaming(false);
+    setActionError(null);
+    setIsConfirmingDelete(false);
   };
 
   const startAdding = () => {
@@ -119,11 +127,12 @@ export function useAreas() {
   };
 
   const startRenaming = () => {
-    if (!selectedArea) {
+    if (!selectedArea || selectedArea.archived_at !== null) {
       return;
     }
     setRenameName(selectedArea.name);
     setRenameError(null);
+    setActionError(null);
     setIsRenaming(true);
   };
 
@@ -158,6 +167,64 @@ export function useAreas() {
     }
   };
 
+  const changeArchiveState = async (archived: boolean) => {
+    if (!selectedArea) {
+      return;
+    }
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      const { data, error } = await setAreaArchived(selectedArea.id, archived);
+      if (!data) {
+        setActionError(
+          areaErrorMessage(
+            error,
+            archived
+              ? "We couldn't archive this area."
+              : "We couldn't restore this area.",
+          ),
+        );
+        return;
+      }
+      setAreas((current) =>
+        current.map((area) => (area.id === data.id ? data : area)),
+      );
+      setIsRenaming(false);
+      setIsConfirmingDelete(false);
+    } catch {
+      setActionError("We couldn't reach Spoons Up. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteArea = async () => {
+    if (!selectedArea || selectedArea.archived_at === null) {
+      return;
+    }
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      const { error, response } = await deleteAreaRequest(selectedArea.id);
+      if (response.status !== 204) {
+        setActionError(areaErrorMessage(error, "We couldn't delete this area."));
+        return;
+      }
+      const remainingAreas = areas.filter((area) => area.id !== selectedArea.id);
+      setAreas(remainingAreas);
+      setSelectedAreaId(
+        remainingAreas.find((area) => area.archived_at === null)?.id ??
+          remainingAreas[0]?.id ??
+          null,
+      );
+      setIsConfirmingDelete(false);
+    } catch {
+      setActionError("We couldn't reach Spoons Up. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return {
     areas,
     selectedArea,
@@ -171,6 +238,8 @@ export function useAreas() {
     isRenaming,
     renameName,
     renameError,
+    actionError,
+    isConfirmingDelete,
     selectArea,
     startAdding,
     cancelAdding,
@@ -180,5 +249,13 @@ export function useAreas() {
     cancelRenaming,
     setRenameName,
     renameArea,
+    archiveArea: () => changeArchiveState(true),
+    restoreArea: () => changeArchiveState(false),
+    startDeleting: () => {
+      setActionError(null);
+      setIsConfirmingDelete(true);
+    },
+    cancelDeleting: () => setIsConfirmingDelete(false),
+    deleteArea,
   };
 }
