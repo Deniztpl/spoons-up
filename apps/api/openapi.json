@@ -324,6 +324,148 @@
         "title": "RegisterRequest",
         "type": "object"
       },
+      "TodayHabitResponse": {
+        "properties": {
+          "area_id": {
+            "title": "Area Id",
+            "type": "string"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "area_id",
+          "title",
+          "done"
+        ],
+        "title": "TodayHabitResponse",
+        "type": "object"
+      },
+      "TodayResponse": {
+        "properties": {
+          "daily_habits": {
+            "items": {
+              "$ref": "#/components/schemas/TodayHabitResponse"
+            },
+            "title": "Daily Habits",
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TodayTaskResponse"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "weekly_habits": {
+            "items": {
+              "$ref": "#/components/schemas/TodayHabitResponse"
+            },
+            "title": "Weekly Habits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "daily_habits",
+          "weekly_habits",
+          "tasks"
+        ],
+        "title": "TodayResponse",
+        "type": "object"
+      },
+      "TodayTaskResponse": {
+        "properties": {
+          "end_time": {
+            "format": "time",
+            "title": "End Time",
+            "type": "string"
+          },
+          "goal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "occurrence_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurrence Date"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "scheduled_date": {
+            "format": "date",
+            "title": "Scheduled Date",
+            "type": "string"
+          },
+          "start_time": {
+            "format": "time",
+            "title": "Start Time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "DONE"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "goal_id",
+          "title",
+          "start_time",
+          "end_time",
+          "status",
+          "scheduled_date",
+          "occurrence_date",
+          "period_start"
+        ],
+        "title": "TodayTaskResponse",
+        "type": "object"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -1557,6 +1699,81 @@
         "summary": "Check Habit",
         "tags": [
           "habits"
+        ]
+      }
+    },
+    "/api/v1/today": {
+      "get": {
+        "operationId": "get_today_api_v1_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get Today",
+        "tags": [
+          "today"
         ]
       }
     }

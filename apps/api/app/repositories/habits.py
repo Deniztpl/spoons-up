@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Area, Habit, HabitEntry, HabitMode, HabitPeriodType
@@ -20,6 +20,36 @@ class HabitRepository:
         return self.session.scalar(
             self._select_active_habits_for_user(user_id=user_id).where(Habit.id == habit_id)
         )
+
+    def list_for_today(
+        self,
+        *,
+        user_id: int,
+        target_date: date,
+        week_start: date,
+    ) -> list[tuple[Habit, bool]]:
+        matching_entry = or_(
+            and_(
+                Habit.mode == HabitMode.DAILY.value,
+                HabitEntry.period_type == HabitPeriodType.DAY.value,
+                HabitEntry.period_start == target_date,
+            ),
+            and_(
+                Habit.mode == HabitMode.WEEKLY.value,
+                HabitEntry.period_type == HabitPeriodType.WEEK.value,
+                HabitEntry.period_start == week_start,
+            ),
+        )
+        query = (
+            self._select_active_habits_for_user(user_id=user_id)
+            .add_columns(HabitEntry.id.is_not(None))
+            .outerjoin(
+                HabitEntry,
+                and_(HabitEntry.habit_id == Habit.id, matching_entry),
+            )
+            .order_by(Habit.created_at, Habit.id)
+        )
+        return [(habit, done) for habit, done in self.session.execute(query)]
 
     def create(
         self,

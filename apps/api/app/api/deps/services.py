@@ -10,6 +10,7 @@ from app.repositories.users import UserRepository
 from app.services.areas import AreaService
 from app.services.auth import AuthService
 from app.services.habits import HabitService
+from app.services.today import TodayService
 
 
 def get_auth_service(session: DatabaseSession) -> AuthService:
@@ -40,3 +41,14 @@ def get_habit_service(session: DatabaseSession) -> HabitService:
 
 
 HabitServiceDependency = Annotated[HabitService, Depends(get_habit_service)]
+
+
+def get_today_service(session: DatabaseSession) -> TodayService:
+    return TodayService(
+        session,
+        HabitRepository(session),
+        UserRepository(session),
+    )
+
+
+TodayServiceDependency = Annotated[TodayService, Depends(get_today_service)]

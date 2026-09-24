@@ -180,6 +180,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Today */
+        get: operations["get_today_api_v1_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -315,6 +332,67 @@ export interface components {
             password: string;
             /** Timezone */
             timezone: string;
+        };
+        /** TodayHabitResponse */
+        TodayHabitResponse: {
+            /** Area Id */
+            area_id: string;
+            /** Done */
+            done: boolean;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** TodayResponse */
+        TodayResponse: {
+            /** Daily Habits */
+            daily_habits: components["schemas"]["TodayHabitResponse"][];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Tasks */
+            tasks: components["schemas"]["TodayTaskResponse"][];
+            /** Weekly Habits */
+            weekly_habits: components["schemas"]["TodayHabitResponse"][];
+        };
+        /** TodayTaskResponse */
+        TodayTaskResponse: {
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /** Goal Id */
+            goal_id: string | null;
+            /** Id */
+            id: string;
+            /** Occurrence Date */
+            occurrence_date: string | null;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "DONE";
+            /** Title */
+            title: string;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -1132,6 +1210,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    get_today_api_v1_today_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayResponse"];
+                };
             };
             /** @description Unauthorized */
             401: {
