@@ -19,6 +19,15 @@ class AreaRepository:
     def get_for_user(self, *, area_id: int, user_id: int) -> Area | None:
         return self.session.scalar(select(Area).where(Area.id == area_id, Area.user_id == user_id))
 
+    def get_active_for_user(self, *, area_id: int, user_id: int) -> Area | None:
+        return self.session.scalar(
+            select(Area).where(
+                Area.id == area_id,
+                Area.user_id == user_id,
+                Area.archived_at.is_(None),
+            )
+        )
+
     def create(self, *, user_id: int, name: str) -> Area:
         area = Area(
             user_id=user_id,

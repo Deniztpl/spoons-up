@@ -43,7 +43,7 @@ class HabitService:
     def create(self, payload: CreateHabitRequest, *, user_id: int) -> HabitResponse:
         with self.session.begin():
             area_id = int(payload.area_id)
-            self._get_owned_area(area_id=area_id, user_id=user_id)
+            self._ensure_active_area(area_id=area_id, user_id=user_id)
             habit = self.habit_repository.create(
                 user_id=user_id,
                 area_id=area_id,
@@ -64,7 +64,7 @@ class HabitService:
             habit = self._get_owned_habit(habit_id=habit_id, user_id=user_id)
             area_id = int(payload.area_id) if payload.area_id is not None else None
             if area_id is not None:
-                self._get_owned_area(area_id=area_id, user_id=user_id)
+                self._ensure_active_area(area_id=area_id, user_id=user_id)
             self.habit_repository.update(
                 habit=habit,
                 area_id=area_id,
@@ -146,8 +146,8 @@ class HabitService:
             raise NotFoundError
         return habit
 
-    def _get_owned_area(self, *, area_id: int, user_id: int) -> None:
-        if self.area_repository.get_for_user(area_id=area_id, user_id=user_id) is None:
+    def _ensure_active_area(self, *, area_id: int, user_id: int) -> None:
+        if self.area_repository.get_active_for_user(area_id=area_id, user_id=user_id) is None:
             raise NotFoundError
 
     def _get_user(self, *, user_id: int) -> User:

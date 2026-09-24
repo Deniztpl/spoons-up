@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import HabitEntry
+from app.models import Habit, HabitEntry
 
 pytestmark = pytest.mark.integration
 
@@ -303,6 +303,131 @@ def test_deleting_a_habit_hard_deletes_its_entries(
 
     assert checked.status_code == 201
     assert deleted.status_code == 204
+    assert (
+        db_session.scalar(select(HabitEntry).where(HabitEntry.habit_id == int(str(habit["id"]))))
+        is None
+    )
+
+
+def test_archived_area_habits_are_inaccessible_and_restore_intact(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "archived-habits@example.com"))
+    archived_area = create_area(client, headers, "Paused")
+    active_area = create_area(client, headers, "Active")
+    archived_habit = create_habit(
+        client,
+        headers,
+        area_id=str(archived_area["id"]),
+        title="Journal",
+        mode="DAILY",
+    )
+    active_habit = create_habit(
+        client,
+        headers,
+        area_id=str(active_area["id"]),
+        title="Walk",
+        mode="DAILY",
+    )
+    check_url = f"/api/v1/habits/{archived_habit['id']}/check"
+    checked = client.post(check_url, json={"date": "2026-09-24"}, headers=headers)
+    archived = client.post(
+        f"/api/v1/areas/{archived_area['id']}/archive",
+        json={"archived": True},
+        headers=headers,
+    )
+
+    listed = client.get("/api/v1/habits", headers=headers)
+    filtered = client.get(
+        "/api/v1/habits",
+        params={"area_id": archived_area["id"]},
+        headers=headers,
+    )
+    blocked_responses = [
+        client.post(
+            "/api/v1/habits",
+            json={
+                "area_id": archived_area["id"],
+                "title": "New habit",
+                "mode": "DAILY",
+            },
+            headers=headers,
+        ),
+        client.patch(
+            f"/api/v1/habits/{archived_habit['id']}",
+            json={"title": "Changed"},
+            headers=headers,
+        ),
+        client.delete(f"/api/v1/habits/{archived_habit['id']}", headers=headers),
+        client.post(check_url, json={"date": "2026-09-25"}, headers=headers),
+        client.delete(check_url, params={"date": "2026-09-24"}, headers=headers),
+        client.patch(
+            f"/api/v1/habits/{active_habit['id']}",
+            json={"area_id": archived_area["id"]},
+            headers=headers,
+        ),
+    ]
+
+    assert checked.status_code == 201
+    assert archived.status_code == 200
+    assert [habit["id"] for habit in listed.json()["habits"]] == [active_habit["id"]]
+    assert filtered.json() == {"habits": []}
+    assert all(response.status_code == 404 for response in blocked_responses)
+    assert all(response.json()["code"] == "not_found" for response in blocked_responses)
+
+    restored = client.post(
+        f"/api/v1/areas/{archived_area['id']}/archive",
+        json={"archived": False},
+        headers=headers,
+    )
+    restored_list = client.get("/api/v1/habits", headers=headers)
+    duplicate_check = client.post(
+        check_url,
+        json={"date": "2026-09-24"},
+        headers=headers,
+    )
+
+    assert restored.status_code == 200
+    assert [habit["id"] for habit in restored_list.json()["habits"]] == [
+        archived_habit["id"],
+        active_habit["id"],
+    ]
+    assert duplicate_check.status_code == 409
+    assert duplicate_check.json()["code"] == "already_checked"
+    assert db_session.get(Habit, int(str(archived_habit["id"]))) is not None
+    assert (
+        db_session.scalar(
+            select(HabitEntry).where(HabitEntry.habit_id == int(str(archived_habit["id"])))
+        )
+        is not None
+    )
+
+
+def test_deleting_an_area_hard_deletes_its_habits_and_entries(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "area-habit-delete@example.com"))
+    area = create_area(client, headers, "Temporary")
+    habit = create_habit(
+        client,
+        headers,
+        area_id=str(area["id"]),
+        title="Temporary habit",
+        mode="DAILY",
+    )
+    checked = client.post(
+        f"/api/v1/habits/{habit['id']}/check",
+        json={"date": "2026-09-24"},
+        headers=headers,
+    )
+
+    deleted = client.delete(f"/api/v1/areas/{area['id']}", headers=headers)
+
+    assert checked.status_code == 201
+    assert deleted.status_code == 204
+    assert db_session.get(Habit, int(str(habit["id"]))) is None
     assert (
         db_session.scalar(select(HabitEntry).where(HabitEntry.habit_id == int(str(habit["id"]))))
         is None

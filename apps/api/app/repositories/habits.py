@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Habit, HabitEntry, HabitMode, HabitPeriodType
+from app.models import Area, Habit, HabitEntry, HabitMode, HabitPeriodType
 
 
 class HabitRepository:
@@ -11,14 +11,29 @@ class HabitRepository:
         self.session = session
 
     def list_for_user(self, *, user_id: int, area_id: int | None) -> list[Habit]:
-        statement = select(Habit).where(Habit.user_id == user_id)
+        statement = (
+            select(Habit)
+            .join(Area, Habit.area_id == Area.id)
+            .where(
+                Habit.user_id == user_id,
+                Area.user_id == user_id,
+                Area.archived_at.is_(None),
+            )
+        )
         if area_id is not None:
             statement = statement.where(Habit.area_id == area_id)
         return list(self.session.scalars(statement.order_by(Habit.created_at, Habit.id)))
 
     def get_for_user(self, *, habit_id: int, user_id: int) -> Habit | None:
         return self.session.scalar(
-            select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
+            select(Habit)
+            .join(Area, Habit.area_id == Area.id)
+            .where(
+                Habit.id == habit_id,
+                Habit.user_id == user_id,
+                Area.user_id == user_id,
+                Area.archived_at.is_(None),
+            )
         )
 
     def create(
