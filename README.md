@@ -32,7 +32,7 @@ Clone the repository and start the complete development stack:
 ```bash
 git clone https://github.com/Deniztpl/spoons-up
 cd spoons-up
-docker compose up --build
+docker compose up --build -d
 ```
 
 Compose starts PostgreSQL, runs every pending Alembic migration, then starts the API and web app. Open the web app at `http://localhost:3000`; the API and its interactive docs are available at `http://localhost:8000` and `http://localhost:8000/docs`.
