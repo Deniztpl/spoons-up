@@ -68,6 +68,16 @@ def test_area_crud_and_archive_filter(client: TestClient) -> None:
         "Finance",
     ]
 
+    already_archived = client.post(
+        f"/api/v1/areas/{first_area['id']}/archive",
+        json={"archived": True},
+        headers=headers,
+    )
+
+    assert already_archived.status_code == 200
+    assert already_archived.json()["archived_at"] == archived.json()["archived_at"]
+    assert already_archived.json()["unarchived_at"] is None
+
     restored = client.post(
         f"/api/v1/areas/{first_area['id']}/archive",
         json={"archived": False},
@@ -82,6 +92,16 @@ def test_area_crud_and_archive_filter(client: TestClient) -> None:
         "Software",
         "Finance",
     ]
+
+    already_restored = client.post(
+        f"/api/v1/areas/{first_area['id']}/archive",
+        json={"archived": False},
+        headers=headers,
+    )
+
+    assert already_restored.status_code == 200
+    assert already_restored.json()["archived_at"] is None
+    assert already_restored.json()["unarchived_at"] == restored.json()["unarchived_at"]
 
     rearchived = client.post(
         f"/api/v1/areas/{first_area['id']}/archive",

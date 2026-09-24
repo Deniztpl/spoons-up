@@ -71,14 +71,20 @@ class AreaService:
     ) -> AreaResponse:
         with self.session.begin():
             area = self._get_owned_area(area_id=area_id, user_id=user_id)
-            now = datetime.now(UTC)
-            archived_at = now if payload.archived else None
-            unarchived_at = area.unarchived_at if payload.archived else now
-            self.area_repository.set_archive_timestamps(
-                area=area,
-                archived_at=archived_at,
-                unarchived_at=unarchived_at,
-            )
+
+            if payload.archived and area.archived_at is None:
+                self.area_repository.set_archive_timestamps(
+                    area=area,
+                    archived_at=datetime.now(UTC),
+                    unarchived_at=area.unarchived_at,
+                )
+            elif not payload.archived and area.archived_at is not None:
+                self.area_repository.set_archive_timestamps(
+                    area=area,
+                    archived_at=None,
+                    unarchived_at=datetime.now(UTC),
+                )
+
             response = AreaResponse.model_validate(area)
         return response
 
