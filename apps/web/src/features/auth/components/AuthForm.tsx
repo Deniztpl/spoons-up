@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 export type AuthMode = "login" | "register";
 
 const inputClassName =
-  "mt-2 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-3 text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-sage-500 focus:ring-3 focus:ring-sage-100 disabled:cursor-not-allowed disabled:bg-stone-100";
+  "mt-2 w-full rounded-xl border border-ink/20 bg-white px-3.5 py-3 text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-accent focus:ring-3 focus:ring-accent/15 disabled:cursor-not-allowed disabled:bg-well";
 
 function getBrowserTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -41,7 +41,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
       <div>
-        <label htmlFor="email" className="text-sm font-semibold text-stone-800">
+        <label htmlFor="email" className="text-sm font-semibold text-ink">
           Email
         </label>
         <input
@@ -59,14 +59,14 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           onChange={(event) => setEmail(event.target.value)}
         />
         {fieldErrors.email ? (
-          <p id="email-error" className="mt-1.5 text-xs text-red-700">
+          <p id="email-error" className="mt-1.5 text-xs text-danger">
             {fieldErrors.email}
           </p>
         ) : null}
       </div>
 
       <div>
-        <label htmlFor="password" className="text-sm font-semibold text-stone-800">
+        <label htmlFor="password" className="text-sm font-semibold text-ink">
           Password
         </label>
         <input
@@ -86,22 +86,22 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           onChange={(event) => setPassword(event.target.value)}
         />
         {fieldErrors.password ? (
-          <p id="password-error" className="mt-1.5 text-xs text-red-700">
+          <p id="password-error" className="mt-1.5 text-xs text-danger">
             {fieldErrors.password}
           </p>
         ) : null}
       </div>
 
       {isRegister ? (
-        <p className="rounded-xl bg-ivory-100 px-3.5 py-3 text-xs leading-5 text-stone-500">
-          Your timezone will be set to <strong className="text-stone-700">{timezone}</strong>.
+        <p className="rounded-xl bg-well px-3.5 py-3 text-xs leading-5 text-ink-soft">
+          Your timezone will be set to <strong className="text-ink">{timezone}</strong>.
         </p>
       ) : null}
 
       {errorMessage ? (
         <div
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger/25 bg-danger-soft px-3.5 py-3 text-sm text-danger"
         >
           {errorMessage}
         </div>
@@ -110,7 +110,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="flex w-full items-center justify-center rounded-xl bg-sage-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sage-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 disabled:cursor-wait disabled:opacity-70"
+        className="flex w-full items-center justify-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-70"
       >
         {isSubmitting
           ? isRegister

@@ -69,37 +69,35 @@ export function AppLayout({
   }, [isNavigationOpen]);
 
   return (
-    <div className="min-h-screen bg-ivory-100 text-stone-900">
-      <AppHeader
-        menuButtonRef={menuButtonRef}
-        isNavigationOpen={isNavigationOpen}
-        isLoggingOut={isLoggingOut}
-        logoutErrorId={logoutError ? "logout-error" : undefined}
-        onOpenNavigation={() => setIsNavigationOpen(true)}
-        onLogout={() => void handleLogout()}
-      />
+    <div className="flex min-h-screen bg-canvas text-sm text-ink">
+      <aside
+        aria-label="Page navigation"
+        className="sticky top-0 hidden h-screen w-[206px] shrink-0 border-r border-line bg-sidebar lg:block"
+      >
+        <AppSidebar />
+      </aside>
 
-      {logoutError ? (
-        <div
-          id="logout-error"
-          role="alert"
-          className="fixed right-4 top-20 z-40 max-w-sm rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg"
-        >
-          {logoutError}
-        </div>
-      ) : null}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader
+          menuButtonRef={menuButtonRef}
+          isNavigationOpen={isNavigationOpen}
+          isLoggingOut={isLoggingOut}
+          logoutErrorId={logoutError ? "logout-error" : undefined}
+          onOpenNavigation={() => setIsNavigationOpen(true)}
+          onLogout={() => void handleLogout()}
+        />
 
-      <div className="flex min-h-[calc(100vh-4rem)]">
-        <aside
-          aria-label="Page navigation"
-          className="hidden w-[310px] shrink-0 border-r border-stone-200/80 bg-ivory-50 lg:block"
-        >
-          <AppSidebar />
-        </aside>
+        {logoutError ? (
+          <div
+            id="logout-error"
+            role="alert"
+            className="fixed right-4 top-16 z-40 max-w-sm rounded-[11px] border border-danger/25 bg-danger-soft px-4 py-3 text-danger shadow-[0_10px_26px_rgb(28_43_33/0.14)]"
+          >
+            {logoutError}
+          </div>
+        ) : null}
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10 xl:px-14">
-          <div className="mx-auto max-w-6xl">{children}</div>
-        </main>
+        <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </div>
 
       {isNavigationOpen ? (
@@ -108,7 +106,7 @@ export function AppLayout({
             type="button"
             aria-label="Close navigation backdrop"
             tabIndex={-1}
-            className="absolute inset-0 bg-stone-950/35 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-ink/35 backdrop-blur-[2px]"
             onClick={closeNavigation}
           />
           <aside
@@ -116,25 +114,21 @@ export function AppLayout({
             role="dialog"
             aria-modal="true"
             aria-labelledby="navigation-drawer-title"
-            className="relative h-full w-[min(88vw,340px)] border-r border-stone-200 bg-ivory-50 shadow-2xl"
+            className="relative h-full w-[min(84vw,280px)] border-r border-line bg-sidebar shadow-2xl"
           >
-            <div className="flex h-16 items-center justify-between border-b border-stone-200/80 px-5">
-              <h2 id="navigation-drawer-title" className="font-semibold tracking-[-0.02em]">
-                Navigation
-              </h2>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                aria-label="Close navigation menu"
-                className="grid size-10 place-items-center rounded-xl border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:border-sage-300 hover:text-sage-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600"
-                onClick={closeNavigation}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="h-[calc(100%-4rem)]">
-              <AppSidebar onNavigate={closeNavigation} />
-            </div>
+            <h2 id="navigation-drawer-title" className="sr-only">
+              Navigation
+            </h2>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              aria-label="Close navigation menu"
+              className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-[9px] text-ink-soft transition hover:bg-card hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={closeNavigation}
+            >
+              <CloseIcon />
+            </button>
+            <AppSidebar onNavigate={closeNavigation} />
           </aside>
         </div>
       ) : null}

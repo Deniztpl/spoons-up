@@ -23,8 +23,8 @@ export function AreaCreateForm({
   };
 
   return (
-    <form className="mt-5 rounded-2xl bg-ivory-100 p-4" onSubmit={handleSubmit}>
-      <label htmlFor="new-area-name" className="text-sm font-semibold text-stone-700">
+    <form className="mb-2 rounded-lg border border-accent/33 bg-card p-4" onSubmit={handleSubmit}>
+      <label htmlFor="new-area-name" className="text-xs font-medium text-ink-soft">
         Area name
       </label>
       <input
@@ -33,11 +33,11 @@ export function AreaCreateForm({
         required
         maxLength={60}
         value={name}
-        className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-sage-500 focus:ring-3 focus:ring-sage-100"
+        className="mt-2 w-full rounded-lg border border-ink/20 bg-card px-3 py-2.5 text-[15px] text-ink outline-none transition focus:border-accent focus:ring-3 focus:ring-accent/15"
         onChange={(event) => onNameChange(event.target.value)}
       />
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-red-700">
+        <p role="alert" className="mt-2 text-[13px] text-danger">
           {error}
         </p>
       ) : null}
@@ -45,14 +45,14 @@ export function AreaCreateForm({
         <button
           type="submit"
           disabled={isSaving}
-          className="rounded-xl bg-sage-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+          className="rounded-[9px] bg-accent px-4 py-2 text-[13px] font-medium text-white transition hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60"
         >
           {isSaving ? "Creating…" : "Create area"}
         </button>
         <button
           type="button"
           disabled={isSaving}
-          className="rounded-xl px-4 py-2 text-sm font-semibold text-stone-500 hover:bg-white"
+          className="rounded-[9px] px-4 py-2 text-[13px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={onCancel}
         >
           Cancel

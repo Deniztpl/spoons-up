@@ -6,9 +6,9 @@ import { AuthPage } from "../pages/AuthPage/AuthPage";
 
 function SessionLoading() {
   return (
-    <main className="grid min-h-screen place-items-center bg-ivory-100 px-6 text-center">
-      <div role="status" className="flex flex-col items-center gap-4 text-stone-600">
-        <span className="grid size-11 place-items-center rounded-2xl bg-sage-700 text-sm font-bold text-white shadow-sm">
+    <main className="grid min-h-screen place-items-center bg-canvas px-6 text-center">
+      <div role="status" className="flex flex-col items-center gap-4 text-ink-soft">
+        <span className="grid size-11 place-items-center rounded-2xl bg-accent text-sm font-bold text-white shadow-sm">
           S
         </span>
         <span className="text-sm font-medium">Restoring your session…</span>

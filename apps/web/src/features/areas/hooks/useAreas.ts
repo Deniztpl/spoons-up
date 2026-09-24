@@ -167,9 +167,9 @@ export function useAreas() {
     }
   };
 
-  const changeArchiveState = async (archived: boolean) => {
+  const changeArchiveState = async (archived: boolean): Promise<boolean> => {
     if (!selectedArea) {
-      return;
+      return false;
     }
     setIsSaving(true);
     setActionError(null);
@@ -184,15 +184,17 @@ export function useAreas() {
               : "We couldn't restore this area.",
           ),
         );
-        return;
+        return false;
       }
       setAreas((current) =>
         current.map((area) => (area.id === data.id ? data : area)),
       );
       setIsRenaming(false);
       setIsConfirmingDelete(false);
+      return true;
     } catch {
       setActionError("We couldn't reach Spoons Up. Please try again.");
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -213,9 +215,7 @@ export function useAreas() {
       const remainingAreas = areas.filter((area) => area.id !== selectedArea.id);
       setAreas(remainingAreas);
       setSelectedAreaId(
-        remainingAreas.find((area) => area.archived_at === null)?.id ??
-          remainingAreas[0]?.id ??
-          null,
+        remainingAreas.find((area) => area.archived_at !== null)?.id ?? null,
       );
       setIsConfirmingDelete(false);
     } catch {

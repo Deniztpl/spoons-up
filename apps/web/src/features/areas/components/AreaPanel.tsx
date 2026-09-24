@@ -1,10 +1,12 @@
 import type { Area } from "../api/areasApi";
+import { AreaActionsMenu } from "./AreaActionsMenu";
 import { AreaArchiveActions } from "./AreaArchiveActions";
 import { AreaIcon } from "./AreaIcon";
 import { AreaRenameForm } from "./AreaRenameForm";
 
 type AreaPanelProps = {
   area: Area | null;
+  view: "active" | "archived";
   isLoading: boolean;
   loadError: string | null;
   isRenaming: boolean;
@@ -24,8 +26,12 @@ type AreaPanelProps = {
   onDelete: () => void;
 };
 
+const panelClassName =
+  "flex w-full shrink-0 flex-col gap-[18px] border-t border-line bg-card px-4 py-7 sm:px-8 md:w-[clamp(272px,32%,344px)] md:border-l md:border-t-0 md:px-[26px] md:pb-[26px] md:pt-[30px]";
+
 export function AreaPanel({
   area,
+  view,
   isLoading,
   loadError,
   isRenaming,
@@ -46,32 +52,37 @@ export function AreaPanel({
 }: AreaPanelProps) {
   if (isLoading) {
     return (
-      <div role="status" className="rounded-[28px] bg-surface p-8 text-stone-500 shadow-panel">
-        Loading your areas…
-      </div>
+      <section className={panelClassName}>
+        <p role="status" className="text-ink-soft">
+          Loading your areas…
+        </p>
+      </section>
     );
   }
 
   if (loadError) {
     return (
-      <div role="alert" className="rounded-[28px] border border-red-200 bg-red-50 p-8 text-red-800">
-        {loadError}
-      </div>
+      <section className={panelClassName}>
+        <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
+          {loadError}
+        </p>
+      </section>
     );
   }
 
   if (!area) {
     return (
-      <section className="rounded-[28px] border border-white/80 bg-surface p-8 shadow-panel sm:p-10">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-sage-600">
-          Selected area
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-stone-950">
-          Create your first area
-        </h1>
-        <p className="mt-3 max-w-xl leading-7 text-stone-600">
-          Add an area from this page to begin.
-        </p>
+      <section className={panelClassName}>
+        <div>
+          <h2 className="text-[22px] font-semibold leading-tight">
+            {view === "archived" ? "No archived areas" : "Create your first area"}
+          </h2>
+          <p className="mt-2 leading-6 text-ink-soft">
+            {view === "archived"
+              ? "Areas you archive will appear here."
+              : "Add an area from this page to begin."}
+          </p>
+        </div>
       </section>
     );
   }
@@ -79,10 +90,7 @@ export function AreaPanel({
   const isArchived = area.archived_at !== null;
 
   return (
-    <section className="rounded-[28px] border border-white/80 bg-surface p-8 shadow-panel sm:p-10">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-sage-600">
-        {isArchived ? "Archived area" : "Selected area"}
-      </p>
+    <section className={panelClassName}>
       {isRenaming ? (
         <AreaRenameForm
           name={renameName}
@@ -93,35 +101,26 @@ export function AreaPanel({
           onSubmit={onRename}
         />
       ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-semibold tracking-[-0.03em] text-stone-950 sm:text-4xl">
+        <div className="flex items-center gap-2.5">
+          <h2 className="min-w-0 flex-1 break-words text-[22px] font-semibold leading-tight">
             {area.name}
-          </h1>
-          {!isArchived ? (
-            <>
-              <button
-                type="button"
-                disabled={isSaving}
-                className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-600 shadow-sm transition hover:border-sage-300 hover:text-sage-700 disabled:cursor-wait disabled:opacity-60"
-                onClick={onStartRenaming}
-              >
-                Rename
-              </button>
-              <button
-                type="button"
-                disabled={isSaving}
-                className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-600 shadow-sm transition hover:border-amber-300 hover:text-amber-700 disabled:cursor-wait disabled:opacity-60"
-                onClick={onArchive}
-              >
-                {isSaving ? "Archiving..." : "Archive"}
-              </button>
-            </>
-          ) : null}
+          </h2>
+          {isArchived ? (
+            <span className="shrink-0 rounded-[5px] bg-well px-[7px] py-[3px] text-[10px] font-medium uppercase tracking-[0.06em] text-ink-soft">
+              Archived
+            </span>
+          ) : (
+            <AreaActionsMenu
+              isSaving={isSaving}
+              onRename={onStartRenaming}
+              onArchive={onArchive}
+            />
+          )}
         </div>
       )}
 
       {actionError ? (
-        <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-[13px] text-danger">
           {actionError}
         </p>
       ) : null}
@@ -137,12 +136,12 @@ export function AreaPanel({
           onDelete={onDelete}
         />
       ) : (
-        <div className="mt-10 rounded-2xl border border-dashed border-stone-300 bg-ivory-50/70 px-6 py-14 text-center">
-          <div className="mx-auto grid size-11 place-items-center rounded-2xl bg-sage-100 text-sage-700">
+        <div className="rounded-[10px] border border-dashed border-ink/18 bg-well px-5 py-9 text-center">
+          <div className="mx-auto grid size-10 place-items-center rounded-xl bg-accent/10 text-accent">
             <AreaIcon />
           </div>
-          <h2 className="mt-4 text-sm font-semibold text-stone-800">Nothing here yet</h2>
-          <p className="mt-1 text-sm text-stone-500">
+          <h3 className="mt-3 text-[13.5px] font-medium">Nothing here yet</h3>
+          <p className="mt-1 text-[13px] leading-5 text-ink-soft">
             This area is ready for its goals and habits.
           </p>
         </div>

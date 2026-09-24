@@ -3,6 +3,7 @@ import { AreaCreateForm } from "./AreaCreateForm";
 
 type AreaListProps = {
   areas: Area[];
+  view: "active" | "archived";
   selectedAreaId: string | null;
   isLoading: boolean;
   isAdding: boolean;
@@ -10,14 +11,20 @@ type AreaListProps = {
   newAreaName: string;
   error: string | null;
   onSelect: (areaId: string) => void;
-  onStartAdding: () => void;
   onCancelAdding: () => void;
   onNameChange: (name: string) => void;
   onCreate: () => void;
 };
 
+const archivedDateFormat = new Intl.DateTimeFormat("en", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
 export function AreaList({
   areas,
+  view,
   selectedAreaId,
   isLoading,
   isAdding,
@@ -25,34 +32,40 @@ export function AreaList({
   newAreaName,
   error,
   onSelect,
-  onStartAdding,
   onCancelAdding,
   onNameChange,
   onCreate,
 }: AreaListProps) {
-  const activeAreas = areas.filter((area) => area.archived_at === null);
-  const archivedAreas = areas.filter((area) => area.archived_at !== null);
+  const isArchivedView = view === "archived";
 
   const renderArea = (area: Area) => {
     const isSelected = area.id === selectedAreaId;
-    const isArchived = area.archived_at !== null;
+    const tone = isSelected
+      ? "border-accent/33 bg-accent/9"
+      : isArchivedView
+        ? "border-ink/16 bg-well hover:bg-card"
+        : "border-ink/10 bg-card hover:bg-well";
     return (
       <button
         key={area.id}
         type="button"
-        aria-label={`${area.name}${isArchived ? " (archived)" : ""}`}
+        aria-label={`${area.name}${isArchivedView ? " (archived)" : ""}`}
         aria-current={isSelected ? "page" : undefined}
-        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 ${
-          isSelected
-            ? "border-sage-300 bg-sage-50 font-semibold text-sage-800"
-            : "border-stone-200 bg-white text-stone-700 hover:border-sage-200 hover:bg-sage-50/40"
-        }`}
+        className={`flex w-full items-center gap-[18px] rounded-lg border px-[18px] py-[17px] text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+          isArchivedView ? "border-dashed" : ""
+        } ${tone}`}
         onClick={() => onSelect(area.id)}
       >
-        <span>{area.name}</span>
-        {isArchived ? (
-          <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-stone-500">
-            Archived
+        <span
+          className={`min-w-0 flex-1 truncate text-[15.5px] font-medium ${
+            isArchivedView ? "text-ink-soft" : ""
+          }`}
+        >
+          {area.name}
+        </span>
+        {area.archived_at !== null ? (
+          <span className="shrink-0 whitespace-nowrap text-xs text-ink-soft">
+            Archived {archivedDateFormat.format(new Date(area.archived_at))}
           </span>
         ) : null}
       </button>
@@ -60,27 +73,10 @@ export function AreaList({
   };
 
   return (
-    <section
-      aria-labelledby="area-list-title"
-      className="rounded-[28px] border border-white/80 bg-surface p-6 shadow-panel sm:p-8"
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 id="area-list-title" className="text-lg font-semibold text-stone-950">
-            Your areas
-          </h2>
-          <p className="mt-1 text-sm text-stone-500">Choose an area to manage it.</p>
-        </div>
-        {!isAdding ? (
-          <button
-            type="button"
-            className="shrink-0 rounded-xl bg-sage-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sage-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600"
-            onClick={onStartAdding}
-          >
-            Add area
-          </button>
-        ) : null}
-      </div>
+    <section aria-labelledby="area-list-title">
+      <h2 id="area-list-title" className="sr-only">
+        {isArchivedView ? "Archived areas" : "Your areas"}
+      </h2>
 
       {isAdding ? (
         <AreaCreateForm
@@ -93,29 +89,20 @@ export function AreaList({
         />
       ) : null}
 
-      <div className="mt-5 space-y-2">
+      <div className="flex flex-col gap-2">
         {isLoading ? (
-          <p role="status" className="rounded-xl bg-ivory-100 px-4 py-3 text-sm text-stone-500">
+          <p role="status" className="rounded-lg bg-well px-[18px] py-[17px] text-ink-soft">
             Loading areas…
           </p>
         ) : null}
 
-        {!isLoading && activeAreas.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500">
-            No active areas.
+        {!isLoading && areas.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-ink/16 px-7 py-7 text-center text-[13px] text-ink-soft">
+            {isArchivedView ? "No archived areas." : "No active areas."}
           </p>
         ) : null}
 
-        {activeAreas.map(renderArea)}
-
-        {archivedAreas.length > 0 ? (
-          <div className="pt-5">
-            <h3 className="px-1 text-xs font-bold uppercase tracking-[0.16em] text-stone-400">
-              Archived
-            </h3>
-            <div className="mt-2 space-y-2">{archivedAreas.map(renderArea)}</div>
-          </div>
-        ) : null}
+        {areas.map(renderArea)}
       </div>
     </section>
   );

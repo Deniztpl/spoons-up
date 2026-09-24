@@ -95,6 +95,7 @@ describe("Areas page", () => {
     await user.click(screen.getByRole("button", { name: "Create area" }));
     expect(await screen.findByRole("heading", { name: "Social" })).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Area actions" }));
     await user.click(screen.getByRole("button", { name: "Rename" }));
     const renameInput = screen.getByLabelText("Area name");
     await user.clear(renameInput);
@@ -139,14 +140,17 @@ describe("Areas page", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "SWE" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Area actions" }));
     await user.click(screen.getByRole("button", { name: "Archive" }));
     expect(
       await screen.findByText("Restore this area to make it active again, or delete it permanently."),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Restore" }));
-    expect(await screen.findByRole("button", { name: "Archive" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Area actions" }));
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Archived 1" }));
     await user.click(screen.getByRole("button", { name: "Old project (archived)" }));
     await user.click(screen.getByRole("button", { name: "Delete permanently" }));
     expect(screen.getByText("Delete Old project permanently?")).toBeInTheDocument();
@@ -157,7 +161,105 @@ describe("Areas page", () => {
         screen.queryByRole("button", { name: "Old project (archived)" }),
       ).not.toBeInTheDocument();
     });
+    expect(screen.getByRole("heading", { name: "No archived areas" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Active" }));
     expect(screen.getByRole("heading", { name: "SWE" })).toBeInTheDocument();
+  });
+
+  it("shows active and archived areas in separate views", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          areas: [
+            area("1", "SWE"),
+            { ...area("2", "Old project"), archived_at: "2026-09-23T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "SWE" })).toBeInTheDocument();
+    const views = screen.getByRole("group", { name: "Area views" });
+    expect(within(views).getByRole("button", { name: "Active" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(views).getByRole("button", { name: /History/ })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Old project (archived)" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(views).getByRole("button", { name: "Archived 1" }));
+    expect(screen.getByRole("heading", { name: "Old project" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Old project (archived)" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("button", { name: "SWE" })).not.toBeInTheDocument();
+
+    await user.click(within(views).getByRole("button", { name: "Active" }));
+    expect(screen.getByRole("heading", { name: "SWE" })).toBeInTheDocument();
+  });
+
+  it("allows empty views and opens area creation in the active view", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          areas: [
+            { ...area("2", "Old project"), archived_at: "2026-09-23T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const views = screen.getByRole("group", { name: "Area views" });
+    const activeView = within(views).getByRole("button", { name: "Active" });
+
+    expect(await screen.findByText("No active areas.")).toBeInTheDocument();
+    const archivedView = within(views).getByRole("button", { name: "Archived 1" });
+    expect(activeView).toHaveAttribute("aria-pressed", "true");
+    expect(archivedView).toBeEnabled();
+
+    await user.click(archivedView);
+    expect(screen.getByRole("heading", { name: "Old project" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add area" }));
+    expect(activeView).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Area name")).toBeInTheDocument();
+    expect(screen.getByText("No active areas.")).toBeInTheDocument();
+  });
+
+  it("opens area actions and closes them with Escape or an outside click", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ areas: [area("1", "SWE")] })),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByRole("heading", { name: "SWE" });
+    const menuButton = screen.getByRole("button", { name: "Area actions" });
+    await user.click(menuButton);
+
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Add goal/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Add habit/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Delete/ })).not.toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Rename" })).not.toBeInTheDocument();
+    expect(menuButton).toHaveFocus();
+
+    await user.click(menuButton);
+    await user.click(screen.getByRole("heading", { name: "Areas" }));
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
   });
 
   it("opens and closes the narrow-screen navigation drawer with focus management", async () => {
