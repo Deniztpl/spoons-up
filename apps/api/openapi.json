@@ -80,6 +80,20 @@
         "title": "AreaResponse",
         "type": "object"
       },
+      "CheckHabitRequest": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "CheckHabitRequest",
+        "type": "object"
+      },
       "CreateAreaRequest": {
         "properties": {
           "name": {
@@ -93,6 +107,30 @@
           "name"
         ],
         "title": "CreateAreaRequest",
+        "type": "object"
+      },
+      "CreateHabitRequest": {
+        "properties": {
+          "area_id": {
+            "pattern": "^[0-9]+$",
+            "title": "Area Id",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/HabitMode"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "area_id",
+          "title",
+          "mode"
+        ],
+        "title": "CreateHabitRequest",
         "type": "object"
       },
       "ErrorResponse": {
@@ -111,6 +149,100 @@
           "message"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "HabitEntryResponse": {
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "habit_id": {
+            "title": "Habit Id",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "period_type": {
+            "$ref": "#/components/schemas/HabitPeriodType"
+          }
+        },
+        "required": [
+          "habit_id",
+          "period_type",
+          "period_start",
+          "completed_at"
+        ],
+        "title": "HabitEntryResponse",
+        "type": "object"
+      },
+      "HabitListResponse": {
+        "properties": {
+          "habits": {
+            "items": {
+              "$ref": "#/components/schemas/HabitResponse"
+            },
+            "title": "Habits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "habits"
+        ],
+        "title": "HabitListResponse",
+        "type": "object"
+      },
+      "HabitMode": {
+        "enum": [
+          "DAILY",
+          "WEEKLY"
+        ],
+        "title": "HabitMode",
+        "type": "string"
+      },
+      "HabitPeriodType": {
+        "enum": [
+          "DAY",
+          "WEEK"
+        ],
+        "title": "HabitPeriodType",
+        "type": "string"
+      },
+      "HabitResponse": {
+        "properties": {
+          "area_id": {
+            "title": "Area Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/HabitMode"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "area_id",
+          "title",
+          "mode",
+          "created_at"
+        ],
+        "title": "HabitResponse",
         "type": "object"
       },
       "LoginRequest": {
@@ -228,6 +360,46 @@
           "name"
         ],
         "title": "UpdateAreaRequest",
+        "type": "object"
+      },
+      "UpdateHabitRequest": {
+        "properties": {
+          "area_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Id"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HabitMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateHabitRequest",
         "type": "object"
       },
       "ValidationErrorResponse": {
@@ -962,6 +1134,429 @@
         "summary": "Register",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/habits": {
+      "get": {
+        "operationId": "list_habits_api_v1_habits_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "area_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Area Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HabitListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List Habits",
+        "tags": [
+          "habits"
+        ]
+      },
+      "post": {
+        "operationId": "create_habit_api_v1_habits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHabitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HabitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create Habit",
+        "tags": [
+          "habits"
+        ]
+      }
+    },
+    "/api/v1/habits/{habit_id}": {
+      "delete": {
+        "operationId": "delete_habit_api_v1_habits__habit_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "habit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "title": "Habit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete Habit",
+        "tags": [
+          "habits"
+        ]
+      },
+      "patch": {
+        "operationId": "update_habit_api_v1_habits__habit_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "habit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "title": "Habit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHabitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HabitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update Habit",
+        "tags": [
+          "habits"
+        ]
+      }
+    },
+    "/api/v1/habits/{habit_id}/check": {
+      "delete": {
+        "operationId": "uncheck_habit_api_v1_habits__habit_id__check_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "habit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "title": "Habit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Uncheck Habit",
+        "tags": [
+          "habits"
+        ]
+      },
+      "post": {
+        "operationId": "check_habit_api_v1_habits__habit_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "habit_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "title": "Habit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckHabitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HabitEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Check Habit",
+        "tags": [
+          "habits"
         ]
       }
     }

@@ -43,6 +43,12 @@ class AreaNameTakenError(AppError):
     default_message = "An area with this name already exists"
 
 
+class AlreadyCheckedError(AppError):
+    status_code = 409
+    code = "already_checked"
+    default_message = "Habit is already checked for this period"
+
+
 class InvalidCredentialsError(AppError):
     status_code = 401
     code = "invalid_credentials"

@@ -126,6 +126,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/habits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Habits */
+        get: operations["list_habits_api_v1_habits_get"];
+        put?: never;
+        /** Create Habit */
+        post: operations["create_habit_api_v1_habits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/habits/{habit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Habit */
+        delete: operations["delete_habit_api_v1_habits__habit_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Habit */
+        patch: operations["update_habit_api_v1_habits__habit_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/habits/{habit_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Habit */
+        post: operations["check_habit_api_v1_habits__habit_id__check_post"];
+        /** Uncheck Habit */
+        delete: operations["uncheck_habit_api_v1_habits__habit_id__check_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -156,10 +210,26 @@ export interface components {
             /** Unarchived At */
             unarchived_at: string | null;
         };
+        /** CheckHabitRequest */
+        CheckHabitRequest: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+        };
         /** CreateAreaRequest */
         CreateAreaRequest: {
             /** Name */
             name: string;
+        };
+        /** CreateHabitRequest */
+        CreateHabitRequest: {
+            /** Area Id */
+            area_id: string;
+            mode: components["schemas"]["HabitMode"];
+            /** Title */
+            title: string;
         };
         /** ErrorResponse */
         ErrorResponse: {
@@ -167,6 +237,52 @@ export interface components {
             code: string;
             /** Message */
             message: string;
+        };
+        /** HabitEntryResponse */
+        HabitEntryResponse: {
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /** Habit Id */
+            habit_id: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            period_type: components["schemas"]["HabitPeriodType"];
+        };
+        /** HabitListResponse */
+        HabitListResponse: {
+            /** Habits */
+            habits: components["schemas"]["HabitResponse"][];
+        };
+        /**
+         * HabitMode
+         * @enum {string}
+         */
+        HabitMode: "DAILY" | "WEEKLY";
+        /**
+         * HabitPeriodType
+         * @enum {string}
+         */
+        HabitPeriodType: "DAY" | "WEEK";
+        /** HabitResponse */
+        HabitResponse: {
+            /** Area Id */
+            area_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            mode: components["schemas"]["HabitMode"];
+            /** Title */
+            title: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -216,6 +332,14 @@ export interface components {
         UpdateAreaRequest: {
             /** Name */
             name: string;
+        };
+        /** UpdateHabitRequest */
+        UpdateHabitRequest: {
+            /** Area Id */
+            area_id?: string | null;
+            mode?: components["schemas"]["HabitMode"] | null;
+            /** Title */
+            title?: string | null;
         };
         /** ValidationErrorResponse */
         ValidationErrorResponse: {
@@ -718,6 +842,308 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    list_habits_api_v1_habits_get: {
+        parameters: {
+            query?: {
+                area_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HabitListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    create_habit_api_v1_habits_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHabitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HabitResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_habit_api_v1_habits__habit_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                habit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    update_habit_api_v1_habits__habit_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                habit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateHabitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HabitResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    check_habit_api_v1_habits__habit_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                habit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckHabitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HabitEntryResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    uncheck_habit_api_v1_habits__habit_id__check_delete: {
+        parameters: {
+            query: {
+                date: string;
+            };
+            header?: never;
+            path: {
+                habit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
