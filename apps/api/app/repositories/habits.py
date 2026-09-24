@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.models import Area, Habit, HabitEntry, HabitMode, HabitPeriodType
@@ -11,29 +11,14 @@ class HabitRepository:
         self.session = session
 
     def list_for_user(self, *, user_id: int, area_id: int | None) -> list[Habit]:
-        statement = (
-            select(Habit)
-            .join(Area, Habit.area_id == Area.id)
-            .where(
-                Habit.user_id == user_id,
-                Area.user_id == user_id,
-                Area.archived_at.is_(None),
-            )
-        )
+        query = self._select_active_habits_for_user(user_id=user_id)
         if area_id is not None:
-            statement = statement.where(Habit.area_id == area_id)
-        return list(self.session.scalars(statement.order_by(Habit.created_at, Habit.id)))
+            query = query.where(Habit.area_id == area_id)
+        return list(self.session.scalars(query.order_by(Habit.created_at, Habit.id)))
 
     def get_for_user(self, *, habit_id: int, user_id: int) -> Habit | None:
         return self.session.scalar(
-            select(Habit)
-            .join(Area, Habit.area_id == Area.id)
-            .where(
-                Habit.id == habit_id,
-                Habit.user_id == user_id,
-                Area.user_id == user_id,
-                Area.archived_at.is_(None),
-            )
+            self._select_active_habits_for_user(user_id=user_id).where(Habit.id == habit_id)
         )
 
     def create(
@@ -106,3 +91,19 @@ class HabitRepository:
         )
         if entry is not None:
             self.session.delete(entry)
+
+    def _select_active_habits_for_user(
+        self,
+        *,
+        user_id: int,
+    ) -> Select[tuple[Habit]]:
+        """Select the user's habits whose parent area is not archived."""
+        return (
+            select(Habit)
+            .join(Area, Habit.area_id == Area.id)
+            .where(
+                Habit.user_id == user_id,
+                Area.user_id == user_id,
+                Area.archived_at.is_(None),
+            )
+        )
