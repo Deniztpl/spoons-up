@@ -1,4 +1,4 @@
-import type { Area } from "../api/areasApi";
+import type { Area } from "../../api/areasApi";
 import { AreaCreateForm } from "./AreaCreateForm";
 
 type AreaListProps = {
@@ -15,12 +15,6 @@ type AreaListProps = {
   onNameChange: (name: string) => void;
   onCreate: () => void;
 };
-
-const archivedDateFormat = new Intl.DateTimeFormat("en", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 
 export function AreaList({
   areas,
@@ -107,3 +101,9 @@ export function AreaList({
     </section>
   );
 }
+
+const archivedDateFormat = new Intl.DateTimeFormat("en", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});

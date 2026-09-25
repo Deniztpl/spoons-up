@@ -2,17 +2,14 @@ import { useState } from "react";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
-import { AreaList } from "../../features/areas/components/AreaList";
-import { AreaPanel } from "../../features/areas/components/AreaPanel";
+import { AreaDetails } from "../../features/areas/components/AreaDetails/AreaDetails";
+import { AreaList } from "../../features/areas/components/AreaList/AreaList";
 import { useAreas } from "../../features/areas/hooks/useAreas";
+import { AreaHabitList } from "../../features/habits/components/AreaHabitList";
+import { HabitFormDialog } from "../../features/habits/components/HabitFormDialog";
+import { useAreaHabits } from "../../features/habits/hooks/useAreaHabits";
 
 type AreaView = "active" | "archived";
-
-function viewButtonClassName(isPressed: boolean) {
-  return `min-w-[74px] rounded-[7px] px-3.5 py-1.5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-muted ${
-    isPressed ? "bg-card text-ink" : "text-ink-soft enabled:hover:text-ink"
-  }`;
-}
 
 export function AreasPage({
   onLogout,
@@ -23,6 +20,7 @@ export function AreasPage({
   const [view, setView] = useState<AreaView>("active");
   const activeAreas = areaState.areas.filter((area) => area.archived_at === null);
   const archivedAreas = areaState.areas.filter((area) => area.archived_at !== null);
+  // Keep selection within the current view.
   const selectedArea =
     areaState.selectedArea &&
     (view === "archived"
@@ -30,6 +28,10 @@ export function AreasPage({
       : areaState.selectedArea.archived_at === null)
       ? areaState.selectedArea
       : null;
+  const areaHabits = useAreaHabits(
+    selectedArea && selectedArea.archived_at === null ? selectedArea.id : null,
+  );
+  const habitDraft = areaHabits.draft;
 
   const showView = (nextView: AreaView) => {
     const firstArea = (nextView === "active" ? activeAreas : archivedAreas)[0];
@@ -125,9 +127,12 @@ export function AreasPage({
           />
         </div>
 
-        <AreaPanel
+        <AreaDetails
           area={selectedArea}
           view={view}
+          habitCount={
+            areaHabits.isLoading || areaHabits.loadError ? null : areaHabits.habits.length
+          }
           isLoading={areaState.isLoading}
           loadError={areaState.loadError}
           isRenaming={areaState.isRenaming}
@@ -145,8 +150,42 @@ export function AreasPage({
           onStartDeleting={areaState.startDeleting}
           onCancelDeleting={areaState.cancelDeleting}
           onDelete={() => void areaState.deleteArea()}
-        />
+        >
+          <AreaHabitList
+            habits={areaHabits.habits}
+            isLoading={areaHabits.isLoading}
+            loadError={areaHabits.loadError}
+            onAdd={areaHabits.openCreate}
+            onEdit={areaHabits.openEdit}
+          />
+        </AreaDetails>
       </div>
+
+      {selectedArea && habitDraft ? (
+        <HabitFormDialog
+          areaName={selectedArea.name}
+          isEditing={habitDraft.habitId !== null}
+          savedTitle={habitDraft.savedTitle}
+          title={habitDraft.title}
+          mode={habitDraft.mode}
+          error={areaHabits.formError}
+          isSaving={areaHabits.isSaving}
+          isConfirmingDelete={areaHabits.isConfirmingDelete}
+          onTitleChange={areaHabits.setTitle}
+          onModeChange={areaHabits.setMode}
+          onSubmit={() => void areaHabits.saveHabit()}
+          onClose={areaHabits.closeForm}
+          onStartDeleting={areaHabits.startDeleting}
+          onCancelDeleting={areaHabits.cancelDeleting}
+          onDelete={() => void areaHabits.deleteHabit()}
+        />
+      ) : null}
     </AppLayout>
   );
+}
+
+function viewButtonClassName(isPressed: boolean) {
+  return `min-w-[74px] rounded-[7px] px-3.5 py-1.5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-muted ${
+    isPressed ? "bg-card text-ink" : "text-ink-soft enabled:hover:text-ink"
+  }`;
 }

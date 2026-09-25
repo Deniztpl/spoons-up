@@ -18,8 +18,15 @@ function authError(code: string, message: string, status = 401) {
   return Response.json({ code, message }, { status });
 }
 
-function emptyAreasResponse() {
-  return Response.json({ areas: [] });
+function emptyTodayResponse() {
+  return Response.json({
+    date: "2026-09-24",
+    week_start: "2026-09-21",
+    week_end: "2026-09-27",
+    daily_habits: [],
+    weekly_habits: [],
+    tasks: [],
+  });
 }
 
 function renderApp(path = "/") {
@@ -72,24 +79,22 @@ describe("web authentication", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (request: Request) =>
-        new URL(request.url).pathname === "/api/v1/areas"
-          ? emptyAreasResponse()
+        new URL(request.url).pathname === "/api/v1/today"
+          ? emptyTodayResponse()
           : tokenResponse(),
       ),
     );
 
     renderApp("/login");
 
-    expect(
-      await screen.findByRole("heading", { name: "Create your first area" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
   });
 
   it("signs in and routes to the protected shell", async () => {
     const fetchMock = vi.fn(async (request: Request) => {
       const pathname = new URL(request.url).pathname;
-      if (pathname === "/api/v1/areas") {
-        return emptyAreasResponse();
+      if (pathname === "/api/v1/today") {
+        return emptyTodayResponse();
       }
       return pathname === "/api/v1/auth/refresh"
         ? authError("invalid_token", "Invalid or expired token")
@@ -104,9 +109,7 @@ describe("web authentication", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Create your first area" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
     const loginRequest = fetchMock.mock.calls
       .map(([request]) => request)
       .find((request) => new URL(request.url).pathname === "/api/v1/auth/login");
@@ -132,8 +135,8 @@ describe("web authentication", () => {
       if (pathname === "/api/v1/auth/register") {
         registerPayload = await request.clone().json();
       }
-      if (pathname === "/api/v1/areas") {
-        return emptyAreasResponse();
+      if (pathname === "/api/v1/today") {
+        return emptyTodayResponse();
       }
       return tokenResponse();
     });
@@ -147,9 +150,7 @@ describe("web authentication", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Create your first area" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
     expect(registerPayload).toEqual({
       email: "new@example.com",
       password: "password123",
@@ -239,8 +240,8 @@ describe("web authentication", () => {
       if (pathname === "/api/v1/auth/refresh") {
         return tokenResponse();
       }
-      if (pathname === "/api/v1/areas") {
-        return emptyAreasResponse();
+      if (pathname === "/api/v1/today") {
+        return emptyTodayResponse();
       }
       if (pathname === "/api/v1/auth/logout" && failLogout) {
         throw new TypeError("Network unavailable");
@@ -251,14 +252,12 @@ describe("web authentication", () => {
     const user = userEvent.setup();
     renderApp();
 
-    await screen.findByRole("heading", { name: "Create your first area" });
+    await screen.findByRole("heading", { name: "Today" });
     await user.click(screen.getByRole("button", { name: "Log out" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Please try logging out again",
     );
-    expect(
-      screen.getByRole("heading", { name: "Create your first area" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
 
     failLogout = false;
     await user.click(screen.getByRole("button", { name: "Log out" }));

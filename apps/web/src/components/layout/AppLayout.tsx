@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { AuthActionResult } from "../../features/auth/AuthContext";
+import { CloseIcon } from "../ui/CloseIcon";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 
@@ -8,19 +9,6 @@ type AppLayoutProps = {
   children: ReactNode;
   onLogout: () => Promise<AuthActionResult>;
 };
-
-function CloseIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none">
-      <path
-        d="m6 6 12 12M18 6 6 18"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
 
 export function AppLayout({
   children,

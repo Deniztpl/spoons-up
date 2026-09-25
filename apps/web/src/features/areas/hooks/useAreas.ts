@@ -9,28 +9,6 @@ import {
   type Area,
 } from "../api/areasApi";
 
-function areaErrorMessage(error: unknown, fallback: string) {
-  if (typeof error !== "object" || error === null) {
-    return fallback;
-  }
-
-  const value = error as {
-    code?: unknown;
-    message?: unknown;
-    fields?: Record<string, unknown>;
-  };
-  if (value.code === "area_name_taken") {
-    return "You already have an area with this name.";
-  }
-  if (
-    value.code === "validation_error" &&
-    typeof value.fields?.name === "string"
-  ) {
-    return value.fields.name;
-  }
-  return typeof value.message === "string" ? value.message : fallback;
-}
-
 export function useAreas() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
@@ -201,9 +179,10 @@ export function useAreas() {
   };
 
   const deleteArea = async () => {
-    if (!selectedArea || selectedArea.archived_at === null) {
+    if (!selectedArea) {
       return;
     }
+    const wasArchived = selectedArea.archived_at !== null;
     setIsSaving(true);
     setActionError(null);
     try {
@@ -215,7 +194,8 @@ export function useAreas() {
       const remainingAreas = areas.filter((area) => area.id !== selectedArea.id);
       setAreas(remainingAreas);
       setSelectedAreaId(
-        remainingAreas.find((area) => area.archived_at !== null)?.id ?? null,
+        remainingAreas.find((area) => (area.archived_at !== null) === wasArchived)?.id ??
+          null,
       );
       setIsConfirmingDelete(false);
     } catch {
@@ -258,4 +238,26 @@ export function useAreas() {
     cancelDeleting: () => setIsConfirmingDelete(false),
     deleteArea,
   };
+}
+
+function areaErrorMessage(error: unknown, fallback: string) {
+  if (typeof error !== "object" || error === null) {
+    return fallback;
+  }
+
+  const value = error as {
+    code?: unknown;
+    message?: unknown;
+    fields?: Record<string, unknown>;
+  };
+  if (value.code === "area_name_taken") {
+    return "You already have an area with this name.";
+  }
+  if (
+    value.code === "validation_error" &&
+    typeof value.fields?.name === "string"
+  ) {
+    return value.fields.name;
+  }
+  return typeof value.message === "string" ? value.message : fallback;
 }

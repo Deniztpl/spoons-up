@@ -14,8 +14,10 @@
   --color-line: rgb(28 43 33 / 0.08);
   --color-accent: #37596b;
   --color-accent-strong: #2c4856;
-  /* The design's #a8746f darkened to meet WCAG AA. */
-  --color-danger: #8e5b56;
+  --color-habit: #a8746f;
+  /* Habit-coloured text: #a8746f darkened to meet WCAG AA. */
+  --color-habit-strong: #8e5b56;
+  --color-danger: #a3564c;
   --color-danger-soft: #f7eeed;
   --color-clay-100: #f2dfd0;
   --shadow-panel: 0 22px 70px -34px rgb(80 69 52 / 0.28), 0 8px 24px -18px rgb(80 69 52 / 0.2);

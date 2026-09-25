@@ -1,8 +1,14 @@
+import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 
 import { AreaIcon } from "../../features/areas/components/AreaIcon";
 
-const plannedPages = ["Today", "Week"];
+const pages: { to: string; label: string; icon: ReactNode }[] = [
+  { to: "/areas", label: "Areas", icon: <AreaIcon /> },
+  { to: "/today", label: "Today", icon: <TodayIcon /> },
+];
+
+const plannedPages = ["Week"];
 
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -22,22 +28,31 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
       </p>
 
       <nav aria-label="Goals & Habits pages" className="flex flex-col gap-0.5">
-        <NavLink
-          to="/areas"
-          className={({ isActive }) =>
-            `flex items-center gap-2.5 rounded-[9px] px-2.5 py-[9px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-              isActive
-                ? "bg-accent/12 font-semibold text-ink"
-                : "text-ink-soft hover:bg-card/70 hover:text-ink"
-            }`
-          }
-          onClick={onNavigate}
-        >
-          <span className="grid w-5 place-items-center text-accent">
-            <AreaIcon />
-          </span>
-          Areas
-        </NavLink>
+        {pages.map((page) => (
+          <NavLink
+            key={page.to}
+            to={page.to}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 rounded-[9px] px-2.5 py-[9px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                isActive
+                  ? "bg-accent/12 font-semibold text-ink"
+                  : "text-ink-soft hover:bg-card/70 hover:text-ink"
+              }`
+            }
+            onClick={onNavigate}
+          >
+            {({ isActive }) => (
+              <>
+                <span
+                  className={`grid w-5 place-items-center ${isActive ? "text-accent" : "text-ink-soft"}`}
+                >
+                  {page.icon}
+                </span>
+                {page.label}
+              </>
+            )}
+          </NavLink>
+        ))}
 
         {plannedPages.map((page) => (
           <button
@@ -59,5 +74,20 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         Small steps, gathered gently.
       </p>
     </div>
+  );
+}
+
+function TodayIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none">
+      <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="m8.8 12.2 2.2 2.2 4.3-4.6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+    </svg>
   );
 }

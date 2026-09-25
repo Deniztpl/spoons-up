@@ -1,12 +1,15 @@
-import type { Area } from "../api/areasApi";
-import { AreaActionsMenu } from "./AreaActionsMenu";
-import { AreaArchiveActions } from "./AreaArchiveActions";
-import { AreaIcon } from "./AreaIcon";
-import { AreaRenameForm } from "./AreaRenameForm";
+import type { ReactNode } from "react";
 
-type AreaPanelProps = {
+import type { Area } from "../../api/areasApi";
+import { ArchivedAreaSection } from "./ArchivedAreaSection";
+import { AreaRenameForm } from "./AreaRenameForm";
+import { AreaSettingsMenu } from "./AreaSettingsMenu";
+
+type AreaDetailsProps = {
   area: Area | null;
   view: "active" | "archived";
+  habitCount: number | null;
+  children?: ReactNode;
   isLoading: boolean;
   loadError: string | null;
   isRenaming: boolean;
@@ -26,12 +29,11 @@ type AreaPanelProps = {
   onDelete: () => void;
 };
 
-const panelClassName =
-  "flex w-full shrink-0 flex-col gap-[18px] border-t border-line bg-card px-4 py-7 sm:px-8 md:w-[clamp(272px,32%,344px)] md:border-l md:border-t-0 md:px-[26px] md:pb-[26px] md:pt-[30px]";
-
-export function AreaPanel({
+export function AreaDetails({
   area,
   view,
+  habitCount,
+  children,
   isLoading,
   loadError,
   isRenaming,
@@ -49,10 +51,10 @@ export function AreaPanel({
   onStartDeleting,
   onCancelDeleting,
   onDelete,
-}: AreaPanelProps) {
+}: AreaDetailsProps) {
   if (isLoading) {
     return (
-      <section className={panelClassName}>
+      <section className={detailsClassName}>
         <p role="status" className="text-ink-soft">
           Loading your areas…
         </p>
@@ -62,7 +64,7 @@ export function AreaPanel({
 
   if (loadError) {
     return (
-      <section className={panelClassName}>
+      <section className={detailsClassName}>
         <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
           {loadError}
         </p>
@@ -72,7 +74,7 @@ export function AreaPanel({
 
   if (!area) {
     return (
-      <section className={panelClassName}>
+      <section className={detailsClassName}>
         <div>
           <h2 className="text-[22px] font-semibold leading-tight">
             {view === "archived" ? "No archived areas" : "Create your first area"}
@@ -88,9 +90,10 @@ export function AreaPanel({
   }
 
   const isArchived = area.archived_at !== null;
+  // The keyed menu resets when the selected area changes.
 
   return (
-    <section className={panelClassName}>
+    <section className={detailsClassName}>
       {isRenaming ? (
         <AreaRenameForm
           name={renameName}
@@ -110,10 +113,14 @@ export function AreaPanel({
               Archived
             </span>
           ) : (
-            <AreaActionsMenu
+            <AreaSettingsMenu
+              key={area.id}
+              areaName={area.name}
+              habitCount={habitCount}
               isSaving={isSaving}
               onRename={onStartRenaming}
               onArchive={onArchive}
+              onDelete={onDelete}
             />
           )}
         </div>
@@ -126,7 +133,7 @@ export function AreaPanel({
       ) : null}
 
       {isArchived ? (
-        <AreaArchiveActions
+        <ArchivedAreaSection
           areaName={area.name}
           isSaving={isSaving}
           isConfirmingDelete={isConfirmingDelete}
@@ -136,16 +143,11 @@ export function AreaPanel({
           onDelete={onDelete}
         />
       ) : (
-        <div className="rounded-[10px] border border-dashed border-ink/18 bg-well px-5 py-9 text-center">
-          <div className="mx-auto grid size-10 place-items-center rounded-xl bg-accent/10 text-accent">
-            <AreaIcon />
-          </div>
-          <h3 className="mt-3 text-[13.5px] font-medium">Nothing here yet</h3>
-          <p className="mt-1 text-[13px] leading-5 text-ink-soft">
-            This area is ready for its goals and habits.
-          </p>
-        </div>
+        children
       )}
     </section>
   );
 }
+
+const detailsClassName =
+  "flex w-full shrink-0 flex-col gap-[18px] border-t border-line bg-card px-4 py-7 sm:px-8 md:w-[clamp(272px,32%,344px)] md:border-l md:border-t-0 md:px-[26px] md:pb-[26px] md:pt-[30px]";
