@@ -24,9 +24,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U spoons -d spoons"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      start_interval: 2s
+      start_period: 30s
+      interval: 5m
+      timeout: 3s
+      retries: 3
 
   migrate:
     <<: *api-service
@@ -54,10 +56,11 @@ services:
           "-c",
           "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=2)",
         ]
-      interval: 5s
+      start_interval: 2s
+      start_period: 30s
+      interval: 5m
       timeout: 3s
-      retries: 12
-      start_period: 5s
+      retries: 3
 
   web:
     image: spoons-up-web:local
@@ -79,10 +82,11 @@ services:
           "-e",
           "fetch('http://127.0.0.1:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
         ]
-      interval: 5s
+      start_interval: 2s
+      start_period: 30s
+      interval: 5m
       timeout: 3s
-      retries: 12
-      start_period: 5s
+      retries: 3
 
   test-db:
     image: postgres:17-alpine
@@ -97,9 +101,11 @@ services:
       - /var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U spoons -d spoons_test"]
-      interval: 2s
-      timeout: 5s
-      retries: 15
+      start_interval: 2s
+      start_period: 30s
+      interval: 5m
+      timeout: 3s
+      retries: 3
 
 volumes:
   postgres_data:
