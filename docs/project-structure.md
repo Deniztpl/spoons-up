@@ -12,16 +12,21 @@ apps/web/src/
 |   |-- App.test.tsx
 |   `-- router.tsx
 |-- components/
-|   `-- layout/
-|       |-- AppLayout.tsx
-|       |-- AppHeader.tsx
-|       `-- AppSidebar.tsx
+|   |-- layout/
+|   |   |-- AppLayout.tsx
+|   |   |-- AppHeader.tsx
+|   |   `-- AppSidebar.tsx
+|   `-- ui/
+|       `-- CloseIcon.tsx
 |-- pages/
 |   |-- AuthPage/
 |   |   `-- AuthPage.tsx
-|   `-- AreasPage/
-|       |-- AreasPage.tsx
-|       `-- AreasPage.test.tsx
+|   |-- AreasPage/
+|   |   |-- AreasPage.tsx
+|   |   `-- AreasPage.test.tsx
+|   `-- TodayPage/
+|       |-- TodayPage.tsx
+|       `-- TodayPage.test.tsx
 |-- features/
 |   |-- auth/
 |   |   |-- api/
@@ -33,19 +38,40 @@ apps/web/src/
 |   |   |-- AuthContext.ts
 |   |   |-- AuthProvider.tsx
 |   |   `-- session.ts
-|   `-- areas/
+|   |-- areas/
+|   |   |-- api/
+|   |   |   `-- areasApi.ts
+|   |   |-- components/
+|   |   |   |-- AreaDetails/
+|   |   |   |   |-- ActiveAreaDeleteConfirmation.tsx
+|   |   |   |   |-- ArchivedAreaDeleteConfirmation.tsx
+|   |   |   |   |-- ArchivedAreaSection.tsx
+|   |   |   |   |-- AreaDetails.tsx
+|   |   |   |   |-- AreaRenameForm.tsx
+|   |   |   |   `-- AreaSettingsMenu.tsx
+|   |   |   |-- AreaList/
+|   |   |   |   |-- AreaCreateForm.tsx
+|   |   |   |   `-- AreaList.tsx
+|   |   |   `-- AreaIcon.tsx
+|   |   `-- hooks/
+|   |       `-- useAreas.ts
+|   |-- habits/
+|   |   |-- api/
+|   |   |   `-- habitsApi.ts
+|   |   |-- components/
+|   |   |   |-- AreaHabitList.tsx
+|   |   |   |-- HabitDeleteConfirmation.tsx
+|   |   |   `-- HabitFormDialog.tsx
+|   |   `-- hooks/
+|   |       `-- useAreaHabits.ts
+|   `-- today/
 |       |-- api/
-|       |   `-- areasApi.ts
+|       |   `-- todayApi.ts
 |       |-- components/
-|       |   |-- AreaActionsMenu.tsx
-|       |   |-- AreaArchiveActions.tsx
-|       |   |-- AreaCreateForm.tsx
-|       |   |-- AreaIcon.tsx
-|       |   |-- AreaList.tsx
-|       |   |-- AreaPanel.tsx
-|       |   `-- AreaRenameForm.tsx
+|       |   |-- TodayHabitList.tsx
+|       |   `-- TodayViewSelector.tsx
 |       `-- hooks/
-|           `-- useAreas.ts
+|           `-- useToday.ts
 |-- lib/
 |   |-- api.ts
 |   `-- api.test.ts
@@ -80,7 +106,16 @@ apps/web/src/
   domain's page navigation; feature CRUD never lives in the sidebar.
 - Responsive navigation is a layout detail. There is no separate mobile
   navigation feature; desktop and narrow layouts render the same navigation.
-- `AreaList`, `AreaPanel`, and area state belong to `features/areas`.
+- `AreaList`, `AreaDetails`, and area state belong to `features/areas`.
+- The today screen is the landing page after sign-in.
+- Habit API calls, the area details' habit list and the habit form belong to
+  `features/habits`. The Areas page composes them into the details: `AreaDetails`
+  renders its children for an active area, so `features/areas` does not depend
+  on habits. The today screen's view state and check-off flow belong to
+  `features/today`.
+- Parts of a design that wait for a later slice are marked with
+  `TODO(slice-N)` comments at the place they plug in, and disabled "Soon"
+  controls where the design shows them. No mock data is rendered in their place.
 - The generated API schema remains in `packages/api-client`; feature folders do
   not duplicate generated request or response types.
 - The web client uses React Router, direct calls through the generated API

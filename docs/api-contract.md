@@ -222,7 +222,7 @@ Areas are the only thing that archives. Habits and goals have delete only.
 
 **204** — the area and everything under it: habits with their entries, goals with their rules and tasks. Its `period_results` rows stay, so past weeks keep reading correctly. Not recoverable.
 
-The client asks for confirmation. Archive is the normal action; delete lives in the archive screen.
+Active and archived areas can both be deleted. The client asks for confirmation with a strong warning that names what goes with the area — its habits, goals and all of their history — and offers archive as the reversible way to put an area down.
 
 ---
 
@@ -523,7 +523,7 @@ Completing a task already done is a no-op and returns the task unchanged.
 
 ### Views
 
-These two take their shape from the screens. Draft until the screens are built.
+These two take their shape from the screens. `/today` is settled by the today screen built in slice 2; `/week` stays a draft until the calendar is built.
 
 Neither adds anything. Tasks are on screen because a goal or rule write created them, or because the daily job did. Both endpoints read what exists — except for a user returning after the daily job stopped running for them, whose window is added once before the first read.
 

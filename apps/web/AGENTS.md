@@ -12,12 +12,20 @@
 - Call `/me` only from the profile screen, not during app startup.
 - Do not modify `apps/api` from this workspace.
 
-## Component boundaries
+## Component conventions
 
-- Reuse is not required for extraction. Extract a feature-local component when
-  a JSX block has its own form submission or interaction lifecycle, loading or
-  error states, or makes its parent coordinate several distinct UI modes.
-- Use domain-specific names such as `AreaRenameForm`, not generic names such as
-  `RenameForm`.
-- Keep small static fragments inline. Do not create components solely to reduce
-  line count or to anticipate reuse.
+- Split components by responsibility, not line count. Long Tailwind classes or
+  local SVGs alone are not reasons to extract a component.
+- Extract a component when it owns behavior or state, is reused, represents a
+  meaningful UI mode, or makes a parent's mode switching clearly easier to
+  follow. A delete confirmation is one example.
+- Keep small static fragments and pass-through markup inline. Do not create a
+  component only to shorten JSX or in anticipation of future reuse.
+- Keep state in the lowest component that needs it.
+- Use names that describe the component's domain role, such as
+  `AreaRenameForm` or `AreaSettingsMenu`, instead of vague names like
+  `Options` or `Controls`.
+- Keep feature components flat by default. Create a folder such as
+  `AreaDetails/` only when a real group of closely related child components has
+  formed. Keep domain components in their feature and move genuinely shared UI
+  primitives to `components/ui/`.

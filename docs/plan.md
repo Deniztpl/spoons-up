@@ -34,10 +34,13 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 2 — Habits
 
-14. `habits` and `habit_entries` migration, CRUD
-15. Check off and undo — a row on check, hard delete on undo
-16. `GET /today?date=` returning daily habits, weekly habits and tasks (tasks empty for now)
-17. Web: today screen with the daily/weekly switch, habit rows with checkboxes
+14. `habits` and `habit_entries` migration, CRUD — DONE
+15. Check off and undo — a row on check, hard delete on undo — DONE
+16. `GET /today?date=` returning daily habits, weekly habits and tasks (tasks empty for now), plus `week_start` and `week_end` for the weekly view's label — DONE
+17. Web: today screen with the daily/weekly switch, habit rows with checkboxes — DONE
+   - Today is the landing page after sign-in — DONE
+   - Habits are added, edited and deleted from the area panel in a modal — DONE
+   - An active area can be deleted from its menu after a strong warning; archive stays the reversible option — DONE
 18. **Done when:** a habit is checked off in the browser and survives a reload; checking twice in one period is rejected
 
 ## Slice 3 — Goals and task generation

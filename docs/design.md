@@ -60,6 +60,8 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Delete is hard everywhere** — deleting a habit removes its entries, deleting a goal removes its rules, tasks and reminders, deleting an area removes everything under it. `period_results` rows are never deleted: they carry a snapshotted `title` and a `ref_id` that is not a foreign key, so past weeks keep reading after the thing they describe is gone. What is lost is the detail below the week — a deleted habit's day squares, a deleted goal's blocks on old calendars.
 
+**Areas delete from either state** — an active area can be deleted without archiving it first. The client confirms with a strong warning that the area's habits, goals and all of their history go with it, and points to archive as the reversible way to put an area down.
+
 **Push notifications** — a reminder five minutes before a task starts. A `reminders` row is written at task creation with `scheduled_at` in UTC, updated on move, cancelled on delete. A scheduler scans due reminders every minute and pushes to registered tokens through FCM/APNs.
 
 **Multi-device push** — a reminder fans out to every registered device. Invalid tokens are pruned on delivery failure.
