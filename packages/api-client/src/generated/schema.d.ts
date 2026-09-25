@@ -355,6 +355,16 @@ export interface components {
             date: string;
             /** Tasks */
             tasks: components["schemas"]["TodayTaskResponse"][];
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
             /** Weekly Habits */
             weekly_habits: components["schemas"]["TodayHabitResponse"][];
         };

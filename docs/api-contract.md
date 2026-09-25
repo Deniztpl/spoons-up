@@ -540,6 +540,8 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
 ```json
 {
   "date": "2026-09-19",
+  "week_start": "2026-09-14",
+  "week_end": "2026-09-20",
   "daily_habits": [
     { "id": "12", "title": "Read", "area_id": "3", "done": true }
   ],
@@ -564,6 +566,10 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
 ```
 
 `done` is derived: an entry exists for that period. `daily_habits` resolves against the date; `weekly_habits` against the week that date falls in.
+
+`week_start` and `week_end` bound the week `date` falls in, using the user's `week_start_day`. The weekly view labels itself with them, so the client never computes a week boundary. To check off or undo a habit shown here, the client sends this response's `date`; the server resolves it to the habit's day or week.
+
+**Open until slice 3:** the implemented endpoint always returns `tasks: []`, and its task shape has no `block_count` yet. Slice 3 (plan item 23) fills the list and adds the field; the example above already shows the slice 3 shape.
 
 Tasks are ordered by `start_time`, `DELETED` excluded. Anything under an archived area is excluded.
 

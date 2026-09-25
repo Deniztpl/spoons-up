@@ -373,6 +373,16 @@
             "title": "Tasks",
             "type": "array"
           },
+          "week_end": {
+            "format": "date",
+            "title": "Week End",
+            "type": "string"
+          },
+          "week_start": {
+            "format": "date",
+            "title": "Week Start",
+            "type": "string"
+          },
           "weekly_habits": {
             "items": {
               "$ref": "#/components/schemas/TodayHabitResponse"
@@ -383,6 +393,8 @@
         },
         "required": [
           "date",
+          "week_start",
+          "week_end",
           "daily_habits",
           "weekly_habits",
           "tasks"

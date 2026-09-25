@@ -29,6 +29,8 @@ class TodayTaskResponse(BaseModel):
 
 class TodayResponse(BaseModel):
     date: date
+    week_start: date
+    week_end: date
     daily_habits: list[TodayHabitResponse]
     weekly_habits: list[TodayHabitResponse]
     tasks: list[TodayTaskResponse]

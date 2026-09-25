@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
-from app.core.periods import get_week_start
+from app.core.periods import get_week_end, get_week_start
 from app.models import HabitMode
 from app.repositories.habits import HabitRepository
 from app.repositories.users import UserRepository
@@ -33,6 +33,10 @@ class TodayService:
                 resolved_date,
                 week_start_day=user.week_start_day,
             )
+            week_end = get_week_end(
+                resolved_date,
+                week_start_day=user.week_start_day,
+            )
             habits = self.habit_repository.list_for_today(
                 user_id=user_id,
                 target_date=resolved_date,
@@ -55,6 +59,8 @@ class TodayService:
 
             return TodayResponse(
                 date=resolved_date,
+                week_start=week_start,
+                week_end=week_end,
                 daily_habits=daily_habits,
                 weekly_habits=weekly_habits,
                 tasks=[],

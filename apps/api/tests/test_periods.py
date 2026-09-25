@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from app.core.periods import get_week_start
+from app.core.periods import get_week_end, get_week_start
 
 
 @pytest.mark.parametrize(
@@ -26,3 +26,20 @@ def test_get_week_start_uses_the_users_week_start_day(
 def test_get_week_start_rejects_an_invalid_week_start_day(week_start_day: int) -> None:
     with pytest.raises(ValueError, match="week_start_day must be between 1 and 7"):
         get_week_start(date(2026, 9, 24), week_start_day=week_start_day)
+
+
+@pytest.mark.parametrize(
+    ("target_date", "week_start_day", "expected"),
+    [
+        (date(2026, 9, 24), 1, date(2026, 9, 27)),
+        (date(2026, 9, 27), 1, date(2026, 9, 27)),
+        (date(2026, 9, 28), 1, date(2026, 10, 4)),
+        (date(2026, 9, 24), 7, date(2026, 9, 26)),
+    ],
+)
+def test_get_week_end_is_the_last_day_of_the_users_week(
+    target_date: date,
+    week_start_day: int,
+    expected: date,
+) -> None:
+    assert get_week_end(target_date, week_start_day=week_start_day) == expected

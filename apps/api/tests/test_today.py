@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import HabitEntry
+from app.models import HabitEntry, User
 
 pytestmark = pytest.mark.integration
 
@@ -140,6 +140,8 @@ def test_today_returns_daily_and_weekly_habits_for_the_requested_date(
     assert response.status_code == 200
     assert response.json() == {
         "date": "2026-09-24",
+        "week_start": "2026-09-21",
+        "week_end": "2026-09-27",
         "daily_habits": [
             {
                 "id": daily_done["id"],
@@ -205,6 +207,42 @@ def test_today_defaults_to_the_users_local_date(
     assert response.status_code == 200
     assert response.json()["date"] == "2026-09-25"
     assert response.json()["daily_habits"][0]["done"] is True
+
+
+def test_today_returns_the_week_from_the_users_week_start_day(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "today-week-start@example.com"))
+    db_session.execute(
+        update(User).where(User.email == "today-week-start@example.com").values(week_start_day=7)
+    )
+    db_session.commit()
+    area = create_area(client, headers, "Home")
+    habit = create_habit(
+        client,
+        headers,
+        area_id=str(area["id"]),
+        title="Tidy up",
+        mode="WEEKLY",
+    )
+    check_habit(
+        client,
+        headers,
+        habit_id=str(habit["id"]),
+        target_date="2026-09-20",
+    )
+
+    response = client.get(
+        "/api/v1/today",
+        params={"date": "2026-09-24"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["week_start"] == "2026-09-20"
+    assert response.json()["week_end"] == "2026-09-26"
+    assert response.json()["weekly_habits"][0]["done"] is True
 
 
 def test_today_requires_authentication_and_validates_the_date(client: TestClient) -> None:
