@@ -330,12 +330,12 @@ A goal object, with its rules embedded:
   "weekly_target": 3,
   "created_at": "2026-09-01T09:00:00Z",
   "rules": [
-    { "id": "21", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60 }
+    { "id": "21", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
   ]
 }
 ```
 
-`weekly_target` is null for goals the user schedules ad hoc — those have no quota, so they never fail a week.
+`weekly_target` is measured in whole blocks. It is null for goals the user schedules ad hoc — those have no quota, so they never fail a week. Completed blocks can include halves (see `block_count`), so a week's `done` can be 2.5 against a target of 3.
 
 `byweekday` is 1 (Monday) to 7 (Sunday), independent of the user's `week_start_day`.
 
@@ -399,33 +399,33 @@ A rule is a pre-fill for generation, not a contract. Once a task exists the rule
 #### POST /goals/{id}/rules
 
 ```json
-{ "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60 }
+{ "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
 ```
 
 **201**
 
 ```json
-{ "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60 }
+{ "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
 ```
 
-The rule adds its tasks and reminders for the current window in the same request, so today's block is on screen as soon as it is saved.
+The rule adds its tasks and reminders for the current window in the same request, copying `block_count` to every generated task, so today's block is on screen as soon as it is saved. `block_count` defaults to 1 and is independent of `duration_minutes`. It is a positive multiple of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4.
 
-A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`.
+A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. `block_count: 2` still generates one task per occurrence; two different times on the same day still use two rules.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal |
-| 422 `validation_error` | empty or out-of-range `byweekday`, `duration_minutes` below 1 |
+| 422 `validation_error` | empty or out-of-range `byweekday`, `duration_minutes` below 1, or `block_count` not a positive multiple of 0.5 |
 
 #### PATCH /rules/{id}
 
 ```json
-{ "byweekday": [1, 4], "start_time": "20:00", "duration_minutes": 90 }
+{ "byweekday": [1, 4], "start_time": "20:00", "duration_minutes": 90, "block_count": 2 }
 ```
 
 All fields optional.
 
-**200** — the updated rule. The tasks it produced are removed from the open week forward and added again in the same request, together with their reminders. `DONE` tasks and tasks the user moved are kept; closed weeks are untouched.
+**200** — the updated rule. The tasks it produced are removed from the open week forward and added again in the same request; newly added tasks carry the updated `block_count`. `DONE` tasks and tasks the user moved are kept unchanged; closed weeks are untouched.
 
 #### DELETE /rules/{id}
 
@@ -447,6 +447,7 @@ A task object:
   "scheduled_date": "2026-09-17",
   "start_time": "19:00",
   "end_time": "20:00",
+  "block_count": 2,
   "period_start": "2026-09-14",
   "status": "PENDING",
   "completed_at": null
@@ -458,6 +459,7 @@ The three dates mean different things and only one of them moves:
 - `occurrence_date` — the date the rule produced. Immutable. Null for ad-hoc tasks.
 - `scheduled_date` — where the task sits now. This is what the calendar draws.
 - `period_start` — the week the task counts toward. Fixed at generation, so postponing across a week boundary doesn't move the quota.
+- `block_count` — how many blocks the task contributes when completed: a positive multiple of 0.5, independent of the task's duration.
 
 There is no `GET /tasks`. Tasks are read through `/today` and `/week`.
 
@@ -471,26 +473,27 @@ Ad-hoc task, created by the user rather than a rule.
   "scheduled_date": "2026-09-22",
   "start_time": "14:00",
   "duration_minutes": 45,
+  "block_count": 2,
   "goal_id": "7"
 }
 ```
 
-`goal_id` optional — attach it to count toward that goal's quota, or leave it out for something standalone.
+`goal_id` optional — attach it to count toward that goal's quota, or leave it out for something standalone. `block_count` defaults to 1.
 
 **201** — the created task. `rule_id` and `occurrence_date` are null; `period_start` is derived from `scheduled_date`; `end_time` from `start_time + duration_minutes`.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal |
-| 422 `validation_error` | empty title, `duration_minutes` below 1 |
+| 422 `validation_error` | empty title, `duration_minutes` below 1, or `block_count` not a positive multiple of 0.5 |
 
 #### PATCH /tasks/{id}
 
 ```json
-{ "title": "...", "scheduled_date": "2026-09-24", "start_time": "20:00", "duration_minutes": 30 }
+{ "title": "...", "scheduled_date": "2026-09-24", "start_time": "20:00", "duration_minutes": 30, "block_count": 2 }
 ```
 
-All fields optional. This is also how postpone works — send a new `scheduled_date`.
+All fields optional. This is also how postpone works — send a new `scheduled_date`. Changing `block_count` updates only this task; its rule is unchanged.
 
 **200** — the updated task. `occurrence_date` and `period_start` are unchanged whatever the new date is.
 
@@ -550,6 +553,7 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
       "title": "CS Block",
       "start_time": "19:00",
       "end_time": "20:00",
+      "block_count": 2,
       "status": "PENDING",
       "scheduled_date": "2026-09-19",
       "occurrence_date": "2026-09-16",
@@ -633,6 +637,8 @@ Newest week first.
 `open` marks the current week — computed live from raw rows, so it moves as the week goes. Closed weeks come from `period_results` and never change.
 
 `passed` is derived: every requirement satisfies `done >= target`. On an open week it reflects where things stand right now.
+
+For goals, `target` is `weekly_target` in blocks and `done` is `SUM(block_count)` across completed tasks in the period, not `COUNT(*)` — so `done` can be fractional, such as 2.5.
 
 `title` is snapshotted alongside `target` and `done`, so a week still reads correctly after the habit or goal is renamed or deleted. `ref_id` is not a foreign key — it identifies the row for the unique constraint, nothing more.
 

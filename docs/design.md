@@ -22,13 +22,13 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Daily and weekly views** — the today screen holds both. Daily shows `DAILY` habits with the day's tasks underneath, ordered by start time; weekly shows `WEEKLY` habits alone. One endpoint returns all three lists. Quota progress lives in the area view.
 
-**Goals** — weekly quotas ("3 CS Blocks a week"), user-entered. `weekly_target` is nullable for goals scheduled ad hoc.
+**Goals** — weekly quotas ("3 CS Blocks a week"), user-entered. `weekly_target` is a whole number of blocks and is nullable for goals scheduled ad hoc. A goal's weekly `done` is `SUM(block_count)` across its completed tasks, not the number of task rows. Blocks can be halved, so `done` can be 2.5 against a target of 3.
 
-**Goal rules** — a goal can have several at once: `{Mon, Wed, Fri} 19:00, 60min` alongside `{Mon, Tue} 07:00, 60min`. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
+**Goal rules** — a goal can have several at once: `{Mon, Wed, Fri} 19:00, 60min` alongside `{Mon, Tue} 07:00, 60min`. `block_count` says how many blocks each generated task contributes and is copied to that task. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
 
 **Changing a rule redraws the open week** — tasks that rule produced are removed and generated again from the open week forward. Removed means untouched ones only: `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`), because those were the user's decisions. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
 
-**Tasks** — concrete scheduled work with a start time and duration. Belongs to a goal, or stands alone (dentist appointment).
+**Tasks** — concrete scheduled work with a start time and duration. `block_count` is a separate user-entered counter value; it is not derived from duration. It moves in steps of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4. Changing one task's `block_count` changes only that task, not its rule. A task belongs to a goal, or stands alone (dentist appointment).
 
 **Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range and writes each task's reminder with it. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
 
@@ -165,6 +165,7 @@ erDiagram
         smallint_array byweekday
         time start_time
         int duration_minutes
+        numeric block_count
     }
 
     tasks {
@@ -177,6 +178,7 @@ erDiagram
         date scheduled_date
         time start_time
         time end_time
+        numeric block_count
         date period_start
         text status
         timestamptz completed_at
@@ -192,7 +194,7 @@ erDiagram
         bigint ref_id
         text title
         int target
-        int done
+        numeric done
     }
 
     reminders {
@@ -288,7 +290,7 @@ UNIQUE (habit_id, period_type, period_start)
 | user_id | bigint | FK -> users |
 | area_id | bigint | FK -> areas |
 | title | text | |
-| weekly_target | int | nullable |
+| weekly_target | int | nullable, number of blocks |
 | created_at | timestamptz | |
 
 #### goal_rules
@@ -300,6 +302,7 @@ UNIQUE (habit_id, period_type, period_start)
 | byweekday | smallint[] | e.g. {1,3,5} |
 | start_time | time | |
 | duration_minutes | int | |
+| block_count | numeric(3,1) | default 1, positive multiple of 0.5, copied to each generated task |
 
 #### tasks
 
@@ -314,6 +317,7 @@ UNIQUE (habit_id, period_type, period_start)
 | scheduled_date | date | |
 | start_time | time | |
 | end_time | time | start_time + duration_minutes |
+| block_count | numeric(3,1) | default 1, positive multiple of 0.5; contribution to the goal's weekly target |
 | period_start | date | which week the quota counts toward |
 | status | text | PENDING \| DONE \| DELETED |
 | completed_at | timestamptz | nullable |
@@ -322,6 +326,14 @@ UNIQUE (habit_id, period_type, period_start)
 ```sql
 CREATE UNIQUE INDEX ON tasks (goal_id, rule_id, occurrence_date)
 WHERE occurrence_date IS NOT NULL;
+```
+
+`block_count` does not change occurrence identity: a two-block occurrence is still one task row. Separate times on the same day still require separate rules.
+
+`goal_rules.block_count` and `tasks.block_count` both carry the same check, so half blocks are allowed and anything finer is rejected:
+
+```sql
+CHECK (block_count > 0 AND block_count * 2 = trunc(block_count * 2))
 ```
 
 #### period_results
@@ -336,7 +348,7 @@ WHERE occurrence_date IS NOT NULL;
 | ref_id | bigint | habits.id or goals.id — not a foreign key |
 | title | text | snapshot of the habit or goal title |
 | target | int | |
-| done | int | |
+| done | numeric(5,1) | goal rows snapshot `SUM(tasks.block_count)` for completed tasks, so it can be fractional |
 
 ```sql
 UNIQUE (ref_type, ref_id, period_start)

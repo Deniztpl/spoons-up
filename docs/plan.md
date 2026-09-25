@@ -42,13 +42,13 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 3 — Goals and task generation
 
-19. `goals` and `goal_rules` migration, CRUD
+19. `goals` and `goal_rules` migration, CRUD; `weekly_target` is in whole blocks and each rule has `block_count` defaulting to 1. `block_count` is a positive multiple of 0.5 (`numeric(3,1)` with a check); the client offers 0.5, 1, 2 and 4
 20. Period math — timezone + `week_start_day` -> `period_start`. Standalone, no DB, tested.
-21. `tasks` migration; `users.last_seen_at`, refreshed on each authenticated request, so the daily job skips dormant users and their first request back adds the window
-22. `add_tasks(user_id, from, to)` — expand rules into dates, insert idempotently. Called by goal and rule writes for their own range, and by a daily job that advances a rolling 14-day window per user timezone. Reads never call it. A rule change removes that rule's untouched `PENDING` tasks from the open week forward and adds them again
-23. `/today` now returns the day's tasks, ordered by `start_time`
+21. `tasks` migration with `block_count` defaulting to 1, a positive multiple of 0.5 as on rules; `users.last_seen_at`, refreshed on each authenticated request, so the daily job skips dormant users and their first request back adds the window
+22. `add_tasks(user_id, from, to)` — expand rules into dates, copy each rule's `block_count` to its tasks, and insert idempotently. Called by goal and rule writes for their own range, and by a daily job that advances a rolling 14-day window per user timezone. Reads never call it. A rule change removes that rule's untouched `PENDING` tasks from the open week forward and adds them again
+23. `/today` now returns the day's tasks with `block_count`, ordered by `start_time`. **Open from slice 2:** the endpoint still returns `tasks: []` and `TodayTaskResponse` has no `block_count` field — add the field and fill the list here. The web today screen marks where task blocks go with `TODO(slice-3)`
 24. Complete and uncomplete a task
-25. Web: goal form with rules; tasks under the habits on the today screen
+25. Web: goal form with rule duration and `block_count` (0.5, 1, 2, 4); tasks under the habits on the today screen. The Today v2 design draws tasks above the habits, while the behaviour section says underneath — settle the order when building this. Enable the disabled "Add goal" entries left in the area panel and on the today screen
 26. **Done when:** a goal created in the browser produces today's task, and completing it holds after a reload
 
 ## Slice 4 — Calendar
@@ -63,7 +63,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 ## Slice 5 — Weekly results
 
 33. `period_results` migration
-34. Live computation for the open week; the daily job from slice 3 freezes each closed week at the week turn in the user's timezone. Targets follow active days: `created_at` and the area's `archived_at` / `unarchived_at` bound each requirement, and one with no active day is left out of the week
+34. Live computation for the open week; goal `done` is `SUM(task.block_count)` rather than task count, so it can be fractional and `period_results.done` is numeric. The daily job from slice 3 freezes each closed week at the week turn in the user's timezone. Targets follow active days: `created_at` and the area's `archived_at` / `unarchived_at` bound each requirement, and one with no active day is left out of the week
 35. Area result — every row for that week satisfies `done >= target`
 36. Web: area view showing weekly progress and past weeks
 37. **Done when:** a closed week's outcome does not move after `weekly_target` is changed
