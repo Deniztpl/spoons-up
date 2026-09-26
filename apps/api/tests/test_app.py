@@ -19,9 +19,13 @@ def test_openapi_smoke() -> None:
         "/api/v1/auth/logout",
         "/api/v1/auth/refresh",
         "/api/v1/auth/register",
+        "/api/v1/goals",
+        "/api/v1/goals/{goal_id}",
+        "/api/v1/goals/{goal_id}/rules",
         "/api/v1/habits",
         "/api/v1/habits/{habit_id}",
         "/api/v1/habits/{habit_id}/check",
+        "/api/v1/rules/{rule_id}",
         "/api/v1/today",
     }
 

@@ -4,11 +4,13 @@ from fastapi import Depends
 
 from app.api.deps.db import DatabaseSession
 from app.repositories.areas import AreaRepository
+from app.repositories.goals import GoalRepository
 from app.repositories.habits import HabitRepository
 from app.repositories.refresh_tokens import RefreshTokenRepository
 from app.repositories.users import UserRepository
 from app.services.areas import AreaService
 from app.services.auth import AuthService
+from app.services.goals import GoalService
 from app.services.habits import HabitService
 from app.services.today import TodayService
 
@@ -29,6 +31,17 @@ def get_area_service(session: DatabaseSession) -> AreaService:
 
 
 AreaServiceDependency = Annotated[AreaService, Depends(get_area_service)]
+
+
+def get_goal_service(session: DatabaseSession) -> GoalService:
+    return GoalService(
+        session,
+        GoalRepository(session),
+        AreaRepository(session),
+    )
+
+
+GoalServiceDependency = Annotated[GoalService, Depends(get_goal_service)]
 
 
 def get_habit_service(session: DatabaseSession) -> HabitService:
