@@ -394,7 +394,7 @@ Goals do not archive. Dropping one is a delete.
 
 ### Goal rules
 
-A rule is a pre-fill for generation, not a contract. Once a task exists the rule no longer binds it — editing the rule does not move or delete tasks already generated.
+A rule is a pre-fill for generation, not a contract. Editing it can replace untouched `PENDING` tasks, but never rewrites tasks the user completed or moved.
 
 #### POST /goals/{id}/rules
 
@@ -408,7 +408,7 @@ A rule is a pre-fill for generation, not a contract. Once a task exists the rule
 { "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
 ```
 
-The rule adds its tasks and reminders for the current window in the same request, copying `block_count` to every generated task, so today's block is on screen as soon as it is saved. `block_count` defaults to 1 and is independent of `duration_minutes`. It is a positive multiple of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4.
+The rule adds its tasks and reminders from today through the current window in the same request, copying `block_count` to every generated task, so today's block is on screen as soon as it is saved. `block_count` defaults to 1 and is independent of `duration_minutes`. It is a positive multiple of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4.
 
 A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. `block_count: 2` still generates one task per occurrence; two different times on the same day still use two rules.
 
@@ -425,7 +425,7 @@ A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mo
 
 All fields optional.
 
-**200** — the updated rule. The tasks it produced are removed from the open week forward and added again in the same request; newly added tasks carry the updated `block_count`. `DONE` tasks and tasks the user moved are kept unchanged; closed weeks are untouched.
+**200** — the updated rule. Its untouched `PENDING` tasks are removed from the open week forward, including days before today. New tasks are added from today forward only and carry the updated `block_count`, so a newly selected weekday earlier in the open week stays empty. `DONE` tasks and tasks the user moved are kept unchanged; closed weeks are untouched.
 
 #### DELETE /rules/{id}
 
@@ -525,7 +525,7 @@ Completing a task already done is a no-op and returns the task unchanged.
 
 These two take their shape from the screens. `/today` is settled by the today screen built in slice 2; `/week` stays a draft until the calendar is built.
 
-Neither adds anything. Tasks are on screen because a goal or rule write created them, or because the daily job did. Both endpoints read what exists — except for a user returning after the daily job stopped running for them, whose window is added once before the first read.
+Neither adds anything. Tasks are on screen because a rule write created them, or because the daily job did. Both endpoints read what exists — except for a user returning after the daily job stopped running for them, whose window is added once before the first read.
 
 #### GET /today
 

@@ -6,7 +6,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 ## Behaviour
 
-**Auth** — email and password, JWT access tokens valid 15 minutes. Normal requests never touch the database for identity. `user_id` comes from the token and never appears in a URL; sub-resources carry their own id but queries still filter on `user_id`, so someone else's row is a 404.
+**Auth** — email and password, JWT access tokens valid 15 minutes. Identity comes from the token; authenticated requests touch the user row only to refresh `last_seen_at` and, after a dormant period, restore the generated task window. `user_id` never appears in a URL; sub-resources carry their own id but queries still filter on `user_id`, so someone else's row is a 404.
 
 **Refresh tokens** — random string valid 30 days, only its sha256 hash stored. The presented token is revoked and a new one issued on every refresh. A revoked token presented again revokes every live row for that user. The client serialises refreshes behind a single in-flight promise; the server reads the row `FOR UPDATE`.
 
@@ -26,15 +26,15 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Goal rules** — a goal can have several at once: `{Mon, Wed, Fri} 19:00, 60min` alongside `{Mon, Tue} 07:00, 60min`. `block_count` says how many blocks each generated task contributes and is copied to that task. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
 
-**Changing a rule redraws the open week** — tasks that rule produced are removed and generated again from the open week forward. Removed means untouched ones only: `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`), because those were the user's decisions. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
+**Changing a rule redraws unfinished work** — untouched `PENDING` tasks that rule produced are removed from the open week forward, including days before today. `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`), because those were the user's decisions. New tasks are generated from today forward only, so newly selected weekdays earlier in the open week stay empty. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
 
 **Tasks** — concrete scheduled work with a start time and duration. `block_count` is a separate user-entered counter value; it is not derived from duration. It moves in steps of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4. Changing one task's `block_count` changes only that task, not its rule. A task belongs to a goal, or stands alone (dentist appointment).
 
 **Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range and writes each task's reminder with it. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
 
-**Two triggers, no lazy reads** — a write that creates or changes a goal or a rule adds its own tasks in the same request, so a goal saved now has today's task and reminder before the response returns. A daily job then advances a rolling window of 14 days, in each user's own timezone, so tasks and reminders exist without the app being opened. Nothing else calls `add_tasks`.
+**Two triggers, no lazy reads** — a write that creates or changes a rule adds its tasks in the same request, so a saved rule has today's task and reminder before the response returns. An hourly cron runs the daily job, which advances a rolling window of 14 days using each user's own timezone, so tasks and reminders exist without the app being opened. Nothing else calls `add_tasks`.
 
-**Dormant users are skipped** — the daily job only runs for users seen recently; `users.last_seen_at` is refreshed on each authenticated request. Someone away for months has no window being written for them. Their first request back adds the window before anything is read, so they see a full calendar immediately and nothing was generated in the meantime.
+**Dormant users are skipped** — the daily job only runs for users seen in the last 30 days; `users.last_seen_at` is refreshed on each authenticated request. Someone away longer has no window being written for them. Their first request back adds the window before anything is read, so they see a full calendar immediately and nothing was generated in the meantime.
 
 **Generated window** — the calendar is generated 14 days ahead. Further out it is empty until the window reaches it.
 
@@ -46,7 +46,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Extra tasks** — the user can add beyond the rule (`rule_id` and `occurrence_date` NULL). Outside the unique index, so unlimited; still counts toward the week's quota through `period_start`.
 
-**Catch-up on return** — nothing to catch up. The daily job runs whether or not the app is opened, so a user away for five weeks comes back to five weeks of generated tasks: past weeks show what was missed, the current week is live.
+**Catch-up on return** — past dormant time is not generated. The first authenticated request after more than 30 days restores only the current 14-day window; older empty dates stay empty.
 
 **Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone; reads never write.
 
@@ -75,8 +75,6 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 ## Open questions
 
 **Goals active for part of a week** — a `DAILY` habit's target can be derived from active days, but a goal's `weekly_target` is a number the user chose, so scaling it is arbitrary. Options: keep the full target, or let the user set a target for the open week only ("2 this week", or 0 to skip it). Decide in slice 5.
-
-**Regenerating into days already past** — when a rule changes mid-week, the new weekdays may fall before today. Options: generate them anyway so the user can still tick them off, or generate from today forward and let the week run short. Decide in slice 3.
 
 **week\_start\_day changed mid-week** — tasks already generated carry a `period_start` computed from the old boundary. After the change the open week's quota looks at a different range and stops matching them. Options: apply the change from the next week, recompute `period_start` for the open week's tasks, or only allow the change at a week boundary. Decide in slice 3.
 

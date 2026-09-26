@@ -34,8 +34,8 @@ Then open:
 - API: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 
-Docker Compose starts PostgreSQL, applies pending migrations, and starts the API and
-web app.
+Docker Compose starts PostgreSQL, applies pending migrations, and starts the API,
+scheduler, and web app.
 
 ## Development
 
