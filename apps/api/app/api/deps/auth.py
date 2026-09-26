@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.api.deps.services import UserActivityServiceDependency
 from app.core.config.auth import auth_settings
 from app.core.errors import InvalidTokenError
 from app.core.security import decode_access_token
@@ -28,4 +29,15 @@ def get_current_user(
     return CurrentUser(id=user_id)
 
 
-CurrentUserDependency = Annotated[CurrentUser, Depends(get_current_user)]
+TokenUserDependency = Annotated[CurrentUser, Depends(get_current_user)]
+
+
+def record_user_activity(
+    current_user: TokenUserDependency,
+    user_activity_service: UserActivityServiceDependency,
+) -> CurrentUser:
+    user_activity_service.record_authenticated_request(user_id=current_user.id)
+    return current_user
+
+
+CurrentUserDependency = Annotated[CurrentUser, Depends(record_user_activity)]

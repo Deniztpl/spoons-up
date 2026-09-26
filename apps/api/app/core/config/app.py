@@ -1,9 +1,11 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppSettings(BaseSettings):
     database_url: str = "postgresql+psycopg://spoons:spoons@localhost:5432/spoons"
     cors_origins: str = "http://localhost:3000"
+    active_user_days: int = Field(default=30, ge=1)
 
     model_config = SettingsConfigDict(
         env_file=".env",

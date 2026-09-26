@@ -15,6 +15,7 @@ from app.services.goals import GoalService
 from app.services.habits import HabitService
 from app.services.tasks import TaskService
 from app.services.today import TodayService
+from app.services.user_activity import UserActivityService
 
 
 def get_auth_service(session: DatabaseSession) -> AuthService:
@@ -60,6 +61,23 @@ def get_goal_service(
 
 
 GoalServiceDependency = Annotated[GoalService, Depends(get_goal_service)]
+
+
+def get_user_activity_service(
+    session: DatabaseSession,
+    task_service: TaskServiceDependency,
+) -> UserActivityService:
+    return UserActivityService(
+        session,
+        UserRepository(session),
+        task_service,
+    )
+
+
+UserActivityServiceDependency = Annotated[
+    UserActivityService,
+    Depends(get_user_activity_service),
+]
 
 
 def get_habit_service(session: DatabaseSession) -> HabitService:
