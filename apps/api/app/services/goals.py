@@ -1,9 +1,14 @@
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
+from app.core.periods import get_week_start
 from app.models import Goal, GoalRule
 from app.repositories.areas import AreaRepository
 from app.repositories.goals import GoalRepository
+from app.repositories.users import UserRepository
 from app.schemas.goals import (
     CreateGoalRequest,
     CreateGoalRuleRequest,
@@ -13,6 +18,7 @@ from app.schemas.goals import (
     UpdateGoalRequest,
     UpdateGoalRuleRequest,
 )
+from app.services.tasks import TASK_GENERATION_DAYS, TaskService
 
 
 class GoalService:
@@ -21,10 +27,14 @@ class GoalService:
         session: Session,
         goal_repository: GoalRepository,
         area_repository: AreaRepository,
+        user_repository: UserRepository,
+        task_service: TaskService,
     ) -> None:
         self.session = session
         self.goal_repository = goal_repository
         self.area_repository = area_repository
+        self.user_repository = user_repository
+        self.task_service = task_service
 
     def list(self, *, user_id: int, area_id: int | None) -> GoalListResponse:
         with self.session.begin():
@@ -96,6 +106,7 @@ class GoalService:
                 duration_minutes=payload.duration_minutes,
                 block_count=payload.block_count,
             )
+            self._add_tasks_for_current_window(user_id=user_id)
             response = GoalRuleResponse.model_validate(rule)
         return response
 
@@ -108,20 +119,61 @@ class GoalService:
     ) -> GoalRuleResponse:
         with self.session.begin():
             rule = self._get_owned_rule(rule_id=rule_id, user_id=user_id)
-            self.goal_repository.update_rule(
-                rule=rule,
-                byweekday=payload.byweekday,
-                start_time=payload.start_time,
-                duration_minutes=payload.duration_minutes,
-                block_count=payload.block_count,
-            )
+            if payload.model_fields_set:
+                today, open_week_start, window_end = self._get_task_generation_dates(
+                    user_id=user_id
+                )
+                self.task_service.delete_untouched_pending_tasks_for_rule(
+                    rule_id=rule.id,
+                    user_id=user_id,
+                    from_date=open_week_start,
+                )
+                self.goal_repository.update_rule(
+                    rule=rule,
+                    byweekday=payload.byweekday,
+                    start_time=payload.start_time,
+                    duration_minutes=payload.duration_minutes,
+                    block_count=payload.block_count,
+                )
+                self.task_service.add_tasks(
+                    user_id=user_id,
+                    from_date=today,
+                    to_date=window_end,
+                )
             response = GoalRuleResponse.model_validate(rule)
         return response
 
     def delete_rule(self, *, rule_id: int, user_id: int) -> None:
         with self.session.begin():
             rule = self._get_owned_rule(rule_id=rule_id, user_id=user_id)
+            _, open_week_start, _ = self._get_task_generation_dates(user_id=user_id)
+            self.task_service.delete_untouched_pending_tasks_for_rule(
+                rule_id=rule.id,
+                user_id=user_id,
+                from_date=open_week_start,
+            )
             self.goal_repository.delete_rule(rule=rule)
+
+    def _add_tasks_for_current_window(self, *, user_id: int) -> None:
+        today, _, window_end = self._get_task_generation_dates(user_id=user_id)
+        self.task_service.add_tasks(
+            user_id=user_id,
+            from_date=today,
+            to_date=window_end,
+        )
+
+    def _get_task_generation_dates(self, *, user_id: int) -> tuple[date, date, date]:
+        user = self.user_repository.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError
+
+        today = datetime.now(ZoneInfo(user.timezone)).date()
+        open_week_start = get_week_start(
+            today,
+            week_start_day=user.week_start_day,
+        )
+        window_end = today + timedelta(days=TASK_GENERATION_DAYS - 1)
+        return today, open_week_start, window_end
 
     def _get_owned_goal(self, *, goal_id: int, user_id: int) -> Goal:
         goal = self.goal_repository.get_for_user(goal_id=goal_id, user_id=user_id)

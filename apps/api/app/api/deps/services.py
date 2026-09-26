@@ -7,11 +7,13 @@ from app.repositories.areas import AreaRepository
 from app.repositories.goals import GoalRepository
 from app.repositories.habits import HabitRepository
 from app.repositories.refresh_tokens import RefreshTokenRepository
+from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.services.areas import AreaService
 from app.services.auth import AuthService
 from app.services.goals import GoalService
 from app.services.habits import HabitService
+from app.services.tasks import TaskService
 from app.services.today import TodayService
 
 
@@ -33,11 +35,27 @@ def get_area_service(session: DatabaseSession) -> AreaService:
 AreaServiceDependency = Annotated[AreaService, Depends(get_area_service)]
 
 
-def get_goal_service(session: DatabaseSession) -> GoalService:
+def get_task_service(session: DatabaseSession) -> TaskService:
+    return TaskService(
+        TaskRepository(session),
+        UserRepository(session),
+    )
+
+
+TaskServiceDependency = Annotated[TaskService, Depends(get_task_service)]
+
+
+def get_goal_service(
+    session: DatabaseSession,
+    task_service: TaskServiceDependency,
+) -> GoalService:
+    user_repository = UserRepository(session)
     return GoalService(
         session,
         GoalRepository(session),
         AreaRepository(session),
+        user_repository,
+        task_service,
     )
 
 

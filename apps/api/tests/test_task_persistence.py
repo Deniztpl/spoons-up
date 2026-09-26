@@ -22,7 +22,7 @@ def test_generated_task_is_persisted_with_its_week_and_defaults(
         db_session,
         email="task-persistence@example.com",
     )
-    occurrence_date = date(2026, 9, 30)
+    occurrence_date = date(2030, 9, 30)
     task = build_task(
         user=user,
         goal=goal,
@@ -54,7 +54,7 @@ def test_generated_task_occurrence_is_unique_and_block_count_uses_half_steps(
         db_session,
         email="task-constraints@example.com",
     )
-    occurrence_date = date(2026, 9, 30)
+    occurrence_date = date(2030, 9, 30)
     db_session.add(
         build_task(
             user=user,
@@ -83,7 +83,7 @@ def test_generated_task_occurrence_is_unique_and_block_count_uses_half_steps(
                 user=user,
                 goal=goal,
                 rule=rule,
-                occurrence_date=date(2026, 10, 2),
+                occurrence_date=date(2030, 10, 2),
             )
             invalid_task.block_count = Decimal("0.3")
             db_session.add(invalid_task)
@@ -103,7 +103,7 @@ def test_rule_deletion_keeps_task_and_goal_deletion_removes_it(
         user=user,
         goal=goal,
         rule=rule,
-        occurrence_date=date(2026, 9, 30),
+        occurrence_date=date(2030, 9, 30),
     )
     db_session.add(task)
     db_session.flush()
