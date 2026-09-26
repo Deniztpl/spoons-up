@@ -64,7 +64,11 @@ services:
       retries: 3
 
   scheduler:
-    <<: *api-service
+    image: spoons-up-api:local
+    pull_policy: never
+    environment:
+      DATABASE_URL: postgresql+psycopg://spoons:spoons@db:5432/spoons
+      ACTIVE_USER_DAYS: ${ACTIVE_USER_DAYS:-30}
     command: ["cron", "-f"]
     depends_on:
       migrate:
