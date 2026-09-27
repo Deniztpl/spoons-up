@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Identity,
     Index,
+    Integer,
     Numeric,
     Text,
     Time,
@@ -38,6 +39,7 @@ class Task(Base):
             "block_count > 0 AND block_count * 2 = trunc(block_count * 2)",
             name="block_count_increment",
         ),
+        CheckConstraint("duration_minutes >= 1", name="duration_minutes_positive"),
         Index("ix_tasks_user_id_scheduled_date", "user_id", "scheduled_date"),
         Index(
             "uq_tasks_goal_rule_occurrence",
@@ -65,13 +67,10 @@ class Task(Base):
     title: Mapped[str] = mapped_column(Text)
     occurrence_date: Mapped[date | None] = mapped_column(Date)
     scheduled_date: Mapped[date] = mapped_column(Date)
-    start_time: Mapped[time] = mapped_column(Time)
-    end_time: Mapped[time] = mapped_column(Time)
-    block_count: Mapped[Decimal] = mapped_column(
-        Numeric(precision=3, scale=1),
-        default=Decimal("1.0"),
-        server_default="1",
-    )
+    start_time: Mapped[time | None] = mapped_column(Time)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    end_time: Mapped[time | None] = mapped_column(Time)
+    block_count: Mapped[Decimal | None] = mapped_column(Numeric(precision=3, scale=1))
     period_start: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(
         Text,

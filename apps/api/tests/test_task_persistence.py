@@ -39,6 +39,7 @@ def test_generated_task_is_persisted_with_its_week_and_defaults(
         occurrence_date,
         week_start_day=user.week_start_day,
     )
+    assert task.duration_minutes == 60
     assert task.block_count == Decimal("2.0")
     assert task.status == TaskStatus.PENDING.value
     assert task.completed_at is None
@@ -88,6 +89,67 @@ def test_generated_task_occurrence_is_unique_and_block_count_uses_half_steps(
             invalid_task.block_count = Decimal("0.3")
             db_session.add(invalid_task)
             db_session.flush()
+
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            invalid_task = build_task(
+                user=user,
+                goal=goal,
+                rule=rule,
+                occurrence_date=date(2030, 10, 3),
+            )
+            invalid_task.duration_minutes = 0
+            db_session.add(invalid_task)
+            db_session.flush()
+
+
+def test_rule_and_task_schedule_values_can_be_null(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user, goal, _ = create_task_context(
+        client,
+        db_session,
+        email="nullable-task-schedule@example.com",
+    )
+    rule = GoalRule(
+        goal_id=goal.id,
+        byweekday=[2],
+        start_time=None,
+        duration_minutes=None,
+        block_count=None,
+    )
+    db_session.add(rule)
+    db_session.flush()
+
+    occurrence_date = date(2030, 10, 1)
+    task = Task(
+        user_id=user.id,
+        goal_id=goal.id,
+        rule_id=rule.id,
+        title=goal.title,
+        occurrence_date=occurrence_date,
+        scheduled_date=occurrence_date,
+        start_time=None,
+        duration_minutes=None,
+        end_time=None,
+        block_count=None,
+        period_start=get_week_start(
+            occurrence_date,
+            week_start_day=user.week_start_day,
+        ),
+    )
+    db_session.add(task)
+    db_session.flush()
+    db_session.refresh(task)
+
+    assert rule.start_time is None
+    assert rule.duration_minutes is None
+    assert rule.block_count is None
+    assert task.start_time is None
+    assert task.duration_minutes is None
+    assert task.end_time is None
+    assert task.block_count is None
 
 
 def test_rule_deletion_keeps_task_and_goal_deletion_removes_it(
@@ -186,6 +248,7 @@ def build_task(
         occurrence_date=occurrence_date,
         scheduled_date=occurrence_date,
         start_time=time(9),
+        duration_minutes=60,
         end_time=time(10),
         block_count=rule.block_count,
         period_start=get_week_start(

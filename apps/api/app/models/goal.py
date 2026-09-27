@@ -80,10 +80,7 @@ class GoalRule(Base):
         ForeignKey("goals.id", ondelete="CASCADE"),
     )
     byweekday: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))
-    start_time: Mapped[time] = mapped_column(Time)
-    duration_minutes: Mapped[int] = mapped_column(Integer)
-    block_count: Mapped[Decimal] = mapped_column(
-        Numeric(precision=3, scale=1),
-        server_default="1",
-    )
+    start_time: Mapped[time | None] = mapped_column(Time)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    block_count: Mapped[Decimal | None] = mapped_column(Numeric(precision=3, scale=1))
     goal: Mapped[Goal] = relationship(back_populates="rules")
