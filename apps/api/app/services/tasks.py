@@ -118,6 +118,7 @@ class TaskService:
                         "occurrence_date": occurrence_date,
                         "scheduled_date": occurrence_date,
                         "start_time": rule.start_time,
+                        "duration_minutes": rule.duration_minutes,
                         "end_time": end_time,
                         "block_count": rule.block_count,
                         "period_start": get_week_start(
@@ -138,5 +139,7 @@ class TaskService:
         return task
 
 
-def _add_minutes(value: time, minutes: int) -> time:
+def _add_minutes(value: time | None, minutes: int | None) -> time | None:
+    if value is None or minutes is None:
+        return None
     return (datetime.combine(date.min, value) + timedelta(minutes=minutes)).time()

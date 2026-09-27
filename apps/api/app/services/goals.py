@@ -134,6 +134,9 @@ class GoalService:
                     start_time=payload.start_time,
                     duration_minutes=payload.duration_minutes,
                     block_count=payload.block_count,
+                    update_start_time="start_time" in payload.model_fields_set,
+                    update_duration_minutes="duration_minutes" in payload.model_fields_set,
+                    update_block_count="block_count" in payload.model_fields_set,
                 )
                 self.task_service.add_tasks(
                     user_id=user_id,

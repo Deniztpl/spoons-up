@@ -59,9 +59,9 @@ class UpdateGoalRequest(BaseModel):
 
 class CreateGoalRuleRequest(BaseModel):
     byweekday: Weekdays
-    start_time: LocalTime
-    duration_minutes: DurationMinutes
-    block_count: BlockCount = 1
+    start_time: LocalTime | None = None
+    duration_minutes: DurationMinutes | None = None
+    block_count: BlockCount | None = None
 
 
 class UpdateGoalRuleRequest(BaseModel):
@@ -70,7 +70,7 @@ class UpdateGoalRuleRequest(BaseModel):
     duration_minutes: DurationMinutes | None = None
     block_count: BlockCount | None = None
 
-    @field_validator("byweekday", "start_time", "duration_minutes", "block_count")
+    @field_validator("byweekday")
     @classmethod
     def reject_explicit_null(cls, value: object) -> object:
         if value is None:
@@ -87,13 +87,13 @@ class GoalRuleResponse(BaseModel):
     id: str
     goal_id: str
     byweekday: list[int]
-    start_time: time
-    duration_minutes: int
-    block_count: float
+    start_time: time | None
+    duration_minutes: int | None
+    block_count: float | None
 
     @field_serializer("start_time")
-    def serialize_start_time(self, value: time) -> str:
-        return value.strftime("%H:%M")
+    def serialize_start_time(self, value: time | None) -> str | None:
+        return value.strftime("%H:%M") if value is not None else None
 
 
 class GoalResponse(BaseModel):

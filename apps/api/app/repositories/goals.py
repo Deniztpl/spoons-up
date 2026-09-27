@@ -79,16 +79,16 @@ class GoalRepository:
         *,
         goal_id: int,
         byweekday: list[int],
-        start_time: time,
-        duration_minutes: int,
-        block_count: float,
+        start_time: time | None,
+        duration_minutes: int | None,
+        block_count: float | None,
     ) -> GoalRule:
         rule = GoalRule(
             goal_id=goal_id,
             byweekday=byweekday,
             start_time=start_time,
             duration_minutes=duration_minutes,
-            block_count=Decimal(str(block_count)),
+            block_count=Decimal(str(block_count)) if block_count is not None else None,
         )
         self.session.add(rule)
         self.session.flush()
@@ -102,15 +102,18 @@ class GoalRepository:
         start_time: time | None,
         duration_minutes: int | None,
         block_count: float | None,
+        update_start_time: bool,
+        update_duration_minutes: bool,
+        update_block_count: bool,
     ) -> GoalRule:
         if byweekday is not None:
             rule.byweekday = byweekday
-        if start_time is not None:
+        if update_start_time:
             rule.start_time = start_time
-        if duration_minutes is not None:
+        if update_duration_minutes:
             rule.duration_minutes = duration_minutes
-        if block_count is not None:
-            rule.block_count = Decimal(str(block_count))
+        if update_block_count:
+            rule.block_count = Decimal(str(block_count)) if block_count is not None else None
         self.session.flush()
         return rule
 
