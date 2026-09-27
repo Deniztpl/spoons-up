@@ -33,6 +33,7 @@ def get_task_service(session: DatabaseSession) -> TaskService:
     return TaskService(
         session,
         TaskRepository(session),
+        GoalRepository(session),
         UserRepository(session),
     )
 

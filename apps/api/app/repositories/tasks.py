@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import Select, and_, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
@@ -39,6 +40,76 @@ class TaskRepository:
             .where(Task.id == task_id)
             .with_for_update(of=Task)
         )
+
+    def create(
+        self,
+        *,
+        user_id: int,
+        goal_id: int | None,
+        title: str,
+        scheduled_date: date,
+        start_time: time | None,
+        duration_minutes: int | None,
+        end_time: time | None,
+        block_count: float | None,
+        period_start: date,
+    ) -> Task:
+        task = Task(
+            user_id=user_id,
+            goal_id=goal_id,
+            rule_id=None,
+            title=title,
+            occurrence_date=None,
+            scheduled_date=scheduled_date,
+            start_time=start_time,
+            duration_minutes=duration_minutes,
+            end_time=end_time,
+            block_count=Decimal(str(block_count)) if block_count is not None else None,
+            period_start=period_start,
+        )
+        self.session.add(task)
+        self.session.flush()
+        return task
+
+    def update(
+        self,
+        *,
+        task: Task,
+        title: str,
+        scheduled_date: date,
+        start_time: time | None,
+        duration_minutes: int | None,
+        end_time: time | None,
+        block_count: float | None,
+        update_title: bool,
+        update_scheduled_date: bool,
+        update_start_time: bool,
+        update_duration_minutes: bool,
+        update_end_time: bool,
+        update_block_count: bool,
+    ) -> Task:
+        if update_title:
+            task.title = title
+        if update_scheduled_date:
+            task.scheduled_date = scheduled_date
+        if update_start_time:
+            task.start_time = start_time
+        if update_duration_minutes:
+            task.duration_minutes = duration_minutes
+        if update_end_time:
+            task.end_time = end_time
+        if update_block_count:
+            task.block_count = Decimal(str(block_count)) if block_count is not None else None
+        self.session.flush()
+        return task
+
+    def delete(self, *, task: Task) -> None:
+        if task.occurrence_date is None:
+            self.session.delete(task)
+            return
+        task.status = TaskStatus.DELETED.value
+        task.completed_at = None
+        self.session.flush()
 
     def complete(self, *, task: Task, completed_at: datetime) -> None:
         if task.status == TaskStatus.DONE.value:

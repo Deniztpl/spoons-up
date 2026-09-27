@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config.app import settings
 from app.core.database import SessionLocal
+from app.repositories.goals import GoalRepository
 from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.services.tasks import TASK_GENERATION_DAYS, TaskService
@@ -20,6 +21,7 @@ def run_daily_task_generation(
     task_service = TaskService(
         session,
         TaskRepository(session),
+        GoalRepository(session),
         user_repository,
     )
 
