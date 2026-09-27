@@ -30,7 +30,7 @@ class TaskRepository:
         query = (
             self._select_visible_tasks_for_user(user_id=user_id)
             .where(Task.scheduled_date == target_date)
-            .order_by(Task.start_time, Task.id)
+            .order_by(Task.start_time.asc().nulls_last(), Task.id)
         )
         return list(self.session.scalars(query))
 
