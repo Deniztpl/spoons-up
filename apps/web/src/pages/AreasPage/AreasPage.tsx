@@ -3,13 +3,20 @@ import { useState } from "react";
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
 import { AreaDetails } from "../../features/areas/components/AreaDetails/AreaDetails";
+import { AreaIcon } from "../../features/areas/components/AreaIcon";
 import { AreaList } from "../../features/areas/components/AreaList/AreaList";
 import { useAreas } from "../../features/areas/hooks/useAreas";
+import { AreaGoalList } from "../../features/goals/components/AreaGoalList";
+import { GoalFormDialog } from "../../features/goals/components/GoalFormDialog";
+import { useAreaGoals } from "../../features/goals/hooks/useAreaGoals";
 import { AreaHabitList } from "../../features/habits/components/AreaHabitList";
 import { HabitFormDialog } from "../../features/habits/components/HabitFormDialog";
 import { useAreaHabits } from "../../features/habits/hooks/useAreaHabits";
 
 type AreaView = "active" | "archived";
+
+const addButtonClassName =
+  "flex items-center justify-center gap-2 rounded-[9px] border border-dashed border-ink/20 p-2.5 text-[12.5px] font-medium text-ink transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 export function AreasPage({
   onLogout,
@@ -28,10 +35,15 @@ export function AreasPage({
       : areaState.selectedArea.archived_at === null)
       ? areaState.selectedArea
       : null;
-  const areaHabits = useAreaHabits(
-    selectedArea && selectedArea.archived_at === null ? selectedArea.id : null,
-  );
+  const activeAreaId =
+    selectedArea && selectedArea.archived_at === null ? selectedArea.id : null;
+  const areaGoals = useAreaGoals(activeAreaId);
+  const areaHabits = useAreaHabits(activeAreaId);
+  const goalDraft = areaGoals.draft;
   const habitDraft = areaHabits.draft;
+  const isLoadingItems = areaGoals.isLoading || areaHabits.isLoading;
+  const itemsError = areaGoals.loadError ?? areaHabits.loadError;
+  const hasItems = areaGoals.goals.length > 0 || areaHabits.habits.length > 0;
 
   const showView = (nextView: AreaView) => {
     const firstArea = (nextView === "active" ? activeAreas : archivedAreas)[0];
@@ -130,6 +142,9 @@ export function AreasPage({
         <AreaDetails
           area={selectedArea}
           view={view}
+          goalCount={
+            areaGoals.isLoading || areaGoals.loadError ? null : areaGoals.goals.length
+          }
           habitCount={
             areaHabits.isLoading || areaHabits.loadError ? null : areaHabits.habits.length
           }
@@ -151,15 +166,80 @@ export function AreasPage({
           onCancelDeleting={areaState.cancelDeleting}
           onDelete={() => void areaState.deleteArea()}
         >
-          <AreaHabitList
-            habits={areaHabits.habits}
-            isLoading={areaHabits.isLoading}
-            loadError={areaHabits.loadError}
-            onAdd={areaHabits.openCreate}
-            onEdit={areaHabits.openEdit}
-          />
+          <div className="flex flex-col gap-4">
+            {isLoadingItems ? (
+              <p role="status" className="text-[13px] text-ink-soft">
+                Loading goals and habits…
+              </p>
+            ) : null}
+
+            {itemsError ? (
+              <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-[13px] text-danger">
+                {itemsError}
+              </p>
+            ) : null}
+
+            {!isLoadingItems && !itemsError && !hasItems ? (
+              <div className="rounded-[10px] border border-dashed border-ink/18 bg-well px-5 py-9 text-center">
+                <div className="mx-auto grid size-10 place-items-center rounded-xl bg-accent/10 text-accent">
+                  <AreaIcon />
+                </div>
+                <h3 className="mt-3 text-[13.5px] font-medium">Nothing here yet</h3>
+                <p className="mt-1 text-[13px] leading-5 text-ink-soft">
+                  This area is ready for its goals and habits.
+                </p>
+              </div>
+            ) : null}
+
+            {hasItems ? (
+              <div className="flex flex-col gap-1">
+                {areaGoals.goals.length > 0 ? (
+                  <AreaGoalList goals={areaGoals.goals} onEdit={areaGoals.openEdit} />
+                ) : null}
+                {areaHabits.habits.length > 0 ? (
+                  <AreaHabitList habits={areaHabits.habits} onEdit={areaHabits.openEdit} />
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className={addButtonClassName} onClick={areaGoals.openCreate}>
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 rounded-[3px] border-[1.5px] border-accent"
+                />
+                Add goal
+              </button>
+              <button type="button" className={addButtonClassName} onClick={areaHabits.openCreate}>
+                <span aria-hidden="true" className="size-2.5 rounded-full border-[1.5px] border-habit" />
+                Add habit
+              </button>
+            </div>
+          </div>
         </AreaDetails>
       </div>
+
+      {selectedArea && goalDraft ? (
+        <GoalFormDialog
+          areaName={selectedArea.name}
+          areaOptions={null}
+          draft={goalDraft}
+          error={areaGoals.formError}
+          isSaving={areaGoals.isSaving}
+          isConfirmingDelete={areaGoals.isConfirmingDelete}
+          onAreaChange={areaGoals.setAreaId}
+          onTitleChange={areaGoals.setTitle}
+          onWeeklyTargetChange={areaGoals.setWeeklyTarget}
+          onAddRule={areaGoals.addRule}
+          onRuleChange={areaGoals.changeRule}
+          onRemoveRule={areaGoals.removeRule}
+          onSubmit={() => void areaGoals.saveGoal()}
+          onClose={areaGoals.closeForm}
+          onStartDeleting={areaGoals.startDeleting}
+          onCancelDeleting={areaGoals.cancelDeleting}
+          onDelete={() => void areaGoals.deleteGoal()}
+        />
+      ) : null}
 
       {selectedArea && habitDraft ? (
         <HabitFormDialog

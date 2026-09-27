@@ -10,6 +10,10 @@ export function listAreas() {
   });
 }
 
+export function listActiveAreas() {
+  return apiClient.GET("/api/v1/areas");
+}
+
 export function createArea(name: string) {
   return apiClient.POST("/api/v1/areas", { body: { name } });
 }

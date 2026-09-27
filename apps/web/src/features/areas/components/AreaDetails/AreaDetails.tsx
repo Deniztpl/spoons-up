@@ -8,6 +8,7 @@ import { AreaSettingsMenu } from "./AreaSettingsMenu";
 type AreaDetailsProps = {
   area: Area | null;
   view: "active" | "archived";
+  goalCount: number | null;
   habitCount: number | null;
   children?: ReactNode;
   isLoading: boolean;
@@ -32,6 +33,7 @@ type AreaDetailsProps = {
 export function AreaDetails({
   area,
   view,
+  goalCount,
   habitCount,
   children,
   isLoading,
@@ -116,6 +118,7 @@ export function AreaDetails({
             <AreaSettingsMenu
               key={area.id}
               areaName={area.name}
+              goalCount={goalCount}
               habitCount={habitCount}
               isSaving={isSaving}
               onRename={onStartRenaming}

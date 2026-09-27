@@ -4,6 +4,7 @@ import { ActiveAreaDeleteConfirmation } from "./ActiveAreaDeleteConfirmation";
 
 type AreaSettingsMenuProps = {
   areaName: string;
+  goalCount: number | null;
   habitCount: number | null;
   isSaving: boolean;
   onRename: () => void;
@@ -13,6 +14,7 @@ type AreaSettingsMenuProps = {
 
 export function AreaSettingsMenu({
   areaName,
+  goalCount,
   habitCount,
   isSaving,
   onRename,
@@ -78,6 +80,7 @@ export function AreaSettingsMenu({
           <ActiveAreaDeleteConfirmation
             id={menuId}
             areaName={areaName}
+            goalCount={goalCount}
             habitCount={habitCount}
             isSaving={isSaving}
             onCancel={() => setIsConfirmingDelete(false)}

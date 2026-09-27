@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,12 +22,46 @@ function habit(id: string, title: string, mode: "DAILY" | "WEEKLY") {
   return { id, area_id: "1", title, mode, created_at: createdAt };
 }
 
+function goal(id: string, title: string, weeklyTarget: number | null, rules: unknown[] = []) {
+  return { id, area_id: "1", title, weekly_target: weeklyTarget, created_at: createdAt, rules };
+}
+
+function rule(
+  id: string,
+  byweekday: number[],
+  startTime: string,
+  durationMinutes = 60,
+  blockCount = 1,
+) {
+  return {
+    id,
+    goal_id: "7",
+    byweekday,
+    start_time: startTime,
+    duration_minutes: durationMinutes,
+    block_count: blockCount,
+  };
+}
+
+function requestsTo(fetchMock: ReturnType<typeof vi.fn>, method: string, pathname: string) {
+  return fetchMock.mock.calls
+    .map(([request]) => request as Request)
+    .filter(
+      (request) => request.method === method && new URL(request.url).pathname === pathname,
+    );
+}
+
 function respondWithAreas(areas: unknown[]) {
-  return vi.fn(async (request: Request) =>
-    new URL(request.url).pathname === "/api/v1/habits"
-      ? Response.json({ habits: [] })
-      : Response.json({ areas }),
-  );
+  return vi.fn(async (request: Request) => {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === "/api/v1/habits") {
+      return Response.json({ habits: [] });
+    }
+    if (pathname === "/api/v1/goals") {
+      return Response.json({ goals: [] });
+    }
+    return Response.json({ areas });
+  });
 }
 
 function renderPage() {
@@ -98,6 +132,9 @@ describe("Areas page", () => {
       if (request.method === "GET" && pathname === "/api/v1/habits") {
         return Response.json({ habits: [] });
       }
+      if (request.method === "GET" && pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
+      }
       throw new Error(`Unexpected request: ${request.method} ${pathname}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -156,6 +193,9 @@ describe("Areas page", () => {
       }
       if (request.method === "GET" && pathname === "/api/v1/habits") {
         return Response.json({ habits: [] });
+      }
+      if (request.method === "GET" && pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
       }
       throw new Error(`Unexpected request: ${request.method} ${pathname}`);
     });
@@ -288,6 +328,9 @@ describe("Areas page", () => {
         expect(url.searchParams.get("area_id")).toBe("1");
         return Response.json({ habits: [habit("10", "Read", "DAILY")] });
       }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
+      }
       if (request.method === "POST" && url.pathname === "/api/v1/habits") {
         expect(await request.clone().json()).toEqual({
           area_id: "1",
@@ -315,7 +358,7 @@ describe("Areas page", () => {
     expect(
       await screen.findByRole("button", { name: "Read, daily habit" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Add goal/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add goal" })).toBeEnabled();
 
     const addHabit = screen.getByRole("button", { name: "Add habit" });
     await user.click(addHabit);
@@ -383,6 +426,9 @@ describe("Areas page", () => {
               : [],
         });
       }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
+      }
       if (request.method === "DELETE" && url.pathname === "/api/v1/areas/1") {
         return new Response(null, { status: 204 });
       }
@@ -400,10 +446,9 @@ describe("Areas page", () => {
 
     const confirmation = screen.getByRole("group", { name: "Confirm area deletion" });
     expect(within(confirmation).getByText("Delete “SWE”?")).toBeInTheDocument();
+    expect(within(confirmation).getByText("The area")).toBeInTheDocument();
     expect(
-      within(confirmation).getByText(
-        /its 2 habits and all of their check-off history will be permanently deleted/,
-      ),
+      within(confirmation).getByText("2 habits and their check-off history"),
     ).toBeInTheDocument();
     expect(within(confirmation).getByText(/Archive it instead/)).toBeInTheDocument();
     expect(within(confirmation).getByRole("button", { name: "Cancel" })).toHaveFocus();
@@ -423,6 +468,243 @@ describe("Areas page", () => {
       ([request]) => request.method === "DELETE",
     );
     expect(deleteRequests).toHaveLength(1);
+  });
+
+  it("adds a goal with its rules from the area panel", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+        return Response.json({ areas: [area("1", "SWE")] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/habits") {
+        return Response.json({ habits: [] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        expect(url.searchParams.get("area_id")).toBe("1");
+        return Response.json({ goals: [] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/goals") {
+        expect(await request.clone().json()).toEqual({
+          area_id: "1",
+          title: "CS Block",
+          weekly_target: 3,
+        });
+        return Response.json(goal("7", "CS Block", 3), { status: 201 });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/goals/7/rules") {
+        const body = await request.clone().json();
+        return Response.json(
+          { id: body.byweekday[0] === 1 ? "21" : "22", goal_id: "7", ...body },
+          { status: 201 },
+        );
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Nothing here yet" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add goal" }));
+
+    const dialog = screen.getByRole("dialog", { name: "New goal" });
+    expect(within(dialog).getByText("SWE")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Area")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Title")).toHaveFocus();
+    await user.type(within(dialog).getByLabelText("Title"), "CS Block");
+    const increaseTarget = within(dialog).getByRole("button", { name: "Increase weekly target" });
+    await user.click(increaseTarget);
+    await user.click(increaseTarget);
+    await user.click(increaseTarget);
+    expect(within(dialog).getByLabelText("Weekly target")).toHaveValue("3");
+
+    // A rule needs a day before the goal can be saved.
+    const firstRule = within(dialog).getByRole("group", { name: "Rule 1" });
+    expect(within(firstRule).getByText("No days selected · 09:00–10:00")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+    for (const day of ["Monday", "Wednesday", "Friday"]) {
+      await user.click(within(firstRule).getByRole("button", { name: day }));
+    }
+    fireEvent.change(within(firstRule).getByLabelText("Start time"), {
+      target: { value: "19:00" },
+    });
+    await user.selectOptions(within(firstRule).getByLabelText("Duration"), "90");
+    await user.click(within(firstRule).getByRole("radio", { name: "2 blocks" }));
+    expect(within(firstRule).getByText("Mon, Wed, Fri · 19:00–20:30")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Add rule" }));
+    const secondRule = within(dialog).getByRole("group", { name: "Rule 2" });
+    await user.click(within(secondRule).getByRole("button", { name: "Saturday" }));
+    await user.click(within(secondRule).getByRole("radio", { name: "Half a block" }));
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByRole("button", { name: "CS Block, goal" })).toBeInTheDocument();
+    expect(screen.getByText("3 blocks/week")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const ruleBodies = await Promise.all(
+      requestsTo(fetchMock, "POST", "/api/v1/goals/7/rules").map((request) =>
+        request.clone().json(),
+      ),
+    );
+    expect(ruleBodies).toEqual([
+      { byweekday: [1, 3, 5], start_time: "19:00", duration_minutes: 90, block_count: 2 },
+      { byweekday: [6], start_time: "09:00", duration_minutes: 60, block_count: 0.5 },
+    ]);
+  });
+
+  it("saves only what changed in a goal and deletes it", async () => {
+    const savedGoal = goal("7", "CS Block", 3, [
+      rule("21", [1, 3, 5], "19:00"),
+      rule("22", [6], "10:00"),
+    ]);
+    const writes: string[] = [];
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+        return Response.json({ areas: [area("1", "SWE")] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/habits") {
+        return Response.json({ habits: [] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [savedGoal] });
+      }
+      writes.push(`${request.method} ${url.pathname}`);
+      if (request.method === "PATCH" && url.pathname === "/api/v1/goals/7") {
+        expect(await request.clone().json()).toEqual({ weekly_target: null });
+        return Response.json({ ...savedGoal, weekly_target: null });
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/v1/rules/21") {
+        return new Response(null, { status: 204 });
+      }
+      if (request.method === "PATCH" && url.pathname === "/api/v1/rules/22") {
+        expect(await request.clone().json()).toEqual({ block_count: 2 });
+        return Response.json(rule("22", [6], "10:00", 60, 2));
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/v1/goals/7") {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "CS Block, goal" }));
+    const editDialog = screen.getByRole("dialog", { name: "Edit goal" });
+    expect(within(editDialog).getByLabelText("Title")).toHaveValue("CS Block");
+    expect(within(editDialog).getByLabelText("Weekly target")).toHaveValue("3");
+    await user.clear(within(editDialog).getByLabelText("Weekly target"));
+    await user.click(within(editDialog).getByRole("button", { name: "Remove rule 1" }));
+    const remainingRule = within(editDialog).getByRole("group", { name: "Rule 1" });
+    expect(within(remainingRule).getByText("Sat · 10:00–11:00")).toBeInTheDocument();
+    await user.click(within(remainingRule).getByRole("radio", { name: "2 blocks" }));
+    await user.click(within(editDialog).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("No target")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // An unchanged title or rule is not sent, since a rule write redraws its pending tasks.
+    expect(writes).toEqual([
+      "PATCH /api/v1/goals/7",
+      "DELETE /api/v1/rules/21",
+      "PATCH /api/v1/rules/22",
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "CS Block, goal" }));
+    const deleteDialog = screen.getByRole("dialog", { name: "Edit goal" });
+    await user.click(within(deleteDialog).getByRole("button", { name: "Delete" }));
+    expect(within(deleteDialog).getByText("Delete “CS Block”?")).toBeInTheDocument();
+    await user.click(within(deleteDialog).getByRole("button", { name: "Delete permanently" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "CS Block, goal" })).not.toBeInTheDocument();
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nothing here yet" })).toBeInTheDocument();
+    expect(writes.at(-1)).toBe("DELETE /api/v1/goals/7");
+  });
+
+  it("keeps a new goal when a rule fails and retries only the rule", async () => {
+    let ruleAttempts = 0;
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+        return Response.json({ areas: [area("1", "SWE")] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/habits") {
+        return Response.json({ habits: [] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/goals") {
+        return Response.json(goal("7", "Read papers", null), { status: 201 });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/goals/7/rules") {
+        ruleAttempts += 1;
+        if (ruleAttempts === 1) {
+          throw new TypeError("Network unavailable");
+        }
+        return Response.json(rule("21", [2], "09:00"), { status: 201 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Add goal" }));
+    const dialog = screen.getByRole("dialog", { name: "New goal" });
+    await user.type(within(dialog).getByLabelText("Title"), "Read papers");
+    const firstRule = within(dialog).getByRole("group", { name: "Rule 1" });
+    await user.click(within(firstRule).getByRole("button", { name: "Tuesday" }));
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "We couldn't reach Spoons Up.",
+    );
+    expect(within(dialog).getByRole("heading", { name: "Edit goal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read papers, goal" })).toBeInTheDocument();
+    expect(screen.getByText("No target")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("No target")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(requestsTo(fetchMock, "POST", "/api/v1/goals")).toHaveLength(1);
+    expect(ruleAttempts).toBe(2);
+  });
+
+  it("lists goals above habits and names them in the delete warning", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === "/api/v1/habits") {
+          return Response.json({ habits: [habit("10", "Read", "DAILY")] });
+        }
+        if (pathname === "/api/v1/goals") {
+          return Response.json({ goals: [goal("7", "CS Block", 3), goal("8", "Ship v1", null)] });
+        }
+        return Response.json({ areas: [area("1", "SWE")] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const goals = await screen.findByRole("list", { name: "Goals" });
+    const habits = screen.getByRole("list", { name: "Habits" });
+    expect(goals.compareDocumentPosition(habits) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(goals).getByText("3 blocks/week")).toBeInTheDocument();
+    expect(within(goals).getByText("No target")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Area actions" }));
+    await user.click(screen.getByRole("button", { name: "Delete area" }));
+    const confirmation = screen.getByRole("group", { name: "Confirm area deletion" });
+    expect(within(confirmation).getByText("2 goals and their history")).toBeInTheDocument();
+    expect(
+      within(confirmation).getByText("1 habit and its check-off history"),
+    ).toBeInTheDocument();
   });
 
   it("opens and closes the narrow-screen navigation drawer with focus management", async () => {

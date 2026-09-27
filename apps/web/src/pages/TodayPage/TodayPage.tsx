@@ -3,8 +3,11 @@ import { Link } from "react-router";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
+import { GoalFormDialog } from "../../features/goals/components/GoalFormDialog";
+import { useGoalForm } from "../../features/goals/hooks/useGoalForm";
 import type { Today } from "../../features/today/api/todayApi";
 import { TodayHabitList } from "../../features/today/components/TodayHabitList";
+import { TodayTaskList } from "../../features/today/components/TodayTaskList";
 import {
   type TodayView,
   TodayViewSelector,
@@ -24,9 +27,15 @@ export function TodayPage({
   onLogout: () => Promise<AuthActionResult>;
 }) {
   const todayState = useToday();
+  // A saved goal can add tasks to today.
+  const goalForm = useGoalForm({
+    onSaved: todayState.reload,
+    onDeleted: todayState.reload,
+  });
   const [view, setView] = useState<TodayView>("daily");
   const { today } = todayState;
   const habits = today ? (view === "daily" ? today.daily_habits : today.weekly_habits) : [];
+  const tasks = today && view === "daily" ? today.tasks : [];
 
   return (
     <AppLayout onLogout={onLogout}>
@@ -43,9 +52,10 @@ export function TodayPage({
 
           <TodayViewSelector value={view} onChange={setView} />
 
+          {/* The left gutter holds the task list's progress rail. */}
           <section
-            aria-label={view === "daily" ? "Daily habits" : "Weekly habits"}
-            className="flex min-w-0 flex-col gap-2"
+            aria-label={view === "daily" ? "Today's tasks and habits" : "Weekly habits"}
+            className="flex min-w-0 flex-col gap-2 pl-[26px]"
           >
             {todayState.isLoading ? (
               <p role="status" className="text-ink-soft">
@@ -65,18 +75,24 @@ export function TodayPage({
               </p>
             ) : null}
 
+            {tasks.length > 0 ? (
+              <TodayTaskList
+                tasks={tasks}
+                pendingTaskIds={todayState.pendingTaskIds}
+                onToggle={(task) => void todayState.toggleTask(task)}
+              />
+            ) : null}
+
             {today && view === "daily" ? (
-              // TODO(slice-3): render task blocks here.
               <button
                 type="button"
-                disabled
-                className="flex h-8 cursor-not-allowed items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-[13.5px] font-medium text-muted"
+                className="flex h-8 items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-left text-[13.5px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                onClick={() => goalForm.openCreate(null)}
               >
                 <span aria-hidden="true" className="w-4 text-center text-base leading-none">
                   +
                 </span>
                 Add goal
-                <span className="ml-auto text-[9px] uppercase tracking-[0.07em]">Soon</span>
               </button>
             ) : null}
 
@@ -88,7 +104,7 @@ export function TodayPage({
               />
             ) : null}
 
-            {today && habits.length === 0 ? (
+            {today && habits.length === 0 && tasks.length === 0 ? (
               <div className="rounded-[10px] border border-dashed border-ink/16 px-5 py-7 text-center">
                 <h2 className="text-[13.5px] font-medium">
                   {view === "daily" ? "No daily habits yet" : "No weekly habits yet"}
@@ -108,6 +124,28 @@ export function TodayPage({
           {/* TODO(slice-5): add weekly area progress. */}
         </div>
       </div>
+
+      {goalForm.draft ? (
+        <GoalFormDialog
+          areaName={null}
+          areaOptions={goalForm.areaOptions}
+          draft={goalForm.draft}
+          error={goalForm.formError}
+          isSaving={goalForm.isSaving}
+          isConfirmingDelete={goalForm.isConfirmingDelete}
+          onAreaChange={goalForm.setAreaId}
+          onTitleChange={goalForm.setTitle}
+          onWeeklyTargetChange={goalForm.setWeeklyTarget}
+          onAddRule={goalForm.addRule}
+          onRuleChange={goalForm.changeRule}
+          onRemoveRule={goalForm.removeRule}
+          onSubmit={() => void goalForm.saveGoal()}
+          onClose={goalForm.closeForm}
+          onStartDeleting={goalForm.startDeleting}
+          onCancelDeleting={goalForm.cancelDeleting}
+          onDelete={() => void goalForm.deleteGoal()}
+        />
+      ) : null}
     </AppLayout>
   );
 }

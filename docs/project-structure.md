@@ -17,7 +17,9 @@ apps/web/src/
 |   |   |-- AppHeader.tsx
 |   |   `-- AppSidebar.tsx
 |   `-- ui/
-|       `-- CloseIcon.tsx
+|       |-- CheckIcon.tsx
+|       |-- CloseIcon.tsx
+|       `-- ModalDialog.tsx
 |-- pages/
 |   |-- AuthPage/
 |   |   `-- AuthPage.tsx
@@ -55,6 +57,17 @@ apps/web/src/
 |   |   |   `-- AreaIcon.tsx
 |   |   `-- hooks/
 |   |       `-- useAreas.ts
+|   |-- goals/
+|   |   |-- api/
+|   |   |   `-- goalsApi.ts
+|   |   |-- components/
+|   |   |   |-- AreaGoalList.tsx
+|   |   |   |-- GoalDeleteConfirmation.tsx
+|   |   |   |-- GoalFormDialog.tsx
+|   |   |   `-- GoalRuleFields.tsx
+|   |   `-- hooks/
+|   |       |-- useAreaGoals.ts
+|   |       `-- useGoalForm.ts
 |   |-- habits/
 |   |   |-- api/
 |   |   |   `-- habitsApi.ts
@@ -64,11 +77,15 @@ apps/web/src/
 |   |   |   `-- HabitFormDialog.tsx
 |   |   `-- hooks/
 |   |       `-- useAreaHabits.ts
+|   |-- tasks/
+|   |   `-- api/
+|   |       `-- tasksApi.ts
 |   `-- today/
 |       |-- api/
 |       |   `-- todayApi.ts
 |       |-- components/
 |       |   |-- TodayHabitList.tsx
+|       |   |-- TodayTaskList.tsx
 |       |   `-- TodayViewSelector.tsx
 |       `-- hooks/
 |           `-- useToday.ts
@@ -109,10 +126,20 @@ apps/web/src/
 - `AreaList`, `AreaDetails`, and area state belong to `features/areas`.
 - The today screen is the landing page after sign-in.
 - Habit API calls, the area details' habit list and the habit form belong to
-  `features/habits`. The Areas page composes them into the details: `AreaDetails`
-  renders its children for an active area, so `features/areas` does not depend
-  on habits. The today screen's view state and check-off flow belong to
-  `features/today`.
+  `features/habits`; goal API calls, the area details' goal list, the goal form
+  and its rule fields belong to `features/goals`. The Areas page composes both
+  lists into the details, with their shared empty state and add buttons:
+  `AreaDetails` renders its children for an active area, so `features/areas`
+  depends on neither, and goals and habits do not depend on each other.
+- `useGoalForm` owns the goal form and its save flow. `useAreaGoals` uses it in
+  the area panel; the today screen uses it directly, and there the form asks
+  for the area. A save sends only what changed, because a rule write redraws
+  that rule's pending tasks.
+- Task API calls belong to `features/tasks`, for the today screen now and the
+  calendar later. The today screen's view state, check-off flow, task blocks
+  and their progress rail belong to `features/today`.
+- `ModalDialog` in `components/ui/` is the shared modal shell: backdrop, focus
+  trap, Escape and focus return. Form content stays in its feature.
 - Parts of a design that wait for a later slice are marked with
   `TODO(slice-N)` comments at the place they plug in, and disabled "Soon"
   controls where the design shows them. No mock data is rendered in their place.

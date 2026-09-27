@@ -20,7 +20,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Habit mode is editable** — each entry carries its own `period_type`, so switching `DAILY` and `WEEKLY` leaves old rows readable at their original granularity.
 
-**Daily and weekly views** — the today screen holds both. Daily shows `DAILY` habits with the day's tasks underneath, ordered by start time; weekly shows `WEEKLY` habits alone. One endpoint returns all three lists. Quota progress lives in the area view.
+**Daily and weekly views** — the today screen holds both. Daily shows the day's tasks, ordered by start time, above the `DAILY` habits; weekly shows `WEEKLY` habits alone. One endpoint returns all three lists. Quota progress lives in the area view.
 
 **Goals** — weekly quotas ("3 CS Blocks a week"), user-entered. `weekly_target` is a whole number of blocks and is nullable for goals scheduled ad hoc. A goal's weekly `done` is `SUM(block_count)` across its completed tasks, not the number of task rows. Blocks can be halved, so `done` can be 2.5 against a target of 3.
 

@@ -1,3 +1,4 @@
+import { CheckIcon } from "../../../components/ui/CheckIcon";
 import type { TodayHabit } from "../api/todayApi";
 
 type TodayHabitListProps = {
@@ -43,19 +44,5 @@ export function TodayHabitList({ habits, pendingHabitIds, onToggle }: TodayHabit
         );
       })}
     </ul>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-2.5" fill="none">
-      <path
-        d="m3.5 8.3 2.8 2.7 6.2-6.3"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2.2"
-      />
-    </svg>
   );
 }
