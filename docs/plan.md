@@ -59,19 +59,27 @@ One slice at a time. Finish it, use it by hand, commit, move on.
    - Changing a task's `block_count` from the today screen waits for `PATCH /tasks/{id}` in slice 4 and is marked `TODO(slice-4)`
 26. **Done when:** a goal created in the browser produces today's task, and completing it holds after a reload — DONE
 
+## Slice 3 fix — Tasks and schedules
+
+- New goals start without a schedule; Repeat reveals one or more schedules. Rules require weekdays, while time, duration and `block_count` are nullable
+- Today replaces "Add goal" with "Add task": choose an area and goal for goal work, or enter a title for a standalone task. Time, duration and `block_count` are optional
+- Add `tasks.duration_minutes`; make task time, end time and `block_count` nullable. Null blocks contribute zero to weekly progress
+- Add, edit and delete tasks from Today. A task edit changes only that task; its linked schedule days are edited separately and keep the existing regeneration rules
+- **Done when:** goal-linked, standalone, timed and untimed tasks can be created from Today and survive a reload
+
 ## Slice 4 — Calendar
 
 27. `GET /week?start=`
-28. Postpone — `scheduled_date` moves, `occurrence_date` and `period_start` stay
-29. Delete — soft for rule-generated, hard for ad-hoc
-30. Ad-hoc task creation
+28. Move tasks in the calendar through the existing task update — `scheduled_date` moves, `occurrence_date` and `period_start` stay
+29. Expose the existing task delete in the calendar — soft for rule-generated, hard for ad-hoc
+30. Reuse the task form from the Slice 3 fix in the calendar
 31. Web: calendar view, move between weeks, drag or pick a new date
 32. **Done when:** a task dragged across a week boundary still counts toward its original week
 
 ## Slice 5 — Weekly results
 
 33. `period_results` migration
-34. Live computation for the open week; goal `done` is `SUM(task.block_count)` rather than task count, so it can be fractional and `period_results.done` is numeric. The daily job from slice 3 freezes each closed week at the week turn in the user's timezone. Targets follow active days: `created_at` and the area's `archived_at` / `unarchived_at` bound each requirement, and one with no active day is left out of the week
+34. Live computation for the open week; goal `done` is `COALESCE(SUM(task.block_count), 0)` rather than task count, so it can be fractional and `period_results.done` is numeric. The daily job from slice 3 freezes each closed week at the week turn in the user's timezone. Targets follow active days: `created_at` and the area's `archived_at` / `unarchived_at` bound each requirement, and one with no active day is left out of the week
 35. Area result — every row for that week satisfies `done >= target`
 36. Web: area view showing weekly progress and past weeks
 37. **Done when:** a closed week's outcome does not move after `weekly_target` is changed
@@ -79,8 +87,8 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 ## Slice 6 — Notifications
 
 38. `reminders` and `devices` migration, token registration
-39. Write a reminder on task create, update on move, cancel on delete
-40. Reminders for tasks the slice 3 job generated before this slice existed — backfill once, then generation writes them itself
+39. Write a reminder on timed task create, update or create it when timing changes, cancel on time removal or delete
+40. Reminders for timed tasks the slice 3 job generated before this slice existed — backfill once, then generation writes them itself
 41. Scheduler — scan due reminders every minute, fan out to the user's tokens, prune invalid ones
 42. `apps/mobile`: Expo, the same generated client, push registration
 43. **Done when:** a task an hour out produces a notification on a real device

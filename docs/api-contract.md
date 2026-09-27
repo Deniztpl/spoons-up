@@ -353,7 +353,7 @@ Goals in an archived area are not returned.
 { "goals": [ ... ] }
 ```
 
-Rules are included on each goal — a goal without them is not useful to display.
+Rules are included on each goal. An empty list means the goal has no repeating schedule; it can still receive ad-hoc tasks.
 
 #### POST /goals
 
@@ -394,7 +394,7 @@ Goals do not archive. Dropping one is a delete.
 
 ### Goal rules
 
-A rule is a pre-fill for generation, not a contract. Editing it can replace untouched `PENDING` tasks, but never rewrites tasks the user completed or moved.
+A rule is a pre-fill for generation, not a contract. `byweekday` is required; `start_time`, `duration_minutes` and `block_count` are nullable templates. Editing a rule can replace untouched `PENDING` tasks, but never rewrites tasks the user completed or moved.
 
 #### POST /goals/{id}/rules
 
@@ -408,14 +408,16 @@ A rule is a pre-fill for generation, not a contract. Editing it can replace unto
 { "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
 ```
 
-The rule adds its tasks and reminders from today through the current window in the same request, copying `block_count` to every generated task, so today's block is on screen as soon as it is saved. `block_count` defaults to 1 and is independent of `duration_minutes`. It is a positive multiple of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4.
+The rule adds its tasks from today through the current window in the same request, copying its nullable time, duration and block values. A reminder is written only for a timed task. A non-null `block_count` is independent of `duration_minutes` and must be a positive multiple of 0.5.
 
 A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. `block_count: 2` still generates one task per occurrence; two different times on the same day still use two rules.
+
+On Today, Repeat requires a goal. With Repeat off the client calls `POST /tasks`; with it on the client calls this endpoint instead and includes today's weekday, so the rule generates the current occurrence rather than creating a duplicate ad-hoc task. The task form shows only weekdays in its schedule section; full schedule values remain editable from the goal.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal |
-| 422 `validation_error` | empty or out-of-range `byweekday`, `duration_minutes` below 1, or `block_count` not a positive multiple of 0.5 |
+| 422 `validation_error` | empty or out-of-range `byweekday`, a non-null `duration_minutes` below 1, or a non-null `block_count` that is not a positive multiple of 0.5 |
 
 #### PATCH /rules/{id}
 
@@ -423,7 +425,7 @@ A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mo
 { "byweekday": [1, 4], "start_time": "20:00", "duration_minutes": 90, "block_count": 2 }
 ```
 
-All fields optional.
+All fields optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it; `byweekday` cannot be null or empty.
 
 **200** — the updated rule. Its untouched `PENDING` tasks are removed from the open week forward, including days before today. New tasks are added from today forward only and carry the updated `block_count`, so a newly selected weekday earlier in the open week stays empty. `DONE` tasks and tasks the user moved are kept unchanged; closed weeks are untouched.
 
@@ -446,6 +448,7 @@ A task object:
   "occurrence_date": "2026-09-16",
   "scheduled_date": "2026-09-17",
   "start_time": "19:00",
+  "duration_minutes": 60,
   "end_time": "20:00",
   "block_count": 2,
   "period_start": "2026-09-14",
@@ -459,7 +462,7 @@ The three dates mean different things and only one of them moves:
 - `occurrence_date` — the date the rule produced. Immutable. Null for ad-hoc tasks.
 - `scheduled_date` — where the task sits now. This is what the calendar draws.
 - `period_start` — the week the task counts toward. Fixed at generation, so postponing across a week boundary doesn't move the quota.
-- `block_count` — how many blocks the task contributes when completed: a positive multiple of 0.5, independent of the task's duration.
+- `start_time`, `duration_minutes` and `block_count` — independent and nullable. `end_time` is present only when both time and duration exist. A null block value contributes zero when completed; otherwise it must be a positive multiple of 0.5.
 
 There is no `GET /tasks`. Tasks are read through `/today` and `/week`.
 
@@ -473,19 +476,19 @@ Ad-hoc task, created by the user rather than a rule.
   "scheduled_date": "2026-09-22",
   "start_time": "14:00",
   "duration_minutes": 45,
-  "block_count": 2,
-  "goal_id": "7"
+  "block_count": null,
+  "goal_id": null
 }
 ```
 
-`goal_id` optional — attach it to count toward that goal's quota, or leave it out for something standalone. `block_count` defaults to 1.
+`goal_id` is optional. When present, `title` must be omitted; the server verifies the goal through its active area and copies its title. Without a goal, `title` is required and the task is standalone. `start_time`, `duration_minutes` and `block_count` are independently optional.
 
-**201** — the created task. `rule_id` and `occurrence_date` are null; `period_start` is derived from `scheduled_date`; `end_time` from `start_time + duration_minutes`.
+**201** — the created task. `rule_id` and `occurrence_date` are null; `period_start` is derived from `scheduled_date`. `end_time` is derived only when both `start_time` and `duration_minutes` are present.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal |
-| 422 `validation_error` | empty title, `duration_minutes` below 1, or `block_count` not a positive multiple of 0.5 |
+| 422 `validation_error` | missing standalone title, a title supplied for a goal-linked task, a non-null `duration_minutes` below 1, or a non-null `block_count` that is not a positive multiple of 0.5 |
 
 #### PATCH /tasks/{id}
 
@@ -493,11 +496,11 @@ Ad-hoc task, created by the user rather than a rule.
 { "title": "...", "scheduled_date": "2026-09-24", "start_time": "20:00", "duration_minutes": 30, "block_count": 2 }
 ```
 
-All fields optional. This is also how postpone works — send a new `scheduled_date`. Changing `block_count` updates only this task; its rule is unchanged.
+All fields optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it. `title` is editable only on a standalone task. This is also how postpone works — send a new `scheduled_date`. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited.
 
 **200** — the updated task. `occurrence_date` and `period_start` are unchanged whatever the new date is.
 
-Moving a task also moves its reminder.
+Changing a timed task updates its reminder. Clearing its time cancels the reminder; adding a time creates one.
 
 #### DELETE /tasks/{id}
 
@@ -505,7 +508,7 @@ Moving a task also moves its reminder.
 
 Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc (`occurrence_date` null) is hard-deleted, since nothing would recreate it.
 
-Either way the reminder is cancelled.
+Either way its reminder, if any, is cancelled.
 
 #### POST /tasks/{id}/check
 
@@ -552,8 +555,10 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
     {
       "id": "481",
       "goal_id": "7",
+      "rule_id": "21",
       "title": "CS Block",
       "start_time": "19:00",
+      "duration_minutes": 60,
       "end_time": "20:00",
       "block_count": 2,
       "status": "PENDING",
@@ -569,7 +574,7 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
 
 `week_start` and `week_end` bound the week `date` falls in, using the user's `week_start_day`. The weekly view labels itself with them, so the client never computes a week boundary. To check off or undo a habit shown here, the client sends this response's `date`; the server resolves it to the habit's day or week.
 
-Tasks are ordered by `start_time`, `DELETED` excluded. Anything under an archived area is excluded.
+Timed tasks are ordered by `start_time`, followed by untimed tasks; `DELETED` is excluded. Anything under an archived area is excluded.
 
 #### GET /week
 
@@ -642,7 +647,7 @@ Newest week first.
 
 `passed` is derived: every requirement satisfies `done >= target`. On an open week it reflects where things stand right now.
 
-For goals, `target` is `weekly_target` in blocks and `done` is `SUM(block_count)` across completed tasks in the period, not `COUNT(*)` — so `done` can be fractional, such as 2.5.
+For goals, `target` is `weekly_target` in blocks and `done` is `COALESCE(SUM(block_count), 0)` across completed tasks in the period, not `COUNT(*)` — so null blocks contribute zero and `done` can be fractional, such as 2.5.
 
 `title` is snapshotted alongside `target` and `done`, so a week still reads correctly after the habit or goal is renamed or deleted. `ref_id` is not a foreign key — it identifies the row for the unique constraint, nothing more.
 

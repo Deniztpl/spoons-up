@@ -12,7 +12,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Session ending** — logout revokes that row, a password change revokes all of them. Login inserts a row without touching existing ones, so several devices stay signed in. Refresh tokens live in SecureStore on mobile and an httpOnly cookie on web; the access token is held in memory.
 
-**Areas** — user-defined top-level buckets (SWE, Finance, Social). Everything tracked belongs to one. An area's weekly result is derived: every requirement under it must pass.
+**Areas** — user-defined top-level buckets (SWE, Finance, Social). Habits and goals belong to one; a standalone task may sit outside them. An area's weekly result is derived: every requirement under it must pass.
 
 **Habits** — behaviours you check off. No scheduling, no duration, no moving. `DAILY` is one checkbox per day, `WEEKLY` one per week on any day. No quota, no fixed weekdays.
 
@@ -20,19 +20,23 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Habit mode is editable** — each entry carries its own `period_type`, so switching `DAILY` and `WEEKLY` leaves old rows readable at their original granularity.
 
-**Daily and weekly views** — the today screen holds both. Daily shows the day's tasks, ordered by start time, above the `DAILY` habits; weekly shows `WEEKLY` habits alone. One endpoint returns all three lists. Quota progress lives in the area view.
+**Daily and weekly views** — the today screen holds both. Daily shows the day's timed tasks ordered by start time, then untimed tasks, above the `DAILY` habits; weekly shows `WEEKLY` habits alone. One endpoint returns all three lists. Quota progress lives in the area view.
 
-**Goals** — weekly quotas ("3 CS Blocks a week"), user-entered. `weekly_target` is a whole number of blocks and is nullable for goals scheduled ad hoc. A goal's weekly `done` is `SUM(block_count)` across its completed tasks, not the number of task rows. Blocks can be halved, so `done` can be 2.5 against a target of 3.
+**Goals** — weekly quotas ("3 CS Blocks a week"), user-entered. `weekly_target` is a whole number of blocks and is nullable for goals scheduled ad hoc. A goal's weekly `done` is `COALESCE(SUM(block_count), 0)` across its completed tasks, not the number of task rows. A null block value contributes zero; non-null blocks can be halved, so `done` can be 2.5 against a target of 3.
 
-**Goal rules** — a goal can have several at once: `{Mon, Wed, Fri} 19:00, 60min` alongside `{Mon, Tue} 07:00, 60min`. `block_count` says how many blocks each generated task contributes and is copied to that task. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
+**Goal rules** — schedules shown under a goal. A goal starts without one and can hold several. Weekdays are required; start time, duration and `block_count` are optional templates copied to generated tasks. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
 
 **Changing a rule redraws unfinished work** — untouched `PENDING` tasks that rule produced are removed from the open week forward, including days before today. `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`), because those were the user's decisions. New tasks are generated from today forward only, so newly selected weekdays earlier in the open week stay empty. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
 
-**Tasks** — concrete scheduled work with a start time and duration. `block_count` is a separate user-entered counter value; it is not derived from duration. It moves in steps of 0.5 — half a block is the smallest unit — and the client offers 0.5, 1, 2 and 4. Changing one task's `block_count` changes only that task, not its rule. A task belongs to a goal, or stands alone (dentist appointment).
+**Tasks** — concrete work on a local date. Start time, duration and `block_count` are independent and optional; `end_time` exists only when both time and duration exist. A non-null block value moves in steps of 0.5 and is not derived from duration. Changing one task changes only that task, not its rule. A task belongs to a goal and takes its title from it, or stands alone with a user-entered title.
 
-**Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range and writes each task's reminder with it. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
+**Goal and task entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today creates tasks instead: choosing an area and goal makes a goal-linked task; choosing neither requires a standalone title.
 
-**Two triggers, no lazy reads** — a write that creates or changes a rule adds its tasks in the same request, so a saved rule has today's task and reminder before the response returns. An hourly cron runs the daily job, which advances a rolling window of 14 days using each user's own timezone, so tasks and reminders exist without the app being opened. Nothing else calls `add_tasks`.
+**Repeat from a task** — Repeat is available only with a goal. With Repeat off, Today creates an ad-hoc task; with it on, Today creates a rule and lets that rule generate the occurrence. The task form shows only the rule's weekdays because time, duration and blocks already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
+
+**Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range, copying nullable schedule values, and writes a reminder only for a timed task. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
+
+**Two triggers, no lazy reads** — a write that creates or changes a rule adds its current-window tasks in the same request, including timed reminders where applicable. An hourly cron runs the daily job, which advances a rolling window of 14 days using each user's own timezone, so tasks can exist without the app being opened. Nothing else calls `add_tasks`.
 
 **Dormant users are skipped** — the daily job only runs for users seen in the last 30 days; `users.last_seen_at` is refreshed on each authenticated request. Someone away longer has no window being written for them. Their first request back adds the window before anything is read, so they see a full calendar immediately and nothing was generated in the meantime.
 
@@ -44,7 +48,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Delete** — when the user deletes a task, a rule-generated one soft deletes (`status = DELETED`) so generation doesn't bring it back, and an ad-hoc one hard deletes. Removals the system does itself — a rule change, an area archive — are hard deletes, so the same occurrence can be generated again later.
 
-**Extra tasks** — the user can add beyond the rule (`rule_id` and `occurrence_date` NULL). Outside the unique index, so unlimited; still counts toward the week's quota through `period_start`.
+**Extra tasks** — the user can add beyond the rule (`rule_id` and `occurrence_date` NULL). Outside the unique index, so unlimited. A goal-linked one contributes its non-null `block_count` through `period_start`; a standalone one has no goal quota.
 
 **Catch-up on return** — past dormant time is not generated. The first authenticated request after more than 30 days restores only the current 14-day window; older empty dates stay empty.
 
@@ -62,11 +66,11 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Areas delete from either state** — an active area can be deleted without archiving it first. The client confirms with a strong warning that the area's habits, goals and all of their history go with it, and points to archive as the reversible way to put an area down.
 
-**Push notifications** — a reminder five minutes before a task starts. A `reminders` row is written at task creation with `scheduled_at` in UTC, updated on move, cancelled on delete. A scheduler scans due reminders every minute and pushes to registered tokens through FCM/APNs.
+**Push notifications** — a reminder five minutes before a timed task starts. A `reminders` row is written only when a task has `start_time`, with `scheduled_at` in UTC; it is created, updated or cancelled as timing changes. A scheduler scans due reminders every minute and pushes to registered tokens through FCM/APNs.
 
 **Multi-device push** — a reminder fans out to every registered device. Invalid tokens are pruned on delivery failure.
 
-**Timezone-correct everywhere** — `scheduled_date` and `start_time` are stored local; `users.timezone` holds an IANA name so DST is handled. The worker derives each user's today from their own timezone. Reminder times are converted to UTC once, at write time.
+**Timezone-correct everywhere** — `scheduled_date` and an optional `start_time` are stored local; `users.timezone` holds an IANA name so DST is handled. The worker derives each user's today from their own timezone. Timed reminder values are converted to UTC once, at write time.
 
 **Configurable week start** — `users.week_start_day` decides where the week boundary falls, and `period_start` is computed from it rather than assuming ISO Monday.
 
@@ -177,6 +181,7 @@ erDiagram
         date occurrence_date
         date scheduled_date
         time start_time
+        int duration_minutes
         time end_time
         numeric block_count
         date period_start
@@ -300,9 +305,9 @@ UNIQUE (habit_id, period_type, period_start)
 | id | bigint | PK |
 | goal_id | bigint | FK -> goals |
 | byweekday | smallint[] | e.g. {1,3,5} |
-| start_time | time | |
-| duration_minutes | int | |
-| block_count | numeric(3,1) | default 1, positive multiple of 0.5, copied to each generated task |
+| start_time | time | nullable |
+| duration_minutes | int | nullable |
+| block_count | numeric(3,1) | nullable, positive multiple of 0.5 when set; copied to each generated task |
 
 #### tasks
 
@@ -315,9 +320,10 @@ UNIQUE (habit_id, period_type, period_start)
 | title | text | |
 | occurrence_date | date | nullable, the date the rule produced |
 | scheduled_date | date | |
-| start_time | time | |
-| end_time | time | start_time + duration_minutes |
-| block_count | numeric(3,1) | default 1, positive multiple of 0.5; contribution to the goal's weekly target |
+| start_time | time | nullable |
+| duration_minutes | int | nullable |
+| end_time | time | nullable, start_time + duration_minutes when both exist |
+| block_count | numeric(3,1) | nullable, positive multiple of 0.5 when set; contribution to the goal's weekly target |
 | period_start | date | which week the quota counts toward |
 | status | text | PENDING \| DONE \| DELETED |
 | completed_at | timestamptz | nullable |
@@ -330,7 +336,7 @@ WHERE occurrence_date IS NOT NULL;
 
 `block_count` does not change occurrence identity: a two-block occurrence is still one task row. Separate times on the same day still require separate rules.
 
-`goal_rules.block_count` and `tasks.block_count` both carry the same check, so half blocks are allowed and anything finer is rejected:
+`goal_rules.block_count` and `tasks.block_count` are nullable and carry the same check when set, so half blocks are allowed and anything finer is rejected:
 
 ```sql
 CHECK (block_count > 0 AND block_count * 2 = trunc(block_count * 2))
@@ -348,7 +354,7 @@ CHECK (block_count > 0 AND block_count * 2 = trunc(block_count * 2))
 | ref_id | bigint | habits.id or goals.id — not a foreign key |
 | title | text | snapshot of the habit or goal title |
 | target | int | |
-| done | numeric(5,1) | goal rows snapshot `SUM(tasks.block_count)` for completed tasks, so it can be fractional |
+| done | numeric(5,1) | goal rows snapshot `COALESCE(SUM(tasks.block_count), 0)` for completed tasks, so it can be fractional |
 
 ```sql
 UNIQUE (ref_type, ref_id, period_start)
