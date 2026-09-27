@@ -506,10 +506,9 @@ export interface components {
         };
         /** TodayTaskResponse */
         TodayTaskResponse: {
-            /**
-             * End Time
-             * Format: time
-             */
+            /** Block Count */
+            block_count: number;
+            /** End Time */
             end_time: string;
             /** Goal Id */
             goal_id: string | null;
@@ -527,10 +526,7 @@ export interface components {
              * Format: date
              */
             scheduled_date: string;
-            /**
-             * Start Time
-             * Format: time
-             */
+            /** Start Time */
             start_time: string;
             /**
              * Status

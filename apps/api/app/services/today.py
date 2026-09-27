@@ -7,8 +7,9 @@ from app.core.errors import NotFoundError
 from app.core.periods import get_week_end, get_week_start
 from app.models import HabitMode
 from app.repositories.habits import HabitRepository
+from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
-from app.schemas.today import TodayHabitResponse, TodayResponse
+from app.schemas.today import TodayHabitResponse, TodayResponse, TodayTaskResponse
 
 
 class TodayService:
@@ -16,10 +17,12 @@ class TodayService:
         self,
         session: Session,
         habit_repository: HabitRepository,
+        task_repository: TaskRepository,
         user_repository: UserRepository,
     ) -> None:
         self.session = session
         self.habit_repository = habit_repository
+        self.task_repository = task_repository
         self.user_repository = user_repository
 
     def get(self, *, user_id: int, target_date: date | None) -> TodayResponse:
@@ -42,6 +45,10 @@ class TodayService:
                 target_date=resolved_date,
                 week_start=week_start,
             )
+            tasks = self.task_repository.list_for_today(
+                user_id=user_id,
+                target_date=resolved_date,
+            )
 
             daily_habits: list[TodayHabitResponse] = []
             weekly_habits: list[TodayHabitResponse] = []
@@ -63,5 +70,5 @@ class TodayService:
                 week_end=week_end,
                 daily_habits=daily_habits,
                 weekly_habits=weekly_habits,
-                tasks=[],
+                tasks=[TodayTaskResponse.model_validate(task) for task in tasks],
             )

@@ -1,11 +1,12 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import HabitEntry, User
+from app.models import HabitEntry, Task, TaskStatus, User
 
 pytestmark = pytest.mark.integration
 
@@ -44,6 +45,22 @@ def create_habit(
     response = client.post(
         "/api/v1/habits",
         json={"area_id": area_id, "title": title, "mode": mode},
+        headers=headers,
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def create_goal(
+    client: TestClient,
+    headers: dict[str, str],
+    *,
+    area_id: str,
+    title: str,
+) -> dict[str, object]:
+    response = client.post(
+        "/api/v1/goals",
+        json={"area_id": area_id, "title": title, "weekly_target": 4},
         headers=headers,
     )
     assert response.status_code == 201
@@ -209,6 +226,157 @@ def test_today_defaults_to_the_users_local_date(
     assert response.json()["daily_habits"][0]["done"] is True
 
 
+def test_today_returns_the_days_visible_tasks_in_start_time_order(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "today-tasks@example.com"))
+    active_area = create_area(client, headers, "Active tasks")
+    archived_area = create_area(client, headers, "Archived tasks")
+    active_goal = create_goal(
+        client,
+        headers,
+        area_id=str(active_area["id"]),
+        title="Active goal",
+    )
+    archived_goal = create_goal(
+        client,
+        headers,
+        area_id=str(archived_area["id"]),
+        title="Archived goal",
+    )
+    target_date = date(2026, 9, 24)
+
+    with db_session.begin():
+        user = db_session.scalar(select(User).where(User.email == "today-tasks@example.com"))
+        assert user is not None
+        morning = build_today_task(
+            user_id=user.id,
+            goal_id=int(str(active_goal["id"])),
+            title="Morning block",
+            scheduled_date=target_date,
+            start_time=time(8),
+            end_time=time(8, 30),
+            block_count=Decimal("0.5"),
+            status=TaskStatus.DONE,
+            occurrence_date=target_date,
+        )
+        standalone = build_today_task(
+            user_id=user.id,
+            goal_id=None,
+            title="Standalone task",
+            scheduled_date=target_date,
+            start_time=time(9),
+            end_time=time(10),
+            block_count=Decimal("1.0"),
+        )
+        evening = build_today_task(
+            user_id=user.id,
+            goal_id=int(str(active_goal["id"])),
+            title="Evening block",
+            scheduled_date=target_date,
+            start_time=time(18),
+            end_time=time(20),
+            block_count=Decimal("2.0"),
+            occurrence_date=date(2026, 9, 23),
+        )
+        db_session.add_all(
+            [
+                morning,
+                standalone,
+                evening,
+                build_today_task(
+                    user_id=user.id,
+                    goal_id=int(str(active_goal["id"])),
+                    title="Deleted task",
+                    scheduled_date=target_date,
+                    start_time=time(7),
+                    end_time=time(8),
+                    block_count=Decimal("1.0"),
+                    status=TaskStatus.DELETED,
+                ),
+                build_today_task(
+                    user_id=user.id,
+                    goal_id=int(str(active_goal["id"])),
+                    title="Another day",
+                    scheduled_date=date(2026, 9, 25),
+                    start_time=time(6),
+                    end_time=time(7),
+                    block_count=Decimal("1.0"),
+                ),
+                build_today_task(
+                    user_id=user.id,
+                    goal_id=int(str(archived_goal["id"])),
+                    title="Hidden archived task",
+                    scheduled_date=target_date,
+                    start_time=time(6),
+                    end_time=time(7),
+                    block_count=Decimal("1.0"),
+                    status=TaskStatus.DONE,
+                ),
+            ]
+        )
+        db_session.flush()
+        expected_ids = [str(morning.id), str(standalone.id), str(evening.id)]
+        task_count_before = db_session.scalar(select(func.count()).select_from(Task))
+
+    archived = client.post(
+        f"/api/v1/areas/{archived_area['id']}/archive",
+        json={"archived": True},
+        headers=headers,
+    )
+    response = client.get(
+        "/api/v1/today",
+        params={"date": target_date.isoformat()},
+        headers=headers,
+    )
+
+    assert archived.status_code == 200
+    assert response.status_code == 200
+    tasks = response.json()["tasks"]
+    assert [task["id"] for task in tasks] == expected_ids
+    assert tasks == [
+        {
+            "id": expected_ids[0],
+            "goal_id": active_goal["id"],
+            "title": "Morning block",
+            "start_time": "08:00",
+            "end_time": "08:30",
+            "block_count": 0.5,
+            "status": "DONE",
+            "scheduled_date": "2026-09-24",
+            "occurrence_date": "2026-09-24",
+            "period_start": "2026-09-21",
+        },
+        {
+            "id": expected_ids[1],
+            "goal_id": None,
+            "title": "Standalone task",
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "block_count": 1.0,
+            "status": "PENDING",
+            "scheduled_date": "2026-09-24",
+            "occurrence_date": None,
+            "period_start": "2026-09-21",
+        },
+        {
+            "id": expected_ids[2],
+            "goal_id": active_goal["id"],
+            "title": "Evening block",
+            "start_time": "18:00",
+            "end_time": "20:00",
+            "block_count": 2.0,
+            "status": "PENDING",
+            "scheduled_date": "2026-09-24",
+            "occurrence_date": "2026-09-23",
+            "period_start": "2026-09-21",
+        },
+    ]
+    with db_session.begin():
+        assert db_session.scalar(select(func.count()).select_from(Task)) == task_count_before
+
+
 def test_today_returns_the_week_from_the_users_week_start_day(
     client: TestClient,
     db_session: Session,
@@ -258,3 +426,31 @@ def test_today_requires_authentication_and_validates_the_date(client: TestClient
     assert invalid_date.status_code == 422
     assert invalid_date.json()["code"] == "validation_error"
     assert "date" in invalid_date.json()["fields"]
+
+
+def build_today_task(
+    *,
+    user_id: int,
+    goal_id: int | None,
+    title: str,
+    scheduled_date: date,
+    start_time: time,
+    end_time: time,
+    block_count: Decimal,
+    status: TaskStatus = TaskStatus.PENDING,
+    occurrence_date: date | None = None,
+) -> Task:
+    return Task(
+        user_id=user_id,
+        goal_id=goal_id,
+        rule_id=None,
+        title=title,
+        occurrence_date=occurrence_date,
+        scheduled_date=scheduled_date,
+        start_time=start_time,
+        end_time=end_time,
+        block_count=block_count,
+        period_start=date(2026, 9, 21),
+        status=status.value,
+        completed_at=(datetime(2026, 9, 24, 8, tzinfo=UTC) if status == TaskStatus.DONE else None),
+    )

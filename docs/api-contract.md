@@ -569,8 +569,6 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
 
 `week_start` and `week_end` bound the week `date` falls in, using the user's `week_start_day`. The weekly view labels itself with them, so the client never computes a week boundary. To check off or undo a habit shown here, the client sends this response's `date`; the server resolves it to the habit's day or week.
 
-**Open until slice 3:** the implemented endpoint always returns `tasks: []`, and its task shape has no `block_count` yet. Slice 3 (plan item 23) fills the list and adds the field; the example above already shows the slice 3 shape.
-
 Tasks are ordered by `start_time`, `DELETED` excluded. Anything under an archived area is excluded.
 
 #### GET /week

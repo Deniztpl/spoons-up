@@ -582,8 +582,11 @@
       },
       "TodayTaskResponse": {
         "properties": {
+          "block_count": {
+            "title": "Block Count",
+            "type": "number"
+          },
           "end_time": {
-            "format": "time",
             "title": "End Time",
             "type": "string"
           },
@@ -625,7 +628,6 @@
             "type": "string"
           },
           "start_time": {
-            "format": "time",
             "title": "Start Time",
             "type": "string"
           },
@@ -648,6 +650,7 @@
           "title",
           "start_time",
           "end_time",
+          "block_count",
           "status",
           "scheduled_date",
           "occurrence_date",

@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,28 @@ class TaskRepository:
             .order_by(Goal.id, GoalRule.id)
         )
         return [(goal, rule) for goal, rule in self.session.execute(query)]
+
+    def list_for_today(self, *, user_id: int, target_date: date) -> list[Task]:
+        query = (
+            select(Task)
+            .outerjoin(Goal, Task.goal_id == Goal.id)
+            .outerjoin(Area, Goal.area_id == Area.id)
+            .where(
+                Task.user_id == user_id,
+                Task.scheduled_date == target_date,
+                Task.status != TaskStatus.DELETED.value,
+                or_(
+                    Task.goal_id.is_(None),
+                    and_(
+                        Goal.user_id == user_id,
+                        Area.user_id == user_id,
+                        Area.archived_at.is_(None),
+                    ),
+                ),
+            )
+            .order_by(Task.start_time, Task.id)
+        )
+        return list(self.session.scalars(query))
 
     def add_generated_tasks(self, *, task_values: list[dict[str, object]]) -> None:
         if not task_values:

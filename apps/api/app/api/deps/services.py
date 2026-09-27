@@ -104,6 +104,7 @@ def get_today_service(session: DatabaseSession) -> TodayService:
     return TodayService(
         session,
         HabitRepository(session),
+        TaskRepository(session),
         UserRepository(session),
     )
 
