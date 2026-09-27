@@ -43,7 +43,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
    - An active area can be deleted from its menu after a strong warning; archive stays the reversible option — DONE
 18. **Done when:** a habit is checked off in the browser and survives a reload; checking twice in one period is rejected
 
-## Slice 3 — Goals and task generation
+## Slice 3 — Goals and task generation — DONE
 
 19. `goals` and `goal_rules` migration, CRUD; `weekly_target` is in whole blocks and each rule has `block_count` defaulting to 1. `block_count` is a positive multiple of 0.5 (`numeric(3,1)` with a check); the client offers 0.5, 1, 2 and 4 — DONE
 20. Period math — timezone + `week_start_day` -> `period_start`. Standalone, no DB, tested. — DONE
@@ -57,7 +57,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
    - "Add goal" on the today screen opens the same form with an area choice — DONE
    - The day's tasks sit above the habits, as in the Today v2 design, each as tall as its `block_count`, with a progress rail beside them; they are completed and undone there — DONE
    - Changing a task's `block_count` from the today screen waits for `PATCH /tasks/{id}` in slice 4 and is marked `TODO(slice-4)`
-26. **Done when:** a goal created in the browser produces today's task, and completing it holds after a reload
+26. **Done when:** a goal created in the browser produces today's task, and completing it holds after a reload — DONE
 
 ## Slice 4 — Calendar
 
