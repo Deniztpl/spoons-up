@@ -252,6 +252,24 @@ export interface paths {
         patch: operations["update_goal_rule_api_v1_rules__rule_id__patch"];
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Task */
+        post: operations["check_task_api_v1_tasks__task_id__check_post"];
+        /** Uncheck Task */
+        delete: operations["uncheck_task_api_v1_tasks__task_id__check_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/today": {
         parameters: {
             query?: never;
@@ -468,6 +486,42 @@ export interface components {
             password: string;
             /** Timezone */
             timezone: string;
+        };
+        /** TaskResponse */
+        TaskResponse: {
+            /** Block Count */
+            block_count: number;
+            /** Completed At */
+            completed_at: string | null;
+            /** End Time */
+            end_time: string;
+            /** Goal Id */
+            goal_id: string | null;
+            /** Id */
+            id: string;
+            /** Occurrence Date */
+            occurrence_date: string | null;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /** Rule Id */
+            rule_id: string | null;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Start Time */
+            start_time: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "DONE" | "DELETED";
+            /** Title */
+            title: string;
         };
         /** TodayHabitResponse */
         TodayHabitResponse: {
@@ -1764,6 +1818,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoalRuleResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    check_task_api_v1_tasks__task_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    uncheck_task_api_v1_tasks__task_id__check_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
                 };
             };
             /** @description Unauthorized */

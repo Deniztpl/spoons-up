@@ -18,6 +18,7 @@ def run_daily_task_generation(
     observed_at = now or datetime.now(UTC)
     user_repository = UserRepository(session)
     task_service = TaskService(
+        session,
         TaskRepository(session),
         user_repository,
     )

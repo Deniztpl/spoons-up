@@ -1,10 +1,13 @@
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+
+from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
 from app.core.periods import get_week_start
-from app.models import Goal, GoalRule, TaskStatus
+from app.models import Goal, GoalRule, Task, TaskStatus
 from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
+from app.schemas.tasks import TaskResponse
 
 TASK_GENERATION_DAYS = 14
 
@@ -12,11 +15,27 @@ TASK_GENERATION_DAYS = 14
 class TaskService:
     def __init__(
         self,
+        session: Session,
         task_repository: TaskRepository,
         user_repository: UserRepository,
     ) -> None:
+        self.session = session
         self.task_repository = task_repository
         self.user_repository = user_repository
+
+    def complete(self, *, task_id: int, user_id: int) -> TaskResponse:
+        with self.session.begin():
+            task = self._get_owned_task(task_id=task_id, user_id=user_id)
+            self.task_repository.complete(task=task, completed_at=datetime.now(UTC))
+            response = TaskResponse.model_validate(task)
+        return response
+
+    def uncomplete(self, *, task_id: int, user_id: int) -> TaskResponse:
+        with self.session.begin():
+            task = self._get_owned_task(task_id=task_id, user_id=user_id)
+            self.task_repository.uncomplete(task=task)
+            response = TaskResponse.model_validate(task)
+        return response
 
     def add_tasks(
         self,
@@ -111,6 +130,12 @@ class TaskService:
             occurrence_date += timedelta(days=1)
 
         return values
+
+    def _get_owned_task(self, *, task_id: int, user_id: int) -> Task:
+        task = self.task_repository.get_task_and_lock(task_id=task_id, user_id=user_id)
+        if task is None:
+            raise NotFoundError
+        return task
 
 
 def _add_minutes(value: time, minutes: int) -> time:

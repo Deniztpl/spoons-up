@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import and_, delete, or_, select
+from sqlalchemy import Select, and_, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -27,25 +27,32 @@ class TaskRepository:
 
     def list_for_today(self, *, user_id: int, target_date: date) -> list[Task]:
         query = (
-            select(Task)
-            .outerjoin(Goal, Task.goal_id == Goal.id)
-            .outerjoin(Area, Goal.area_id == Area.id)
-            .where(
-                Task.user_id == user_id,
-                Task.scheduled_date == target_date,
-                Task.status != TaskStatus.DELETED.value,
-                or_(
-                    Task.goal_id.is_(None),
-                    and_(
-                        Goal.user_id == user_id,
-                        Area.user_id == user_id,
-                        Area.archived_at.is_(None),
-                    ),
-                ),
-            )
+            self._select_visible_tasks_for_user(user_id=user_id)
+            .where(Task.scheduled_date == target_date)
             .order_by(Task.start_time, Task.id)
         )
         return list(self.session.scalars(query))
+
+    def get_task_and_lock(self, *, task_id: int, user_id: int) -> Task | None:
+        return self.session.scalar(
+            self._select_visible_tasks_for_user(user_id=user_id)
+            .where(Task.id == task_id)
+            .with_for_update(of=Task)
+        )
+
+    def complete(self, *, task: Task, completed_at: datetime) -> None:
+        if task.status == TaskStatus.DONE.value:
+            return
+        task.status = TaskStatus.DONE.value
+        task.completed_at = completed_at
+        self.session.flush()
+
+    def uncomplete(self, *, task: Task) -> None:
+        if task.status == TaskStatus.PENDING.value:
+            return
+        task.status = TaskStatus.PENDING.value
+        task.completed_at = None
+        self.session.flush()
 
     def add_generated_tasks(self, *, task_values: list[dict[str, object]]) -> None:
         if not task_values:
@@ -88,3 +95,23 @@ class TaskRepository:
             Task.status == TaskStatus.PENDING.value,
         )
         self.session.execute(query)
+
+    def _select_visible_tasks_for_user(self, *, user_id: int) -> Select[tuple[Task]]:
+        """Select non-deleted tasks that are standalone or under an active area."""
+        return (
+            select(Task)
+            .outerjoin(Goal, Task.goal_id == Goal.id)
+            .outerjoin(Area, Goal.area_id == Area.id)
+            .where(
+                Task.user_id == user_id,
+                Task.status != TaskStatus.DELETED.value,
+                or_(
+                    Task.goal_id.is_(None),
+                    and_(
+                        Goal.user_id == user_id,
+                        Area.user_id == user_id,
+                        Area.archived_at.is_(None),
+                    ),
+                ),
+            )
+        )

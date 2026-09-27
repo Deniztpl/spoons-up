@@ -31,6 +31,7 @@ AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 
 def get_task_service(session: DatabaseSession) -> TaskService:
     return TaskService(
+        session,
         TaskRepository(session),
         UserRepository(session),
     )

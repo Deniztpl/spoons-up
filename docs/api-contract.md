@@ -507,7 +507,7 @@ Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so
 
 Either way the reminder is cancelled.
 
-#### POST /tasks/{id}/complete
+#### POST /tasks/{id}/check
 
 No body.
 
@@ -515,7 +515,7 @@ No body.
 
 Completing a task already done is a no-op and returns the task unchanged.
 
-#### DELETE /tasks/{id}/complete
+#### DELETE /tasks/{id}/check
 
 **200** — the task back at `status: "PENDING"`, `completed_at` null.
 

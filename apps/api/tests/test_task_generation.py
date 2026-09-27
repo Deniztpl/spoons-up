@@ -69,6 +69,7 @@ def test_rule_creation_adds_the_current_window_idempotently(
     db_session.rollback()
     with db_session.begin():
         task_service = TaskService(
+            db_session,
             TaskRepository(db_session),
             UserRepository(db_session),
         )
