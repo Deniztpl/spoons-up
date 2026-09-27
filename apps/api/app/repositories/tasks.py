@@ -47,3 +47,22 @@ class TaskRepository:
             Task.scheduled_date == Task.occurrence_date,
         )
         self.session.execute(query)
+
+    def delete_pending_tasks_for_area(
+        self,
+        *,
+        area_id: int,
+        user_id: int,
+        from_date: date,
+    ) -> None:
+        goal_ids = select(Goal.id).where(
+            Goal.area_id == area_id,
+            Goal.user_id == user_id,
+        )
+        query = delete(Task).where(
+            Task.user_id == user_id,
+            Task.goal_id.in_(goal_ids),
+            Task.scheduled_date >= from_date,
+            Task.status == TaskStatus.PENDING.value,
+        )
+        self.session.execute(query)

@@ -7,9 +7,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Goal, Task, TaskStatus, User
+from app.models import Goal, GoalRule, Task, TaskStatus, User
 from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
+from app.services import areas as areas_service_module
 from app.services import goals as goals_service_module
 from app.services.tasks import TaskService
 
@@ -248,6 +249,107 @@ def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
     assert all(task.rule_id is None for task in remaining_tasks)
 
 
+def test_area_archive_hard_deletes_only_future_pending_tasks(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_goal_service_time(monkeypatch)
+    freeze_area_service_time(monkeypatch)
+    headers = bearer(register(client, "area-task-archive@example.com"))
+    area = create_area(client, headers)
+    goal = create_goal(client, headers, area_id=str(area["id"]))
+    rule = create_rule(
+        client,
+        headers,
+        goal_id=str(goal["id"]),
+        byweekday=[1, 2, 3, 4, 5, 6, 7],
+        start_time="09:00",
+        duration_minutes=60,
+        block_count=1,
+    )
+    other_area = create_area(client, headers, name="Personal")
+    other_goal = create_goal(client, headers, area_id=str(other_area["id"]))
+    other_rule = create_rule(
+        client,
+        headers,
+        goal_id=str(other_goal["id"]),
+        byweekday=[1, 2, 3, 4, 5, 6, 7],
+        start_time="18:00",
+        duration_minutes=30,
+        block_count=1,
+    )
+    goal_id = int(str(goal["id"]))
+    rule_id = int(str(rule["id"]))
+    other_rule_id = int(str(other_rule["id"]))
+
+    with db_session.begin():
+        user = db_session.scalar(select(User).where(User.email == "area-task-archive@example.com"))
+        goal_model = db_session.get(Goal, goal_id)
+        generated_tasks = {
+            task.occurrence_date: task
+            for task in db_session.scalars(select(Task).where(Task.rule_id == rule_id))
+        }
+        assert user is not None
+        assert goal_model is not None
+
+        generated_tasks[date(2026, 9, 23)].scheduled_date = date(2026, 9, 30)
+        generated_tasks[date(2026, 9, 25)].status = TaskStatus.DONE.value
+        generated_tasks[date(2026, 9, 26)].status = TaskStatus.DELETED.value
+        db_session.add(
+            build_task(
+                user=user,
+                goal=goal_model,
+                rule_id=rule_id,
+                occurrence_date=date(2026, 9, 22),
+            )
+        )
+
+    archived = client.post(
+        f"/api/v1/areas/{area['id']}/archive",
+        json={"archived": True},
+        headers=headers,
+    )
+
+    assert archived.status_code == 200
+    with db_session.begin():
+        remaining_tasks = list(
+            db_session.scalars(
+                select(Task).where(Task.goal_id == goal_id).order_by(Task.occurrence_date)
+            )
+        )
+        assert {
+            (task.occurrence_date, task.scheduled_date, task.status) for task in remaining_tasks
+        } == {
+            (date(2026, 9, 22), date(2026, 9, 22), TaskStatus.PENDING.value),
+            (date(2026, 9, 25), date(2026, 9, 25), TaskStatus.DONE.value),
+            (date(2026, 9, 26), date(2026, 9, 26), TaskStatus.DELETED.value),
+        }
+        assert db_session.get(Goal, goal_id) is not None
+        assert db_session.get(GoalRule, rule_id) is not None
+        remaining_task_ids = {task.id for task in remaining_tasks}
+        other_task_ids = set(
+            db_session.scalars(select(Task.id).where(Task.rule_id == other_rule_id))
+        )
+        assert len(other_task_ids) == 14
+
+    restored = client.post(
+        f"/api/v1/areas/{area['id']}/archive",
+        json={"archived": False},
+        headers=headers,
+    )
+
+    assert restored.status_code == 200
+    with db_session.begin():
+        assert (
+            set(db_session.scalars(select(Task.id).where(Task.goal_id == goal_id)))
+            == remaining_task_ids
+        )
+        assert set(db_session.scalars(select(Task.id).where(Task.rule_id == other_rule_id))) == (
+            other_task_ids
+        )
+
+
 def build_task(
     *,
     user: User,
@@ -280,6 +382,15 @@ def freeze_goal_service_time(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(goals_service_module, "datetime", FixedDateTime)
 
 
+def freeze_area_service_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[no-untyped-def]
+            return FIXED_NOW if tz is None else FIXED_NOW.astimezone(tz)
+
+    monkeypatch.setattr(areas_service_module, "datetime", FixedDateTime)
+
+
 def register(client: TestClient, email: str) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/register",
@@ -297,8 +408,13 @@ def bearer(tokens: dict[str, str]) -> dict[str, str]:
     return {"Authorization": f"Bearer {tokens['access_token']}"}
 
 
-def create_area(client: TestClient, headers: dict[str, str]) -> dict[str, object]:
-    response = client.post("/api/v1/areas", json={"name": "Work"}, headers=headers)
+def create_area(
+    client: TestClient,
+    headers: dict[str, str],
+    *,
+    name: str = "Work",
+) -> dict[str, object]:
+    response = client.post("/api/v1/areas", json={"name": name}, headers=headers)
     assert response.status_code == 201
     return response.json()
 

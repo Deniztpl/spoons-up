@@ -1,11 +1,13 @@
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AreaNameTakenError, NotFoundError
-from app.models import Area
+from app.models import Area, User
 from app.repositories.areas import AreaRepository
+from app.repositories.users import UserRepository
 from app.schemas.areas import (
     ArchiveAreaRequest,
     AreaListResponse,
@@ -13,12 +15,21 @@ from app.schemas.areas import (
     CreateAreaRequest,
     UpdateAreaRequest,
 )
+from app.services.tasks import TaskService
 
 
 class AreaService:
-    def __init__(self, session: Session, area_repository: AreaRepository) -> None:
+    def __init__(
+        self,
+        session: Session,
+        area_repository: AreaRepository,
+        user_repository: UserRepository,
+        task_service: TaskService,
+    ) -> None:
         self.session = session
         self.area_repository = area_repository
+        self.user_repository = user_repository
+        self.task_service = task_service
 
     def list(self, *, user_id: int, include_archived: bool) -> AreaListResponse:
         with self.session.begin():
@@ -73,9 +84,16 @@ class AreaService:
             area = self._get_owned_area(area_id=area_id, user_id=user_id)
 
             if payload.archived and area.archived_at is None:
+                archived_at = datetime.now(UTC)
+                user = self._get_user(user_id=user_id)
+                self.task_service.delete_pending_tasks_for_area(
+                    area_id=area.id,
+                    user_id=user_id,
+                    from_date=archived_at.astimezone(ZoneInfo(user.timezone)).date(),
+                )
                 self.area_repository.set_archive_timestamps(
                     area=area,
-                    archived_at=datetime.now(UTC),
+                    archived_at=archived_at,
                     unarchived_at=area.unarchived_at,
                 )
             elif not payload.archived and area.archived_at is not None:
@@ -98,3 +116,9 @@ class AreaService:
         if area is None:
             raise NotFoundError
         return area
+
+    def _get_user(self, *, user_id: int) -> User:
+        user = self.user_repository.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError
+        return user

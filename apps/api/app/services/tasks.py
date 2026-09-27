@@ -61,6 +61,19 @@ class TaskService:
             from_date=from_date,
         )
 
+    def delete_pending_tasks_for_area(
+        self,
+        *,
+        area_id: int,
+        user_id: int,
+        from_date: date,
+    ) -> None:
+        self.task_repository.delete_pending_tasks_for_area(
+            area_id=area_id,
+            user_id=user_id,
+            from_date=from_date,
+        )
+
     def _build_task_values_for_rule(
         self,
         *,

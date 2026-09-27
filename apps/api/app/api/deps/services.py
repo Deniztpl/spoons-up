@@ -29,13 +29,6 @@ def get_auth_service(session: DatabaseSession) -> AuthService:
 AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 
 
-def get_area_service(session: DatabaseSession) -> AreaService:
-    return AreaService(session, AreaRepository(session))
-
-
-AreaServiceDependency = Annotated[AreaService, Depends(get_area_service)]
-
-
 def get_task_service(session: DatabaseSession) -> TaskService:
     return TaskService(
         TaskRepository(session),
@@ -44,6 +37,21 @@ def get_task_service(session: DatabaseSession) -> TaskService:
 
 
 TaskServiceDependency = Annotated[TaskService, Depends(get_task_service)]
+
+
+def get_area_service(
+    session: DatabaseSession,
+    task_service: TaskServiceDependency,
+) -> AreaService:
+    return AreaService(
+        session,
+        AreaRepository(session),
+        UserRepository(session),
+        task_service,
+    )
+
+
+AreaServiceDependency = Annotated[AreaService, Depends(get_area_service)]
 
 
 def get_goal_service(
