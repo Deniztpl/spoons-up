@@ -23,6 +23,7 @@ type GoalFormDialogProps = {
   onAreaChange: (areaId: string) => void;
   onTitleChange: (title: string) => void;
   onWeeklyTargetChange: (weeklyTarget: string) => void;
+  onRepeatChange: (isRepeating: boolean) => void;
   onAddRule: () => void;
   onRuleChange: (key: string, changes: Partial<GoalRuleValues>) => void;
   onRemoveRule: (key: string) => void;
@@ -52,6 +53,7 @@ export function GoalFormDialog({
   onAreaChange,
   onTitleChange,
   onWeeklyTargetChange,
+  onRepeatChange,
   onAddRule,
   onRuleChange,
   onRemoveRule,
@@ -197,36 +199,45 @@ export function GoalFormDialog({
           </div>
         </div>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 flex items-baseline gap-2">
-            <span className={fieldLabelClassName}>Rules</span>
-            {ruleCount > 0 ? (
-              <span className="text-[11px] text-ink-soft">
-                {ruleCount} {ruleCount === 1 ? "rule" : "rules"}
-              </span>
-            ) : null}
-          </legend>
-          {draft.rules.map((rule, index) => (
-            <GoalRuleFields
-              key={rule.key}
-              label={`Rule ${index + 1}`}
-              rule={rule}
-              onChange={(changes) => onRuleChange(rule.key, changes)}
-              onRemove={() => onRemoveRule(rule.key)}
+        <fieldset className="flex flex-col gap-2.5">
+          <legend className={fieldLabelClassName}>Schedule</legend>
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-ink/14 bg-card px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={ruleCount > 0}
+              className="size-4 accent-accent"
+              onChange={(event) => onRepeatChange(event.target.checked)}
             />
-          ))}
-          {ruleCount === 0 ? (
-            <p className="py-0.5 text-xs text-ink-soft">
-              No rules. The goal isn't tied to a day or time.
-            </p>
+            <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
+              <span className="text-[13px] font-medium text-ink">Repeat</span>
+              {ruleCount > 0 ? (
+                <span className="text-[11px] text-ink-soft">
+                  {ruleCount} {ruleCount === 1 ? "schedule" : "schedules"}
+                </span>
+              ) : null}
+            </span>
+          </label>
+
+          {ruleCount > 0 ? (
+            <div className="flex flex-col gap-2">
+              {draft.rules.map((rule, index) => (
+                <GoalRuleFields
+                  key={rule.key}
+                  label={`Schedule ${index + 1}`}
+                  rule={rule}
+                  onChange={(changes) => onRuleChange(rule.key, changes)}
+                  onRemove={() => onRemoveRule(rule.key)}
+                />
+              ))}
+              <button
+                type="button"
+                className="rounded-[9px] border border-dashed border-ink/20 px-2.5 py-2 text-left text-[12.5px] font-medium text-accent transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                onClick={onAddRule}
+              >
+                <span aria-hidden="true">+</span> Add schedule
+              </button>
+            </div>
           ) : null}
-          <button
-            type="button"
-            className="rounded-[9px] border border-dashed border-ink/20 px-2.5 py-2 text-left text-[12.5px] font-medium text-accent transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            onClick={onAddRule}
-          >
-            <span aria-hidden="true">+</span> Add rule
-          </button>
         </fieldset>
 
         {error ? (

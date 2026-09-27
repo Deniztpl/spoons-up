@@ -136,6 +136,7 @@ export function TodayPage({
           onAreaChange={goalForm.setAreaId}
           onTitleChange={goalForm.setTitle}
           onWeeklyTargetChange={goalForm.setWeeklyTarget}
+          onRepeatChange={goalForm.setRepeating}
           onAddRule={goalForm.addRule}
           onRuleChange={goalForm.changeRule}
           onRemoveRule={goalForm.removeRule}

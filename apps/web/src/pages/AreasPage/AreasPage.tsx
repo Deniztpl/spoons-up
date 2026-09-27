@@ -230,6 +230,7 @@ export function AreasPage({
           onAreaChange={areaGoals.setAreaId}
           onTitleChange={areaGoals.setTitle}
           onWeeklyTargetChange={areaGoals.setWeeklyTarget}
+          onRepeatChange={areaGoals.setRepeating}
           onAddRule={areaGoals.addRule}
           onRuleChange={areaGoals.changeRule}
           onRemoveRule={areaGoals.removeRule}

@@ -98,7 +98,7 @@ export function useGoalForm({ onSaved, onDeleted }: GoalFormCallbacks) {
 
   const openCreate = (areaId: string | null) => {
     openForm(
-      { saved: null, areaId: areaId ?? "", title: "", weeklyTarget: "", rules: [newRule()] },
+      { saved: null, areaId: areaId ?? "", title: "", weeklyTarget: "", rules: [] },
       areaId === null ? { areas: null, loadError: null } : null,
     );
     if (areaId === null) {
@@ -264,6 +264,15 @@ export function useGoalForm({ onSaved, onDeleted }: GoalFormCallbacks) {
     setTitle: (title: string) => updateDraft((current) => ({ ...current, title })),
     setWeeklyTarget: (weeklyTarget: string) =>
       updateDraft((current) => ({ ...current, weeklyTarget })),
+    setRepeating: (isRepeating: boolean) =>
+      updateDraft((current) => ({
+        ...current,
+        rules: isRepeating
+          ? current.rules.length > 0
+            ? current.rules
+            : [newRule()]
+          : [],
+      })),
     addRule: () => {
       const rule = newRule();
       updateDraft((current) => ({ ...current, rules: [...current.rules, rule] }));
