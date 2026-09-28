@@ -92,7 +92,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Allow callers to open the form with a prefilled date and optional time, ready for Week's slot and header entry points
 - Keep Repeat, goal selection, standalone title, time, duration and block behaviour shared with Today
 
-### Block 4 — Week calendar interactions
+### Block 4 — Week calendar interactions — DONE
 
 - Add the Week route, page and active sidebar navigation
 - Show the current week first and allow navigation only to the following week and back

@@ -8,15 +8,17 @@ Monorepo for a personal habit and task tracker.
 - `apps/web/` — React 19, Vite 8, TypeScript, and Tailwind CSS web client
 - `apps/mobile/` — planned mobile client
 - `packages/api-client/` — generated API types and shared `openapi-fetch` client factory
-- `docs/` — product design, API contracts, and implementation plan
+- `docs/` — domain documentation, grouped by domain
 - `compose.yaml` — local shared infrastructure
 
 ## Documentation
 
-- `docs/design.md` — features, decisions with their reasoning, and the database schema. Read before changing behaviour or adding a table.
-- `docs/plan.md` — the slice being built and what comes next.
-- `docs/api-contract.md` — request and response shapes for the current slice.
-- `docs/project-structure.md` — target code placement and rules for growing the repository without empty scaffolding.
+- `docs/goals-habits/design.md` — features, decisions with their reasoning, and the database schema. Read before changing behaviour or adding a table.
+- `docs/goals-habits/plan.md` — the slice being built and what comes next.
+- `docs/goals-habits/api-contract.md` — request and response shapes for the current slice.
+- `docs/goals-habits/project-structure.md` — target code placement and rules for growing the repository without empty scaffolding.
+
+Each domain's documentation lives under `docs/<domain>/`.
 
 ## General rules
 

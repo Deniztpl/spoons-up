@@ -21,9 +21,9 @@ Backend for a personal habit and task tracker. Areas group habits and goals; goa
 
 ## Documentation
 
-- `../../docs/design.md` — features, decisions with their reasoning, and the database schema. Read before changing behaviour or adding a table.
-- `../../docs/plan.md` — the slice being built and what comes next.
-- `../../docs/api-contract.md` — request and response shapes for the current slice.
+- `../../docs/goals-habits/design.md` — features, decisions with their reasoning, and the database schema. Read before changing behaviour or adding a table.
+- `../../docs/goals-habits/plan.md` — the slice being built and what comes next.
+- `../../docs/goals-habits/api-contract.md` — request and response shapes for the current slice.
 
 ## Development
 

@@ -11,7 +11,8 @@ nutrition.
 - **Tasks** turn goals into concrete scheduled work.
 
 The current implementation focuses on the Goals & Habits domain. Development status
-and upcoming slices are tracked in [`docs/plan.md`](docs/plan.md).
+and upcoming slices are tracked in
+[`docs/goals-habits/plan.md`](docs/goals-habits/plan.md).
 
 ## Stack
 
@@ -69,12 +70,14 @@ apps/api/            FastAPI backend, migrations, and tests
 apps/web/            React web application
 apps/mobile/         planned mobile application
 packages/api-client/ generated TypeScript API contract and client
-docs/                product design, API contract, and implementation plan
+docs/                domain documentation under one folder per domain
 ```
 
-Read [`docs/design.md`](docs/design.md) for product decisions,
-[`docs/api-contract.md`](docs/api-contract.md) for request and response shapes, and
-[`docs/project-structure.md`](docs/project-structure.md) for code placement rules.
+Read [`docs/goals-habits/design.md`](docs/goals-habits/design.md) for product
+decisions, [`docs/goals-habits/api-contract.md`](docs/goals-habits/api-contract.md)
+for request and response shapes, and
+[`docs/goals-habits/project-structure.md`](docs/goals-habits/project-structure.md)
+for code placement rules.
 
 ## License
 
