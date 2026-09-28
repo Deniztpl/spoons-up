@@ -307,6 +307,186 @@ def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
     assert all(task.rule_id is None for task in remaining_tasks)
 
 
+def test_repeat_from_a_task_makes_it_the_new_rule_occurrence(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_goal_service_time(monkeypatch)
+    headers = bearer(register(client, "repeat-from-task@example.com"))
+    area = create_area(client, headers)
+    goal = create_goal(client, headers, area_id=str(area["id"]))
+
+    with db_session.begin():
+        user = db_session.scalar(select(User).where(User.email == "repeat-from-task@example.com"))
+        goal_model = db_session.get(Goal, int(str(goal["id"])))
+        assert user is not None
+        assert goal_model is not None
+        task = build_ad_hoc_task(user=user, goal=goal_model, scheduled_date=date(2026, 9, 24))
+        db_session.add(task)
+        db_session.flush()
+        task_id = task.id
+
+    response = client.post(
+        f"/api/v1/tasks/{task_id}/repeat",
+        json={"byweekday": [6, 4]},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(task_id)
+    assert body["rule_id"] is not None
+    assert body["occurrence_date"] == "2026-09-24"
+    assert body["scheduled_date"] == "2026-09-24"
+    rule = db_session.get(GoalRule, int(body["rule_id"]))
+    assert rule is not None
+    assert rule.byweekday == [4, 6]
+    assert rule.start_time == time(19)
+    assert rule.duration_minutes == 45
+    assert rule.block_count == Decimal("2.0")
+    rule_tasks = list(
+        db_session.scalars(
+            select(Task).where(Task.rule_id == rule.id).order_by(Task.occurrence_date)
+        )
+    )
+    assert [task.occurrence_date for task in rule_tasks] == [
+        date(2026, 9, 24),
+        date(2026, 9, 26),
+        date(2026, 10, 1),
+        date(2026, 10, 3),
+    ]
+    assert rule_tasks[0].id == task_id
+    assert all(task.start_time == time(19) for task in rule_tasks)
+
+
+def test_repeat_from_a_task_needs_a_goal_its_weekday_and_no_schedule_yet(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_goal_service_time(monkeypatch)
+    headers = bearer(register(client, "repeat-rejected@example.com"))
+    stranger_headers = bearer(register(client, "repeat-stranger@example.com"))
+    area = create_area(client, headers)
+    goal = create_goal(client, headers, area_id=str(area["id"]))
+    rule = create_rule(
+        client,
+        headers,
+        goal_id=str(goal["id"]),
+        byweekday=[4],
+        start_time=None,
+        duration_minutes=None,
+        block_count=None,
+    )
+
+    with db_session.begin():
+        user = db_session.scalar(select(User).where(User.email == "repeat-rejected@example.com"))
+        goal_model = db_session.get(Goal, int(str(goal["id"])))
+        assert user is not None
+        assert goal_model is not None
+        standalone = build_ad_hoc_task(user=user, goal=None, scheduled_date=date(2026, 9, 24))
+        ad_hoc = build_ad_hoc_task(user=user, goal=goal_model, scheduled_date=date(2026, 9, 24))
+        db_session.add_all([standalone, ad_hoc])
+        db_session.flush()
+        standalone_id = standalone.id
+        ad_hoc_id = ad_hoc.id
+        generated_id = db_session.scalar(
+            select(Task.id).where(Task.rule_id == int(str(rule["id"])))
+        )
+
+    without_goal = client.post(
+        f"/api/v1/tasks/{standalone_id}/repeat", json={"byweekday": [4]}, headers=headers
+    )
+    without_own_weekday = client.post(
+        f"/api/v1/tasks/{ad_hoc_id}/repeat", json={"byweekday": [5]}, headers=headers
+    )
+    without_weekdays = client.post(
+        f"/api/v1/tasks/{ad_hoc_id}/repeat", json={"byweekday": []}, headers=headers
+    )
+    already_repeating = client.post(
+        f"/api/v1/tasks/{generated_id}/repeat", json={"byweekday": [4]}, headers=headers
+    )
+    stranger = client.post(
+        f"/api/v1/tasks/{ad_hoc_id}/repeat", json={"byweekday": [4]}, headers=stranger_headers
+    )
+    stop_without_schedule = client.delete(f"/api/v1/tasks/{ad_hoc_id}/repeat", headers=headers)
+
+    assert without_goal.status_code == 422
+    assert without_goal.json()["fields"] == {"goal_id": "Repeat needs a goal"}
+    assert without_own_weekday.status_code == 422
+    assert without_own_weekday.json()["fields"] == {
+        "byweekday": "Repeat must include the task's own weekday"
+    }
+    assert without_weekdays.status_code == 422
+    assert already_repeating.status_code == 422
+    assert already_repeating.json()["fields"] == {"rule_id": "This task already repeats"}
+    assert stranger.status_code == 404
+    assert stop_without_schedule.status_code == 422
+    assert stop_without_schedule.json()["fields"] == {"rule_id": "This task does not repeat"}
+    with db_session.begin():
+        assert list(
+            db_session.scalars(select(GoalRule.id).where(GoalRule.goal_id == int(str(goal["id"]))))
+        ) == [int(str(rule["id"]))]
+
+
+def test_stop_repeating_keeps_the_task_and_removes_its_rule(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_goal_service_time(monkeypatch)
+    headers = bearer(register(client, "stop-repeating@example.com"))
+    area = create_area(client, headers)
+    goal = create_goal(client, headers, area_id=str(area["id"]))
+    rule = create_rule(
+        client,
+        headers,
+        goal_id=str(goal["id"]),
+        byweekday=[1, 3, 4, 5],
+        start_time="09:00",
+        duration_minutes=60,
+        block_count=1,
+    )
+    rule_id = int(str(rule["id"]))
+
+    with db_session.begin():
+        generated = {
+            task.occurrence_date: task
+            for task in db_session.scalars(select(Task).where(Task.rule_id == rule_id))
+        }
+        kept_id = generated[date(2026, 9, 24)].id
+        generated[date(2026, 9, 25)].status = TaskStatus.DONE.value
+        generated[date(2026, 9, 25)].completed_at = datetime(2026, 9, 25, 8, tzinfo=UTC)
+        generated[date(2026, 9, 30)].scheduled_date = date(2026, 10, 2)
+
+    response = client.delete(f"/api/v1/tasks/{kept_id}/repeat", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["rule_id"] is None
+    assert response.json()["occurrence_date"] is None
+    assert response.json()["scheduled_date"] == "2026-09-24"
+    assert response.json()["start_time"] == "09:00"
+    with db_session.begin():
+        assert db_session.get(GoalRule, rule_id) is None
+        remaining = list(
+            db_session.scalars(select(Task).where(Task.goal_id == int(str(goal["id"]))))
+        )
+        assert {(task.id == kept_id, task.occurrence_date, task.status) for task in remaining} == {
+            (True, None, TaskStatus.PENDING.value),
+            (False, date(2026, 9, 25), TaskStatus.DONE.value),
+            (False, date(2026, 9, 30), TaskStatus.PENDING.value),
+        }
+        assert all(task.rule_id is None for task in remaining)
+
+    repeated_again = client.post(
+        f"/api/v1/tasks/{kept_id}/repeat", json={"byweekday": [4]}, headers=headers
+    )
+
+    assert repeated_again.status_code == 200
+    assert repeated_again.json()["occurrence_date"] == "2026-09-24"
+
+
 def test_area_archive_hard_deletes_only_future_pending_tasks(
     client: TestClient,
     db_session: Session,
@@ -429,6 +609,22 @@ def build_task(
         block_count=Decimal("1.0"),
         period_start=date(2026, 9, 21),
         status=status.value,
+    )
+
+
+def build_ad_hoc_task(*, user: User, goal: Goal | None, scheduled_date: date) -> Task:
+    return Task(
+        user_id=user.id,
+        goal_id=goal.id if goal is not None else None,
+        rule_id=None,
+        title=goal.title if goal is not None else "Dentist",
+        occurrence_date=None,
+        scheduled_date=scheduled_date,
+        start_time=time(19),
+        duration_minutes=45,
+        end_time=time(19, 45),
+        block_count=Decimal("2.0"),
+        period_start=date(2026, 9, 21),
     )
 
 

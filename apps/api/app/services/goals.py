@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, ValidationAppError
 from app.core.periods import get_week_start
 from app.models import Goal, GoalRule
 from app.repositories.areas import AreaRepository
@@ -18,6 +18,7 @@ from app.schemas.goals import (
     UpdateGoalRequest,
     UpdateGoalRuleRequest,
 )
+from app.schemas.tasks import RepeatTaskRequest, TaskResponse
 from app.services.tasks import TASK_GENERATION_DAYS, TaskService
 
 
@@ -156,6 +157,62 @@ class GoalService:
                 from_date=open_week_start,
             )
             self.goal_repository.delete_rule(rule=rule)
+
+    def repeat_task(
+        self,
+        payload: RepeatTaskRequest,
+        *,
+        task_id: int,
+        user_id: int,
+    ) -> TaskResponse:
+        with self.session.begin():
+            task = self.task_service.get_owned_task(task_id=task_id, user_id=user_id)
+            if task.goal_id is None:
+                raise ValidationAppError({"goal_id": "Repeat needs a goal"}, "Repeat needs a goal")
+            if task.rule_id is not None:
+                raise ValidationAppError(
+                    {"rule_id": "This task already repeats"},
+                    "This task already repeats",
+                )
+            if task.scheduled_date.isoweekday() not in payload.byweekday:
+                raise ValidationAppError(
+                    {"byweekday": "Repeat must include the task's own weekday"},
+                    "Repeat must include the task's own weekday",
+                )
+            goal = self._get_owned_goal(goal_id=task.goal_id, user_id=user_id)
+            rule = self.goal_repository.create_rule(
+                goal_id=goal.id,
+                byweekday=payload.byweekday,
+                start_time=task.start_time,
+                duration_minutes=task.duration_minutes,
+                block_count=float(task.block_count) if task.block_count is not None else None,
+            )
+            # The task stands in for the rule's occurrence on its date, so generation skips it.
+            self.task_service.attach_to_rule(task=task, rule=rule)
+            self._add_tasks_for_current_window(user_id=user_id)
+            response = TaskResponse.model_validate(task)
+        return response
+
+    def stop_repeating_task(self, *, task_id: int, user_id: int) -> TaskResponse:
+        with self.session.begin():
+            task = self.task_service.get_owned_task(task_id=task_id, user_id=user_id)
+            if task.rule_id is None:
+                raise ValidationAppError(
+                    {"rule_id": "This task does not repeat"},
+                    "This task does not repeat",
+                )
+            rule = self._get_owned_rule(rule_id=task.rule_id, user_id=user_id)
+            # Detach first so the rule's cleanup below keeps this task.
+            self.task_service.detach_from_rule(task=task)
+            _, open_week_start, _ = self._get_task_generation_dates(user_id=user_id)
+            self.task_service.delete_untouched_pending_tasks_for_rule(
+                rule=rule,
+                user_id=user_id,
+                from_date=open_week_start,
+            )
+            self.goal_repository.delete_rule(rule=rule)
+            response = TaskResponse.model_validate(task)
+        return response
 
     def _add_tasks_for_current_window(self, *, user_id: int) -> None:
         today, _, window_end = self._get_task_generation_dates(user_id=user_id)

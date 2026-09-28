@@ -8,6 +8,7 @@ import {
   isScheduleChanged,
   isTaskChanged,
   isTaskDraftComplete,
+  repeatChange,
   type TaskDraft,
 } from "../hooks/useTaskForm";
 import { TaskDeleteConfirmation } from "./TaskDeleteConfirmation";
@@ -86,8 +87,9 @@ export function TaskFormDialog({
   const initialFocusRef = useRef<HTMLInputElement>(null);
   const isEditing = draft.task !== null;
   const isGoalLinked = draft.goalId !== "";
+  const hasSchedule = Boolean(draft.task?.rule_id);
   const taskChanged = isTaskChanged(draft);
-  const scheduleChanged = isScheduleChanged(draft);
+  const scheduleChanged = isScheduleChanged(draft) || repeatChange(draft) !== null;
   const canSave =
     isTaskDraftComplete(draft) && (!isEditing || taskChanged || scheduleChanged);
   const selectedWeekday = draft.scheduledDate
@@ -239,7 +241,7 @@ export function TaskFormDialog({
           </div>
         </fieldset>
 
-        {!isEditing && isGoalLinked ? (
+        {isGoalLinked ? (
           <fieldset className="flex flex-col gap-2.5">
             <legend className={`${fieldLabelClassName} mb-1.5`}>Schedule</legend>
             <label className="flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-ink/14 bg-card px-3 py-2.5">
@@ -252,25 +254,23 @@ export function TaskFormDialog({
               <span className="text-[13px] font-medium text-ink">Repeat</span>
             </label>
             {draft.isRepeating ? (
-              <WeekdayPicker
-                selected={draft.byweekday}
-                requiredWeekday={selectedWeekday}
-                onToggle={onWeekdayToggle}
-              />
-            ) : null}
-          </fieldset>
-        ) : null}
-
-        {isEditing && draft.task?.rule_id ? (
-          <fieldset className="flex flex-col gap-2.5">
-            <legend className={`${fieldLabelClassName} mb-1.5`}>Schedule</legend>
-            {draft.savedWeekdays === null ? (
-              <p role="status" className="text-xs text-ink-soft">
-                Loading schedule…
+              hasSchedule && draft.savedWeekdays === null ? (
+                <p role="status" className="text-xs text-ink-soft">
+                  Loading schedule…
+                </p>
+              ) : (
+                <WeekdayPicker
+                  selected={draft.byweekday}
+                  requiredWeekday={hasSchedule ? undefined : selectedWeekday}
+                  onToggle={onWeekdayToggle}
+                />
+              )
+            ) : hasSchedule ? (
+              <p className="text-xs leading-5 text-ink-soft">
+                Saving ends this schedule and removes its unfinished repeats from this week on.
+                This task stays.
               </p>
-            ) : (
-              <WeekdayPicker selected={draft.byweekday} onToggle={onWeekdayToggle} />
-            )}
+            ) : null}
           </fieldset>
         ) : null}
 

@@ -33,3 +33,16 @@ export function uncheckTask(taskId: string) {
     params: { path: { task_id: taskId } },
   });
 }
+
+export function repeatTask(taskId: string, byweekday: number[]) {
+  return apiClient.POST("/api/v1/tasks/{task_id}/repeat", {
+    params: { path: { task_id: taskId } },
+    body: { byweekday },
+  });
+}
+
+export function stopRepeatingTask(taskId: string) {
+  return apiClient.DELETE("/api/v1/tasks/{task_id}/repeat", {
+    params: { path: { task_id: taskId } },
+  });
+}

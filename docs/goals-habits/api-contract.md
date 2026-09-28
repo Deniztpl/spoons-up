@@ -412,7 +412,7 @@ The rule adds its tasks from today through the current window in the same reques
 
 A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. `block_count: 2` still generates one task per occurrence; two different times on the same day still use two rules.
 
-In the shared Today/Week task form, Repeat requires a goal. With Repeat off the client calls `POST /tasks`; with it on the client calls this endpoint instead and includes the form date's weekday, so the rule supplies the occurrence rather than creating a duplicate ad-hoc task. The task form shows only weekdays in its schedule section; full schedule values remain editable from the goal.
+In the shared Today/Week task form, Repeat requires a goal. With Repeat off the client calls `POST /tasks`; with it on the client calls this endpoint instead and includes the form date's weekday, so the rule supplies the occurrence rather than creating a duplicate ad-hoc task. The task form shows only weekdays in its schedule section; full schedule values remain editable from the goal. When editing an existing task, the form turns Repeat on and off through `POST` and `DELETE /tasks/{id}/repeat`.
 
 | Error | When |
 |---|---|
@@ -459,7 +459,7 @@ A task object:
 
 The three dates mean different things and only one of them moves:
 
-- `occurrence_date` — the date the rule produced. Immutable. Null for ad-hoc tasks.
+- `occurrence_date` — the date the rule produced. Never changes while the task belongs to its rule. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it.
 - `scheduled_date` — where the task sits now. This is what the calendar draws.
 - `period_start` — the week the task counts toward. Fixed at generation, so postponing across a week boundary doesn't move the quota.
 - `start_time`, `duration_minutes` and `block_count` — independent and nullable. `end_time` is present only when both time and duration exist. A null block value contributes zero when completed; otherwise it must be a positive multiple of 0.5.
@@ -529,6 +529,32 @@ Completing a task already done is a no-op and returns the task unchanged.
 #### DELETE /tasks/{id}/check
 
 **200** — the task back at `status: "PENDING"`, `completed_at` null.
+
+#### POST /tasks/{id}/repeat
+
+Repeat on, from the edit form of a goal task that has no schedule.
+
+```json
+{ "byweekday": [4, 6] }
+```
+
+**200** — the task, now with `rule_id` set and `occurrence_date` equal to its current `scheduled_date`. A new rule on the task's goal copies the task's `start_time`, `duration_minutes` and `block_count`, then adds its tasks from today through the current window like `POST /goals/{id}/rules`. The task stands in for the rule's occurrence on its own date, so no duplicate is generated there.
+
+| Error | When |
+|---|---|
+| 404 `not_found` | no such task, or it sits under an archived area |
+| 422 `validation_error` | the task is standalone (`goal_id`), already repeats (`rule_id`), or `byweekday` is empty, out of range or misses the task's own weekday |
+
+#### DELETE /tasks/{id}/repeat
+
+Repeat off, from the edit form of a repeating task.
+
+**200** — the task, kept as an ad-hoc task with `rule_id` and `occurrence_date` null. Its rule is deleted as `DELETE /rules/{id}` does: the rule's untouched pending tasks from the open week forward go with it, while tasks already done, tasks the user moved and closed weeks stay.
+
+| Error | When |
+|---|---|
+| 404 `not_found` | no such task, or it sits under an archived area |
+| 422 `validation_error` | the task does not repeat (`rule_id`) |
 
 ---
 

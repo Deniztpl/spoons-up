@@ -76,7 +76,7 @@ class TaskService:
         user_id: int,
     ) -> TaskResponse:
         with self.session.begin():
-            task = self._get_owned_task(task_id=task_id, user_id=user_id)
+            task = self.get_owned_task(task_id=task_id, user_id=user_id)
             fields = payload.model_fields_set
             if "scheduled_date" in fields:
                 user = self.user_repository.get_by_id(user_id)
@@ -118,19 +118,19 @@ class TaskService:
 
     def delete(self, *, task_id: int, user_id: int) -> None:
         with self.session.begin():
-            task = self._get_owned_task(task_id=task_id, user_id=user_id)
+            task = self.get_owned_task(task_id=task_id, user_id=user_id)
             self.task_repository.delete(task=task)
 
     def complete(self, *, task_id: int, user_id: int) -> TaskResponse:
         with self.session.begin():
-            task = self._get_owned_task(task_id=task_id, user_id=user_id)
+            task = self.get_owned_task(task_id=task_id, user_id=user_id)
             self.task_repository.complete(task=task, completed_at=datetime.now(UTC))
             response = TaskResponse.model_validate(task)
         return response
 
     def uncomplete(self, *, task_id: int, user_id: int) -> TaskResponse:
         with self.session.begin():
-            task = self._get_owned_task(task_id=task_id, user_id=user_id)
+            task = self.get_owned_task(task_id=task_id, user_id=user_id)
             self.task_repository.uncomplete(task=task)
             response = TaskResponse.model_validate(task)
         return response
@@ -164,6 +164,24 @@ class TaskService:
             )
 
         self.task_repository.add_generated_tasks(task_values=task_values)
+
+    def get_owned_task(self, *, task_id: int, user_id: int) -> Task:
+        task = self.task_repository.get_task_and_lock(task_id=task_id, user_id=user_id)
+        if task is None:
+            raise NotFoundError
+        return task
+
+    def attach_to_rule(self, *, task: Task, rule: GoalRule) -> None:
+        """Make the task the rule's occurrence on the date it sits on now."""
+        self.task_repository.set_rule(
+            task=task,
+            rule_id=rule.id,
+            occurrence_date=task.scheduled_date,
+        )
+
+    def detach_from_rule(self, *, task: Task) -> None:
+        """Turn a rule occurrence back into an ad-hoc task."""
+        self.task_repository.set_rule(task=task, rule_id=None, occurrence_date=None)
 
     def delete_untouched_pending_tasks_for_rule(
         self,
@@ -232,12 +250,6 @@ class TaskService:
             occurrence_date += timedelta(days=1)
 
         return values
-
-    def _get_owned_task(self, *, task_id: int, user_id: int) -> Task:
-        task = self.task_repository.get_task_and_lock(task_id=task_id, user_id=user_id)
-        if task is None:
-            raise NotFoundError
-        return task
 
     @staticmethod
     def _validate_scheduled_date(*, scheduled_date: date | None, timezone: str) -> None:

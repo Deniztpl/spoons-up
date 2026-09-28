@@ -10,6 +10,8 @@ from pydantic import (
     field_validator,
 )
 
+from app.schemas.goals import Weekdays
+
 
 def _strip_title(value: str) -> str:
     return value.strip()
@@ -54,6 +56,10 @@ class UpdateTaskRequest(BaseModel):
         if value is None:
             raise ValueError("Field cannot be null")
         return value
+
+
+class RepeatTaskRequest(BaseModel):
+    byweekday: Weekdays
 
 
 class TaskResponse(BaseModel):

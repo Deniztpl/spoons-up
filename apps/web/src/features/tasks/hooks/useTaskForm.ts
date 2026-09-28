@@ -11,6 +11,8 @@ import {
 import {
   createTask,
   deleteTask,
+  repeatTask,
+  stopRepeatingTask,
   updateTask,
   type UpdateTaskFields,
 } from "../api/tasksApi";
@@ -175,17 +177,21 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
     updateDraft((current) => ({
       ...current,
       isRepeating,
-      byweekday:
-        isRepeating && current.scheduledDate
-          ? [weekdayForDate(current.scheduledDate)]
-          : [],
+      byweekday: !isRepeating
+        ? []
+        : current.task?.rule_id
+          ? (current.savedWeekdays ?? [])
+          : current.scheduledDate
+            ? [weekdayForDate(current.scheduledDate)]
+            : [],
     }));
 
   const toggleWeekday = (weekday: number) =>
     updateDraft((current) => {
-      const isCreateOccurrence = current.task === null && current.isRepeating;
+      // A new schedule keeps the task's own day, so the rule supplies that occurrence.
+      const isNewSchedule = current.isRepeating && !current.task?.rule_id;
       if (
-        isCreateOccurrence &&
+        isNewSchedule &&
         current.scheduledDate !== "" &&
         weekday === weekdayForDate(current.scheduledDate)
       ) {
@@ -242,17 +248,13 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
           );
         }
 
-        if (draft.task.rule_id && isScheduleChanged(draft)) {
-          const { data, error } = await updateGoalRule(draft.task.rule_id, {
-            byweekday: draft.byweekday,
-          });
-          if (!data) {
-            if (taskWasSaved) {
-              onSaved();
-            }
-            setFormError(taskErrorMessage(error, "We couldn't save this schedule."));
-            return;
+        const scheduleError = await saveSchedule(draft, draft.task);
+        if (scheduleError) {
+          if (taskWasSaved) {
+            onSaved();
           }
+          setFormError(scheduleError);
+          return;
         }
       } else if (draft.isRepeating) {
         const { data, error } = await createGoalRule(draft.goalId, {
@@ -332,7 +334,7 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
     setTitle: (title: string) => updateDraft((current) => ({ ...current, title })),
     setScheduledDate: (scheduledDate: string) =>
       updateDraft((current) => {
-        if (current.task !== null || !current.isRepeating) {
+        if (current.task?.rule_id || !current.isRepeating) {
           return { ...current, scheduledDate };
         }
         const previousWeekday = current.scheduledDate
@@ -386,17 +388,48 @@ export function isTaskDraftComplete(draft: TaskDraft) {
   const hasWork = draft.goalId === "" ? draft.title.trim().length > 0 : true;
   const canCreateRepeat =
     !draft.isRepeating ||
-    draft.task !== null ||
+    Boolean(draft.task?.rule_id) ||
     (draft.goalId !== "" && draft.byweekday.includes(weekdayForDate(draft.scheduledDate)));
   return hasWork && canCreateRepeat;
 }
 
 export function isScheduleChanged(draft: TaskDraft) {
   return (
+    draft.isRepeating &&
     draft.savedWeekdays !== null &&
     draft.byweekday.length > 0 &&
     draft.byweekday.join() !== draft.savedWeekdays.join()
   );
+}
+
+// Repeat on gives an ad-hoc goal task a schedule; Repeat off ends the task's schedule.
+export function repeatChange(draft: TaskDraft): "start" | "stop" | null {
+  const task = draft.task;
+  if (!task || task.goal_id === null) {
+    return null;
+  }
+  if (task.rule_id === null) {
+    return draft.isRepeating ? "start" : null;
+  }
+  return draft.isRepeating ? null : "stop";
+}
+
+// Saves the schedule side of an edit after the task itself, returning a message when it fails.
+async function saveSchedule(draft: TaskDraft, task: EditableTask) {
+  const change = repeatChange(draft);
+  if (change === "start") {
+    const { data, error } = await repeatTask(task.id, draft.byweekday);
+    return data ? null : taskErrorMessage(error, "We couldn't add this schedule.");
+  }
+  if (change === "stop") {
+    const { data, error } = await stopRepeatingTask(task.id);
+    return data ? null : taskErrorMessage(error, "We couldn't stop this schedule.");
+  }
+  if (task.rule_id && isScheduleChanged(draft)) {
+    const { data, error } = await updateGoalRule(task.rule_id, { byweekday: draft.byweekday });
+    return data ? null : taskErrorMessage(error, "We couldn't save this schedule.");
+  }
+  return null;
 }
 
 export function isTaskChanged(draft: TaskDraft) {

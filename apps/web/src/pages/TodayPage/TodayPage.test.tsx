@@ -348,6 +348,116 @@ describe("Today page", () => {
     });
   });
 
+  it("turns on Repeat from a goal task's edit form without adding a duplicate task", async () => {
+    let task = {
+      ...todayTask("490", "CS Block", ["19:00", "20:00"], 2),
+      rule_id: null as string | null,
+      occurrence_date: null as string | null,
+    };
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return todayResponse({ tasks: [task] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/tasks/490/repeat") {
+        expect(await request.clone().json()).toEqual({ byweekday: [4, 6] });
+        task = { ...task, rule_id: "22", occurrence_date: "2026-09-24" };
+        return Response.json({ ...task, completed_at: null });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "CS Block" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit task" });
+    const repeat = within(dialog).getByRole("checkbox", { name: "Repeat" });
+    expect(repeat).not.toBeChecked();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    await user.click(repeat);
+    expect(within(dialog).getByRole("button", { name: "Thursday, task date" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Saturday" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(
+      fetchMock.mock.calls.filter(
+        ([request]) =>
+          request.method === "POST" && new URL(request.url).pathname === "/api/v1/tasks/490/repeat",
+      ),
+    ).toHaveLength(1);
+    expect(fetchMock.mock.calls.some(([request]) => request.method === "PATCH")).toBe(false);
+  });
+
+  it("turns off Repeat from a repeating task's edit form and keeps the task", async () => {
+    let task = {
+      ...todayTask("483", "CS Block", ["19:00", "20:00"], 2),
+      rule_id: "21" as string | null,
+      occurrence_date: "2026-09-24" as string | null,
+    };
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return todayResponse({ tasks: [task] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals/7") {
+        return Response.json({
+          id: "7",
+          area_id: "3",
+          title: "CS Block",
+          weekly_target: 3,
+          created_at: "2026-09-20T07:00:00Z",
+          rules: [
+            {
+              id: "21",
+              goal_id: "7",
+              byweekday: [4],
+              start_time: "19:00",
+              duration_minutes: 60,
+              block_count: 2,
+            },
+          ],
+        });
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/v1/tasks/483/repeat") {
+        task = { ...task, rule_id: null, occurrence_date: null };
+        return Response.json({ ...task, completed_at: null });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "CS Block" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit task" });
+    expect(await within(dialog).findByRole("button", { name: "Thursday" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(within(dialog).getByRole("checkbox", { name: "Repeat" }));
+    expect(within(dialog).getByText(/Saving ends this schedule/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(
+      fetchMock.mock.calls.filter(
+        ([request]) =>
+          request.method === "DELETE" &&
+          new URL(request.url).pathname === "/api/v1/tasks/483/repeat",
+      ),
+    ).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "CS Block" })).toBeInTheDocument();
+  });
+
   it("keeps a task open and explains why when completing it fails", async () => {
     vi.stubGlobal(
       "fetch",

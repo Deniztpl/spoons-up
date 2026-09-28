@@ -38,6 +38,8 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Repeat from a task** — Repeat is available only with a goal. With Repeat off, the shared Today/Week form creates an ad-hoc task; with it on, it creates a rule and lets that rule generate the occurrences. The task form shows only the rule's weekdays because time, duration and blocks already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
 
+**Repeat on and off while editing** — turning Repeat on for an ad-hoc goal task creates a rule from the task's time, duration and blocks, and the task becomes that rule's occurrence on its current date, so generation never adds a second task there. The chosen weekdays must include the task's own weekday. Turning Repeat off on a repeating task ends its schedule: the task is kept as an ad-hoc task, and the rule is deleted exactly as a rule delete does, taking its untouched pending tasks from the open week forward. These two conversions are the only writes that change a task's `occurrence_date`; while a task belongs to a rule it never changes.
+
 **Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range, copying nullable schedule values, and writes a reminder only for a timed task. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
 
 **Two triggers, no lazy reads** — a write that creates or changes a rule adds its current-window tasks in the same request, including timed reminders where applicable. An hourly cron runs the daily job, which advances a rolling window of 14 days using each user's own timezone, so tasks can exist without the app being opened. Nothing else calls `add_tasks`.
@@ -46,7 +48,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Generated window** — rule occurrences are generated 14 days ahead; rules do not populate dates beyond that window until it advances. Manually created tasks and tasks the user moves have no upper date limit, so they can exist later and appear in Week's `later_tasks` summary.
 
-**Occurrence identity** — `occurrence_date` records the date a rule produced and never changes. `scheduled_date` is where the user actually put it.
+**Occurrence identity** — `occurrence_date` records the date a rule produced and never changes while the task belongs to that rule; only Repeat on and off while editing set or clear it. `scheduled_date` is where the user actually put it.
 
 **Postpone** — `scheduled_date` moves; `occurrence_date` and `period_start` stay fixed, so a task dragged to next Monday still counts toward the week it belonged to.
 

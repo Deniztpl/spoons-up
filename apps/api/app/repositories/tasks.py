@@ -147,6 +147,18 @@ class TaskRepository:
         self.session.flush()
         return task
 
+    def set_rule(
+        self,
+        *,
+        task: Task,
+        rule_id: int | None,
+        occurrence_date: date | None,
+    ) -> Task:
+        task.rule_id = rule_id
+        task.occurrence_date = occurrence_date
+        self.session.flush()
+        return task
+
     def delete(self, *, task: Task) -> None:
         if task.occurrence_date is None:
             self.session.delete(task)

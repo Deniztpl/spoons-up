@@ -55,7 +55,7 @@ These cannot be inferred from the code and are easy to break.
 - All task generation goes through `add_tasks(user_id, from_date, to_date)`. Never expand a rule anywhere else.
 - Week boundaries come from the user's `week_start_day`, not ISO Monday. Use the project's period utilities; never calculate a week boundary ad hoc.
 - "Today" is derived from the user's `timezone`, never from the server's UTC date. This applies to the worker too.
-- `occurrence_date` is immutable once written. Postponing changes `scheduled_date` only.
+- `occurrence_date` never changes while a task belongs to its rule. Postponing changes `scheduled_date` only. Repeat on and off from a task (`/tasks/{id}/repeat`) are the only writes that set or clear it.
 - `period_start` is fixed at generation. A task moved across a week boundary still counts toward its original week.
 - A rule-generated task is soft-deleted (`status = DELETED`); an ad-hoc task is hard-deleted.
 - Closed weeks in `period_results` are written once and never recomputed. Only the open week is computed live.

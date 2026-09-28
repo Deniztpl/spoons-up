@@ -3,9 +3,14 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Response, status
 
 from app.api.deps.auth import CurrentUserDependency
-from app.api.deps.services import TaskServiceDependency
+from app.api.deps.services import GoalServiceDependency, TaskServiceDependency
 from app.schemas.errors import ErrorResponse, ValidationErrorResponse
-from app.schemas.tasks import CreateTaskRequest, TaskResponse, UpdateTaskRequest
+from app.schemas.tasks import (
+    CreateTaskRequest,
+    RepeatTaskRequest,
+    TaskResponse,
+    UpdateTaskRequest,
+)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -71,3 +76,22 @@ def uncheck_task(
     task_service: TaskServiceDependency,
 ) -> TaskResponse:
     return task_service.uncomplete(task_id=int(task_id), user_id=current_user.id)
+
+
+@router.post("/{task_id}/repeat", response_model=TaskResponse, responses=READ_RESPONSES)
+def repeat_task(
+    task_id: TaskIdPath,
+    payload: RepeatTaskRequest,
+    current_user: CurrentUserDependency,
+    goal_service: GoalServiceDependency,
+) -> TaskResponse:
+    return goal_service.repeat_task(payload, task_id=int(task_id), user_id=current_user.id)
+
+
+@router.delete("/{task_id}/repeat", response_model=TaskResponse, responses=READ_RESPONSES)
+def stop_repeating_task(
+    task_id: TaskIdPath,
+    current_user: CurrentUserDependency,
+    goal_service: GoalServiceDependency,
+) -> TaskResponse:
+    return goal_service.stop_repeating_task(task_id=int(task_id), user_id=current_user.id)
