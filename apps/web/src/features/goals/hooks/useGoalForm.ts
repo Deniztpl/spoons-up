@@ -17,9 +17,9 @@ import {
 
 export type GoalRuleValues = {
   byweekday: number[];
-  startTime: string;
-  durationMinutes: number;
-  blockCount: number;
+  startTime: string | null;
+  durationMinutes: number | null;
+  blockCount: number | null;
 };
 
 export type GoalRuleDraft = GoalRuleValues & {
@@ -301,7 +301,7 @@ export function isGoalDraftComplete(draft: GoalDraft) {
   return (
     draft.title.trim().length > 0 &&
     draft.areaId !== "" &&
-    draft.rules.every((rule) => rule.byweekday.length > 0 && rule.startTime !== "")
+    draft.rules.every((rule) => rule.byweekday.length > 0)
   );
 }
 

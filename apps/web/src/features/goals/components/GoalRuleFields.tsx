@@ -83,17 +83,21 @@ export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFiel
         <input
           type="time"
           aria-label="Start time"
-          required
-          value={rule.startTime}
+          value={rule.startTime ?? ""}
           className={`${controlClassName} w-28`}
-          onChange={(event) => onChange({ startTime: event.target.value })}
+          onChange={(event) => onChange({ startTime: event.target.value || null })}
         />
         <select
           aria-label="Duration"
-          value={rule.durationMinutes}
+          value={rule.durationMinutes ?? ""}
           className={controlClassName}
-          onChange={(event) => onChange({ durationMinutes: Number(event.target.value) })}
+          onChange={(event) =>
+            onChange({
+              durationMinutes: event.target.value ? Number(event.target.value) : null,
+            })
+          }
         >
+          <option value="">No duration</option>
           {durationOptions.map((minutes) => (
             <option key={minutes} value={minutes}>
               {durationLabel(minutes)}
@@ -105,12 +109,12 @@ export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFiel
       <fieldset className="flex flex-col">
         <legend className="mb-[5px] text-[11.5px] text-ink-soft">Blocks</legend>
         <div className="grid auto-cols-fr grid-flow-col gap-0.5 rounded-[7px] border border-ink/12 bg-card p-0.5">
-          {blockOptions.map((count) => (
-            <label key={count}>
+          {[null, ...blockOptions].map((count) => (
+            <label key={count ?? "none"}>
               <input
                 type="radio"
                 name={blockName}
-                value={count}
+                value={count ?? ""}
                 checked={rule.blockCount === count}
                 aria-label={blockCountLabel(count)}
                 className="peer sr-only"
@@ -120,7 +124,7 @@ export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFiel
                 aria-hidden="true"
                 className="block cursor-pointer rounded-[5px] py-1 text-center text-xs font-medium text-ink-soft transition peer-checked:bg-accent peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
               >
-                {count === 0.5 ? "½" : count}
+                {count === null ? "—" : count === 0.5 ? "½" : count}
               </span>
             </label>
           ))}
@@ -130,8 +134,10 @@ export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFiel
   );
 }
 
-function withValue(options: number[], value: number) {
-  return options.includes(value) ? options : [...options, value].sort((a, b) => a - b);
+function withValue(options: number[], value: number | null) {
+  return value === null || options.includes(value)
+    ? options
+    : [...options, value].sort((a, b) => a - b);
 }
 
 function ruleSummary(rule: GoalRuleDraft) {
@@ -142,7 +148,9 @@ function ruleSummary(rule: GoalRuleDraft) {
         .join(", ")
     : "No days selected";
   const time = rule.startTime
-    ? `${rule.startTime}–${endTime(rule.startTime, rule.durationMinutes)}`
+    ? rule.durationMinutes
+      ? `${rule.startTime}–${endTime(rule.startTime, rule.durationMinutes)}`
+      : rule.startTime
     : "No start time";
   return `${days} · ${time}`;
 }
@@ -162,7 +170,10 @@ function durationLabel(minutes: number) {
   return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
 }
 
-function blockCountLabel(count: number) {
+function blockCountLabel(count: number | null) {
+  if (count === null) {
+    return "No block value";
+  }
   if (count === 0.5) {
     return "Half a block";
   }

@@ -518,8 +518,9 @@ describe("Areas page", () => {
     await user.click(increaseTarget);
     expect(within(dialog).getByLabelText("Weekly target")).toHaveValue("3");
 
-    // A rule needs a day before the goal can be saved.
-    const firstRule = within(dialog).getByRole("group", { name: "Rule 1" });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Repeat" }));
+    // A schedule needs a day before the goal can be saved.
+    const firstRule = within(dialog).getByRole("group", { name: "Schedule 1" });
     expect(within(firstRule).getByText("No days selected · 09:00–10:00")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
     for (const day of ["Monday", "Wednesday", "Friday"]) {
@@ -532,8 +533,8 @@ describe("Areas page", () => {
     await user.click(within(firstRule).getByRole("radio", { name: "2 blocks" }));
     expect(within(firstRule).getByText("Mon, Wed, Fri · 19:00–20:30")).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "Add rule" }));
-    const secondRule = within(dialog).getByRole("group", { name: "Rule 2" });
+    await user.click(within(dialog).getByRole("button", { name: "Add schedule" }));
+    const secondRule = within(dialog).getByRole("group", { name: "Schedule 2" });
     await user.click(within(secondRule).getByRole("button", { name: "Saturday" }));
     await user.click(within(secondRule).getByRole("radio", { name: "Half a block" }));
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
@@ -595,8 +596,8 @@ describe("Areas page", () => {
     expect(within(editDialog).getByLabelText("Title")).toHaveValue("CS Block");
     expect(within(editDialog).getByLabelText("Weekly target")).toHaveValue("3");
     await user.clear(within(editDialog).getByLabelText("Weekly target"));
-    await user.click(within(editDialog).getByRole("button", { name: "Remove rule 1" }));
-    const remainingRule = within(editDialog).getByRole("group", { name: "Rule 1" });
+    await user.click(within(editDialog).getByRole("button", { name: "Remove schedule 1" }));
+    const remainingRule = within(editDialog).getByRole("group", { name: "Schedule 1" });
     expect(within(remainingRule).getByText("Sat · 10:00–11:00")).toBeInTheDocument();
     await user.click(within(remainingRule).getByRole("radio", { name: "2 blocks" }));
     await user.click(within(editDialog).getByRole("button", { name: "Save" }));
@@ -656,7 +657,8 @@ describe("Areas page", () => {
     await user.click(await screen.findByRole("button", { name: "Add goal" }));
     const dialog = screen.getByRole("dialog", { name: "New goal" });
     await user.type(within(dialog).getByLabelText("Title"), "Read papers");
-    const firstRule = within(dialog).getByRole("group", { name: "Rule 1" });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Repeat" }));
+    const firstRule = within(dialog).getByRole("group", { name: "Schedule 1" });
     await user.click(within(firstRule).getByRole("button", { name: "Tuesday" }));
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
