@@ -34,6 +34,50 @@ class TaskRepository:
         )
         return list(self.session.scalars(query))
 
+    def list_for_week(
+        self,
+        *,
+        user_id: int,
+        week_start: date,
+        week_end: date,
+    ) -> list[Task]:
+        query = (
+            self._select_visible_tasks_for_user(user_id=user_id)
+            .where(
+                Task.scheduled_date >= week_start,
+                Task.scheduled_date <= week_end,
+            )
+            .order_by(
+                Task.scheduled_date,
+                Task.start_time.asc().nulls_last(),
+                Task.id,
+            )
+        )
+        return list(self.session.scalars(query))
+
+    def list_later_tasks(
+        self,
+        *,
+        user_id: int,
+        cutoff_date: date,
+    ) -> list[Task]:
+        query = (
+            self._select_visible_tasks_for_user(user_id=user_id)
+            .where(
+                Task.scheduled_date > cutoff_date,
+                or_(
+                    Task.occurrence_date.is_(None),
+                    Task.scheduled_date != Task.occurrence_date,
+                ),
+            )
+            .order_by(
+                Task.scheduled_date,
+                Task.start_time.asc().nulls_last(),
+                Task.id,
+            )
+        )
+        return list(self.session.scalars(query))
+
     def get_task_and_lock(self, *, task_id: int, user_id: int) -> Task | None:
         return self.session.scalar(
             self._select_visible_tasks_for_user(user_id=user_id)

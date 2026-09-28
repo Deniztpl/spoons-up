@@ -76,7 +76,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Today and future dates are allowed; there is no upper date limit
 - Moving a task changes only `scheduled_date`; `occurrence_date` and `period_start` stay fixed
 
-### Block 2 — Week read API
+### Block 2 — Week read API — DONE
 
 - Add `GET /week?start=` with seven ordered day entries and their tasks
 - Accept only the user's current week or following week; reject past weeks and the third week onward with 422

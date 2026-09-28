@@ -538,6 +538,58 @@
         "title": "HabitResponse",
         "type": "object"
       },
+      "LaterTaskResponse": {
+        "properties": {
+          "scheduled_date": {
+            "format": "date",
+            "title": "Scheduled Date",
+            "type": "string"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scheduled_date",
+          "start_time",
+          "title"
+        ],
+        "title": "LaterTaskResponse",
+        "type": "object"
+      },
+      "LaterTasksResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LaterTaskResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "count",
+          "items"
+        ],
+        "title": "LaterTasksResponse",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -1231,6 +1283,54 @@
           "fields"
         ],
         "title": "ValidationErrorResponse",
+        "type": "object"
+      },
+      "WeekDayResponse": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TodayTaskResponse"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "tasks"
+        ],
+        "title": "WeekDayResponse",
+        "type": "object"
+      },
+      "WeekResponse": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/WeekDayResponse"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "later_tasks": {
+            "$ref": "#/components/schemas/LaterTasksResponse"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_start",
+          "days",
+          "later_tasks"
+        ],
+        "title": "WeekResponse",
         "type": "object"
       }
     },
@@ -3321,6 +3421,81 @@
         "summary": "Get Today",
         "tags": [
           "today"
+        ]
+      }
+    },
+    "/api/v1/week": {
+      "get": {
+        "operationId": "get_week_api_v1_week_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get Week",
+        "tags": [
+          "week"
         ]
       }
     }

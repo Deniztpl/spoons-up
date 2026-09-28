@@ -16,6 +16,7 @@ from app.services.habits import HabitService
 from app.services.tasks import TaskService
 from app.services.today import TodayService
 from app.services.user_activity import UserActivityService
+from app.services.week import WeekService
 
 
 def get_auth_service(session: DatabaseSession) -> AuthService:
@@ -112,3 +113,14 @@ def get_today_service(session: DatabaseSession) -> TodayService:
 
 
 TodayServiceDependency = Annotated[TodayService, Depends(get_today_service)]
+
+
+def get_week_service(session: DatabaseSession) -> WeekService:
+    return WeekService(
+        session,
+        TaskRepository(session),
+        UserRepository(session),
+    )
+
+
+WeekServiceDependency = Annotated[WeekService, Depends(get_week_service)]
