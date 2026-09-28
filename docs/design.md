@@ -30,7 +30,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Tasks** — concrete work on a local date. Start time, duration and `block_count` are independent and optional; `end_time` exists only when both time and duration exist. A non-null block value moves in steps of 0.5 and is not derived from duration. Changing one task changes only that task, not its rule. A task belongs to a goal and takes its title from it, or stands alone with a user-entered title.
 
-**Goal and task entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today creates tasks instead: choosing an area and goal makes a goal-linked task; choosing neither requires a standalone title.
+**Goal and task entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today creates tasks instead: one Goal choice lists `No goal` followed by `Area - Goal` options. Choosing a goal makes a goal-linked task; `No goal` requires a standalone title.
 
 **Repeat from a task** — Repeat is available only with a goal. With Repeat off, Today creates an ad-hoc task; with it on, Today creates a rule and lets that rule generate the occurrence. The task form shows only the rule's weekdays because time, duration and blocks already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
 

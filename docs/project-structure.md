@@ -132,12 +132,12 @@ apps/web/src/
   `AreaDetails` renders its children for an active area, so `features/areas`
   depends on neither, and goals and habits do not depend on each other.
 - `useGoalForm` owns the goal form and its save flow. `useAreaGoals` uses it in
-  the area panel; the today screen uses it directly, and there the form asks
-  for the area. A save sends only what changed, because a rule write redraws
-  that rule's pending tasks.
+  the area panel. A save sends only what changed, because a rule write redraws
+  that rule's untouched pending tasks.
 - Task API calls belong to `features/tasks`, for the today screen now and the
-  calendar later. The today screen's view state, check-off flow, task blocks
-  and their progress rail belong to `features/today`.
+  calendar later. `useTaskForm` owns task create, edit and delete flows; the
+  today screen's view state, check-off flow, task blocks and their progress
+  rail belong to `features/today`.
 - `ModalDialog` in `components/ui/` is the shared modal shell: backdrop, focus
   trap, Escape and focus return. Form content stays in its feature.
 - Parts of a design that wait for a later slice are marked with

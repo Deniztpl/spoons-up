@@ -59,13 +59,13 @@ One slice at a time. Finish it, use it by hand, commit, move on.
    - Changing a task's `block_count` from the today screen waits for `PATCH /tasks/{id}` in slice 4 and is marked `TODO(slice-4)`
 26. **Done when:** a goal created in the browser produces today's task, and completing it holds after a reload — DONE
 
-## Slice 3 fix — Tasks and schedules
+## Slice 3 fix — Tasks and schedules — DONE
 
-- New goals start without a schedule; Repeat reveals one or more schedules. Rules require weekdays, while time, duration and `block_count` are nullable
-- Today replaces "Add goal" with "Add task": choose an area and goal for goal work, or enter a title for a standalone task. Time, duration and `block_count` are optional
-- Add `tasks.duration_minutes`; make task time, end time and `block_count` nullable. Null blocks contribute zero to weekly progress
-- Add, edit and delete tasks from Today. A task edit changes only that task; its linked schedule days are edited separately and keep the existing regeneration rules
-- **Done when:** goal-linked, standalone, timed and untimed tasks can be created from Today and survive a reload
+- New goals start without a schedule; Repeat reveals one or more schedules. Rules require weekdays, while time, duration and `block_count` are nullable — DONE
+- Today replaces "Add goal" with "Add task": choose `Area - Goal` from one goal field for goal work, or choose `No goal` and enter a standalone title. Time, duration and `block_count` are optional — DONE
+- Add `tasks.duration_minutes`; make task time, end time and `block_count` nullable. Null blocks contribute zero to weekly progress — DONE
+- Add, edit and delete tasks from Today. A task edit changes only that task; its linked schedule days are edited separately and keep the existing regeneration rules — DONE
+- **Done when:** goal-linked, standalone, timed and untimed tasks can be created from Today and survive a reload — DONE
 
 ## Slice 4 — Calendar
 
