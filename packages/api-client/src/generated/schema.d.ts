@@ -252,6 +252,41 @@ export interface paths {
         patch: operations["update_goal_rule_api_v1_rules__rule_id__patch"];
         trace?: never;
     };
+    "/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Task */
+        post: operations["create_task_api_v1_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Task */
+        delete: operations["delete_task_api_v1_tasks__task_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Task */
+        patch: operations["update_task_api_v1_tasks__task_id__patch"];
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/check": {
         parameters: {
             query?: never;
@@ -341,20 +376,14 @@ export interface components {
         };
         /** CreateGoalRuleRequest */
         CreateGoalRuleRequest: {
-            /**
-             * Block Count
-             * @default 1
-             */
-            block_count: number;
+            /** Block Count */
+            block_count?: number | null;
             /** Byweekday */
             byweekday: number[];
             /** Duration Minutes */
-            duration_minutes: number;
-            /**
-             * Start Time
-             * Format: time
-             */
-            start_time: string;
+            duration_minutes?: number | null;
+            /** Start Time */
+            start_time?: string | null;
         };
         /** CreateHabitRequest */
         CreateHabitRequest: {
@@ -363,6 +392,24 @@ export interface components {
             mode: components["schemas"]["HabitMode"];
             /** Title */
             title: string;
+        };
+        /** CreateTaskRequest */
+        CreateTaskRequest: {
+            /** Block Count */
+            block_count?: number | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Goal Id */
+            goal_id?: string | null;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Start Time */
+            start_time?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** ErrorResponse */
         ErrorResponse: {
@@ -397,17 +444,17 @@ export interface components {
         /** GoalRuleResponse */
         GoalRuleResponse: {
             /** Block Count */
-            block_count: number;
+            block_count: number | null;
             /** Byweekday */
             byweekday: number[];
             /** Duration Minutes */
-            duration_minutes: number;
+            duration_minutes: number | null;
             /** Goal Id */
             goal_id: string;
             /** Id */
             id: string;
             /** Start Time */
-            start_time: string;
+            start_time: string | null;
         };
         /** HabitEntryResponse */
         HabitEntryResponse: {
@@ -490,11 +537,13 @@ export interface components {
         /** TaskResponse */
         TaskResponse: {
             /** Block Count */
-            block_count: number;
+            block_count: number | null;
             /** Completed At */
             completed_at: string | null;
+            /** Duration Minutes */
+            duration_minutes: number | null;
             /** End Time */
-            end_time: string;
+            end_time: string | null;
             /** Goal Id */
             goal_id: string | null;
             /** Id */
@@ -514,7 +563,7 @@ export interface components {
              */
             scheduled_date: string;
             /** Start Time */
-            start_time: string;
+            start_time: string | null;
             /**
              * Status
              * @enum {string}
@@ -561,9 +610,11 @@ export interface components {
         /** TodayTaskResponse */
         TodayTaskResponse: {
             /** Block Count */
-            block_count: number;
+            block_count: number | null;
+            /** Duration Minutes */
+            duration_minutes: number | null;
             /** End Time */
-            end_time: string;
+            end_time: string | null;
             /** Goal Id */
             goal_id: string | null;
             /** Id */
@@ -575,13 +626,15 @@ export interface components {
              * Format: date
              */
             period_start: string;
+            /** Rule Id */
+            rule_id: string | null;
             /**
              * Scheduled Date
              * Format: date
              */
             scheduled_date: string;
             /** Start Time */
-            start_time: string;
+            start_time: string | null;
             /**
              * Status
              * @enum {string}
@@ -632,6 +685,19 @@ export interface components {
             /** Area Id */
             area_id?: string | null;
             mode?: components["schemas"]["HabitMode"] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** UpdateTaskRequest */
+        UpdateTaskRequest: {
+            /** Block Count */
+            block_count?: number | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Scheduled Date */
+            scheduled_date?: string | null;
+            /** Start Time */
+            start_time?: string | null;
             /** Title */
             title?: string | null;
         };
@@ -1818,6 +1884,157 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoalRuleResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_task_api_v1_tasks__task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    update_task_api_v1_tasks__task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
                 };
             };
             /** @description Unauthorized */
