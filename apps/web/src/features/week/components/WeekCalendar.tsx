@@ -79,18 +79,19 @@ export function WeekCalendar({
   const selectedDate =
     selection.periodStart === week.period_start ? selection.date : defaultSelectedDate;
 
-  // Open on the morning once the grid has a size; on a narrow screen that happens when it is widened.
+  // Open with the current time a quarter of the way down, once the grid has a size; on a
+  // narrow screen that happens when it is widened. Switching weeks keeps the scroll.
   useEffect(() => {
     const element = scrollRef.current;
     if (!element || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       if (element.clientHeight === 0) return;
-      element.scrollTop = 7.5 * HOUR_HEIGHT;
+      element.scrollTop = (currentMinutes() / 60) * HOUR_HEIGHT - element.clientHeight / 4;
       observer.disconnect();
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [week.period_start]);
+  }, []);
 
   const selectedDay =
     week.days.find((day) => day.date === selectedDate) ?? week.days[0];
