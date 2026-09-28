@@ -30,9 +30,13 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Tasks** — concrete work on a local date. Start time, duration and `block_count` are independent and optional; `end_time` exists only when both time and duration exist. A non-null block value moves in steps of 0.5 and is not derived from duration. Changing one task changes only that task, not its rule. A task belongs to a goal and takes its title from it, or stands alone with a user-entered title.
 
-**Goal and task entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today creates tasks instead: one Goal choice lists `No goal` followed by `Area - Goal` options. Choosing a goal makes a goal-linked task; `No goal` requires a standalone title.
+**Goal and task entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today and Week create tasks instead: one Goal choice lists `No goal` followed by `Area - Goal` options. Choosing a goal makes a goal-linked task; `No goal` requires a standalone title. The shared task form has a date field. Today fixes it to the user's today and disables it; Week lets the user change it from today onward, with no upper bound.
 
-**Repeat from a task** — Repeat is available only with a goal. With Repeat off, Today creates an ad-hoc task; with it on, Today creates a rule and lets that rule generate the occurrence. The task form shows only the rule's weekdays because time, duration and blocks already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
+**Week scope and task entry** — Week has only two destinations: the user's current week and the following week. It never navigates into a past week or beyond the following week. Clicking a today-or-future calendar slot opens the task form with that slot's date and time; elapsed slots in the current week remain visible but are not creation targets. The header add-task button opens the form with today's date. Both paths reuse the same task form.
+
+**Tasks beyond Week** — manually placed tasks after the end of next week remain visible from Week even though the calendar cannot navigate to them. `GET /week` returns one `later_tasks` summary containing both the count and the complete, simple list; the client shows the count on a small info button and, when opened, lists date, optional time and title. The summary includes ad-hoc tasks (`occurrence_date` is null) and rule-generated tasks the user moved (`scheduled_date != occurrence_date`), but excludes untouched occurrences produced automatically by rules.
+
+**Repeat from a task** — Repeat is available only with a goal. With Repeat off, the shared Today/Week form creates an ad-hoc task; with it on, it creates a rule and lets that rule generate the occurrences. The task form shows only the rule's weekdays because time, duration and blocks already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
 
 **Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range, copying nullable schedule values, and writes a reminder only for a timed task. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
 
@@ -40,11 +44,13 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Dormant users are skipped** — the daily job only runs for users seen in the last 30 days; `users.last_seen_at` is refreshed on each authenticated request. Someone away longer has no window being written for them. Their first request back adds the window before anything is read, so they see a full calendar immediately and nothing was generated in the meantime.
 
-**Generated window** — the calendar is generated 14 days ahead. Further out it is empty until the window reaches it.
+**Generated window** — rule occurrences are generated 14 days ahead; rules do not populate dates beyond that window until it advances. Manually created tasks and tasks the user moves have no upper date limit, so they can exist later and appear in Week's `later_tasks` summary.
 
 **Occurrence identity** — `occurrence_date` records the date a rule produced and never changes. `scheduled_date` is where the user actually put it.
 
 **Postpone** — `scheduled_date` moves; `occurrence_date` and `period_start` stay fixed, so a task dragged to next Monday still counts toward the week it belonged to.
+
+**No scheduling in the past** — task writes compare `scheduled_date` with today in the user's timezone. `POST /tasks` and a `PATCH /tasks/{id}` that supplies `scheduled_date` reject an earlier date with `422 validation_error`; future dates have no upper bound.
 
 **Delete** — when the user deletes a task, a rule-generated one soft deletes (`status = DELETED`) so generation doesn't bring it back, and an ad-hoc one hard deletes. Removals the system does itself — a rule change, an area archive — are hard deletes, so the same occurrence can be generated again later.
 

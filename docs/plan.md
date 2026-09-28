@@ -69,12 +69,46 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 4 — Calendar
 
-27. `GET /week?start=`
-28. Move tasks in the calendar through the existing task update — `scheduled_date` moves, `occurrence_date` and `period_start` stay
-29. Expose the existing task delete in the calendar — soft for rule-generated, hard for ad-hoc
-30. Reuse the task form from the Slice 3 fix in the calendar
-31. Web: calendar view, move between weeks, drag or pick a new date
-32. **Done when:** a task dragged across a week boundary still counts toward its original week
+### Block 1 — Task date rules
+
+- `POST /tasks` rejects a `scheduled_date` before today in the user's timezone with 422
+- `PATCH /tasks/{id}` does the same when `scheduled_date` is supplied
+- Today and future dates are allowed; there is no upper date limit
+- Moving a task changes only `scheduled_date`; `occurrence_date` and `period_start` stay fixed
+
+### Block 2 — Week read API
+
+- Add `GET /week?start=` with seven ordered day entries and their tasks
+- Accept only the user's current week or following week; reject past weeks and the third week onward with 422
+- Resolve week boundaries on the server from the user's timezone and `week_start_day`
+- Return `later_tasks` in the same response, with both `count` and the complete date/time/title list for tasks after the following week
+- Include ad-hoc tasks and rule-generated tasks the user moved; exclude untouched occurrences generated automatically by rules
+
+### Block 3 — Shared task form
+
+- Add `scheduled_date` to the form shared by Today and Week
+- On Today, show today and disable the date field
+- On Week, allow the date to change from today onward with no maximum
+- A today-or-future calendar slot click opens the form with the clicked date and time
+- The Week header add-task button opens the form with today's date
+- Keep Repeat, goal selection, standalone title, time, duration and block behaviour shared with Today
+
+### Block 4 — Week calendar interactions
+
+- Add the Week route, page and active sidebar navigation
+- Show the current week first and allow navigation only to the following week and back
+- Keep elapsed slots in the current week visible but unavailable for task creation or moving
+- Move tasks by drag or date selection through `PATCH /tasks/{id}`
+- Edit tasks with the shared form and expose the existing delete behaviour: soft delete for rule-generated tasks, hard delete for ad-hoc tasks
+- Show a small info button when `later_tasks.count > 0`; display the response's date, optional time and title items as a simple bullet list when opened
+
+### Block 5 — Verification
+
+- API tests cover both allowed weeks, rejected week navigation, custom week starts and user timezones
+- API tests cover past-date rejection and confirm that a patch without `scheduled_date` can still update another field
+- API tests cover `later_tasks` count, ordering and inclusion/exclusion rules
+- Web tests cover both form entry points, Today's disabled date, Week's minimum date, limited navigation, moving/deleting tasks and the later-task info list
+- **Done when:** a task moved across a week boundary still counts toward its original week; past and third-week navigation are unavailable; a manually placed task after next week appears in the info count and list while an untouched generated occurrence does not
 
 ## Slice 5 — Weekly results
 

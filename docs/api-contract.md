@@ -412,7 +412,7 @@ The rule adds its tasks from today through the current window in the same reques
 
 A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. `block_count: 2` still generates one task per occurrence; two different times on the same day still use two rules.
 
-On Today, Repeat requires a goal. With Repeat off the client calls `POST /tasks`; with it on the client calls this endpoint instead and includes today's weekday, so the rule generates the current occurrence rather than creating a duplicate ad-hoc task. The task form shows only weekdays in its schedule section; full schedule values remain editable from the goal.
+In the shared Today/Week task form, Repeat requires a goal. With Repeat off the client calls `POST /tasks`; with it on the client calls this endpoint instead and includes the form date's weekday, so the rule supplies the occurrence rather than creating a duplicate ad-hoc task. The task form shows only weekdays in its schedule section; full schedule values remain editable from the goal.
 
 | Error | When |
 |---|---|
@@ -483,12 +483,14 @@ Ad-hoc task, created by the user rather than a rule.
 
 `goal_id` is optional. When present, `title` must be omitted; the server verifies the goal through its active area and copies its title. Without a goal, `title` is required and the task is standalone. `start_time`, `duration_minutes` and `block_count` are independently optional.
 
+`scheduled_date` cannot be earlier than today in the user's timezone. There is no upper bound.
+
 **201** — the created task. `rule_id` and `occurrence_date` are null; `period_start` is derived from `scheduled_date`. `end_time` is derived only when both `start_time` and `duration_minutes` are present.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal |
-| 422 `validation_error` | missing standalone title, a title supplied for a goal-linked task, a non-null `duration_minutes` below 1, or a non-null `block_count` that is not a positive multiple of 0.5 |
+| 422 `validation_error` | `scheduled_date` is before today in the user's timezone, missing standalone title, a title supplied for a goal-linked task, a non-null `duration_minutes` below 1, or a non-null `block_count` that is not a positive multiple of 0.5 |
 
 #### PATCH /tasks/{id}
 
@@ -498,9 +500,15 @@ Ad-hoc task, created by the user rather than a rule.
 
 All fields optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it. `title` is editable only on a standalone task. This is also how postpone works — send a new `scheduled_date`. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited.
 
+When supplied, `scheduled_date` cannot be earlier than today in the user's timezone. There is no upper bound.
+
 **200** — the updated task. `occurrence_date` and `period_start` are unchanged whatever the new date is.
 
 Changing a timed task updates its reminder. Clearing its time cancels the reminder; adding a time creates one.
+
+| Error | When |
+|---|---|
+| 422 `validation_error` | the supplied `scheduled_date` is before today in the user's timezone, a non-null `duration_minutes` is below 1, or a non-null `block_count` is not a positive multiple of 0.5 |
 
 #### DELETE /tasks/{id}
 
@@ -578,13 +586,13 @@ Timed tasks are ordered by `start_time`, followed by untimed tasks; `DELETED` is
 
 #### GET /week
 
-The calendar screen: seven days side by side.
+The calendar screen: seven days side by side. It can show only the user's current week and the following week; the client offers no navigation before the current week or beyond the following week.
 
 | Query | Default |
 |---|---|
 | `start` | the current week's `period_start` |
 
-Any date inside the week works — the server resolves it to `period_start`. Weeks beyond the generated window return empty days until the window reaches them.
+Any date inside the current or following week works — the server resolves it to `period_start`. A past week or a week after the following week is rejected. The boundary uses today and `week_start_day` in the user's timezone.
 
 **200**
 
@@ -594,13 +602,30 @@ Any date inside the week works — the server resolves it to `period_start`. Wee
   "days": [
     { "date": "2026-09-14", "tasks": [ ... ] },
     { "date": "2026-09-15", "tasks": [] }
-  ]
+  ],
+  "later_tasks": {
+    "count": 2,
+    "items": [
+      { "scheduled_date": "2026-09-28", "start_time": "14:00", "title": "Dentist" },
+      { "scheduled_date": "2026-10-03", "start_time": null, "title": "CS Block" }
+    ]
+  }
 }
 ```
 
 `days` always holds seven entries in order, so the client draws columns without knowing `week_start_day`. Task objects are the same shape as in `/today`.
 
+`later_tasks` makes tasks after the following week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They contain only the date, nullable time and title needed by the simple bullet list.
+
+The list includes non-deleted ad-hoc tasks (`occurrence_date` is null) and rule-generated tasks the user moved there (`scheduled_date != occurrence_date`). Untouched occurrences generated automatically by rules are excluded. The normal visibility rule still applies: tasks under an archived area are excluded.
+
+The shared task form always includes `scheduled_date`. On Today it displays today and is disabled. On Week it is editable with today as its minimum and no maximum. Clicking a today-or-future calendar slot opens the form with that slot's date and time; elapsed slots in the current week remain visible but do not create tasks. The header add-task button opens the form with today's date.
+
 Habits are not in this response — the calendar shows scheduled work only.
+
+| Error | When |
+|---|---|
+| 422 `validation_error` | `start` resolves to a past week or a week after the following week |
 
 ---
 
