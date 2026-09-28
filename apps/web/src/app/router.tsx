@@ -4,6 +4,7 @@ import { useAuth } from "../features/auth/hooks/useAuth";
 import { AreasPage } from "../pages/AreasPage/AreasPage";
 import { AuthPage } from "../pages/AuthPage/AuthPage";
 import { TodayPage } from "../pages/TodayPage/TodayPage";
+import { WeekPage } from "../pages/WeekPage/WeekPage";
 
 export function AppRouter() {
   const { status, logout } = useAuth();
@@ -16,6 +17,7 @@ export function AppRouter() {
     return (
       <Routes>
         <Route path="/today" element={<TodayPage onLogout={logout} />} />
+        <Route path="/week" element={<WeekPage onLogout={logout} />} />
         <Route path="/areas" element={<AreasPage onLogout={logout} />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>

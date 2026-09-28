@@ -6,9 +6,8 @@ import { AreaIcon } from "../../features/areas/components/AreaIcon";
 const pages: { to: string; label: string; icon: ReactNode }[] = [
   { to: "/areas", label: "Areas", icon: <AreaIcon /> },
   { to: "/today", label: "Today", icon: <TodayIcon /> },
+  { to: "/week", label: "Week", icon: <WeekIcon /> },
 ];
-
-const plannedPages = ["Week"];
 
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -53,21 +52,6 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
             )}
           </NavLink>
         ))}
-
-        {plannedPages.map((page) => (
-          <button
-            key={page}
-            type="button"
-            disabled
-            className="flex cursor-not-allowed items-center gap-2.5 rounded-[9px] px-2.5 py-[9px] text-left text-muted"
-          >
-            <span aria-hidden="true" className="grid w-5 place-items-center">
-              <span className="size-1 rounded-full bg-current" />
-            </span>
-            {page}
-            <span className="ml-auto text-[9px] uppercase tracking-[0.07em]">Soon</span>
-          </button>
-        ))}
       </nav>
 
       <p className="mt-auto px-1.5 pt-8 text-[11px] text-muted-light">
@@ -88,6 +72,16 @@ function TodayIcon() {
         strokeLinejoin="round"
         strokeWidth="1.6"
       />
+    </svg>
+  );
+}
+
+function WeekIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none">
+      <rect x="4.5" y="5.5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 3.8v3.4M16 3.8v3.4M4.8 9.5h14.4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+      <path d="M8 13h2M13 13h2M8 16h2M13 16h2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.4" />
     </svg>
   );
 }

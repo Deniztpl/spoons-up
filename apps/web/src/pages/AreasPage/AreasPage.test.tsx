@@ -104,7 +104,10 @@ describe("Areas page", () => {
       "href",
       "/today",
     );
-    expect(within(sidebar).getByRole("button", { name: /Week/ })).toBeDisabled();
+    expect(within(sidebar).getByRole("link", { name: "Week" })).toHaveAttribute(
+      "href",
+      "/week",
+    );
     expect(within(sidebar).queryByRole("button", { name: "Add area" })).not.toBeInTheDocument();
 
     expect(
