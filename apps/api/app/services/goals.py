@@ -124,7 +124,7 @@ class GoalService:
                     user_id=user_id
                 )
                 self.task_service.delete_untouched_pending_tasks_for_rule(
-                    rule_id=rule.id,
+                    rule=rule,
                     user_id=user_id,
                     from_date=open_week_start,
                 )
@@ -151,7 +151,7 @@ class GoalService:
             rule = self._get_owned_rule(rule_id=rule_id, user_id=user_id)
             _, open_week_start, _ = self._get_task_generation_dates(user_id=user_id)
             self.task_service.delete_untouched_pending_tasks_for_rule(
-                rule_id=rule.id,
+                rule=rule,
                 user_id=user_id,
                 from_date=open_week_start,
             )

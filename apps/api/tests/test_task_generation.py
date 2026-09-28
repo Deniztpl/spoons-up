@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Goal, GoalRule, Task, TaskStatus, User
+from app.repositories.goals import GoalRepository
 from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.services import areas as areas_service_module
@@ -71,6 +72,7 @@ def test_rule_creation_adds_the_current_window_idempotently(
         task_service = TaskService(
             db_session,
             TaskRepository(db_session),
+            GoalRepository(db_session),
             UserRepository(db_session),
         )
         task_service.add_tasks(
@@ -83,6 +85,36 @@ def test_rule_creation_adds_the_current_window_idempotently(
         db_session.scalars(select(Task).where(Task.rule_id == int(str(rule["id"]))))
     )
     assert len(repeated_tasks) == len(expected_dates)
+
+
+def test_rule_generation_copies_nullable_schedule_values(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_goal_service_time(monkeypatch)
+    headers = bearer(register(client, "untimed-task-generation@example.com"))
+    area = create_area(client, headers)
+    goal = create_goal(client, headers, area_id=str(area["id"]))
+
+    rule = create_rule(
+        client,
+        headers,
+        goal_id=str(goal["id"]),
+        byweekday=[3],
+        start_time=None,
+        duration_minutes=None,
+        block_count=None,
+    )
+
+    task = db_session.scalar(
+        select(Task).where(Task.rule_id == int(str(rule["id"]))).order_by(Task.occurrence_date)
+    )
+    assert task is not None
+    assert task.start_time is None
+    assert task.duration_minutes is None
+    assert task.end_time is None
+    assert task.block_count is None
 
 
 def test_rule_update_clears_open_week_but_only_regenerates_from_today(
@@ -120,13 +152,24 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
                 Task.occurrence_date == date(2026, 10, 2),
             )
         )
+        customized_task = db_session.scalar(
+            select(Task).where(
+                Task.rule_id == rule_id,
+                Task.occurrence_date == date(2026, 9, 25),
+            )
+        )
         assert user is not None
         assert goal_model is not None
         assert thursday_task is not None
         assert deleted_task is not None
+        assert customized_task is not None
 
         thursday_task.scheduled_date = date(2026, 9, 26)
         deleted_task.status = TaskStatus.DELETED.value
+        customized_task.start_time = time(11)
+        customized_task.duration_minutes = 45
+        customized_task.end_time = time(11, 45)
+        customized_task.block_count = Decimal("2.0")
         db_session.add_all(
             [
                 build_task(
@@ -168,7 +211,9 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
     assert tasks_by_date[date(2026, 9, 22)].status == TaskStatus.DONE.value
     assert tasks_by_date[date(2026, 9, 24)].scheduled_date == date(2026, 9, 26)
     assert tasks_by_date[date(2026, 9, 24)].start_time == time(9)
-    assert date(2026, 9, 25) not in tasks_by_date
+    assert tasks_by_date[date(2026, 9, 25)].start_time == time(11)
+    assert tasks_by_date[date(2026, 9, 25)].duration_minutes == 45
+    assert tasks_by_date[date(2026, 9, 25)].block_count == Decimal("2.0")
     assert tasks_by_date[date(2026, 10, 2)].status == TaskStatus.DELETED.value
 
     regenerated_dates = {
@@ -218,14 +263,25 @@ def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
                 Task.occurrence_date == date(2026, 9, 25),
             )
         )
+        customized_task = db_session.scalar(
+            select(Task).where(
+                Task.rule_id == rule_id,
+                Task.occurrence_date == date(2026, 9, 23),
+            )
+        )
         assert user is not None
         assert goal_model is not None
         assert moved_task is not None
         assert done_task is not None
+        assert customized_task is not None
 
         moved_task.scheduled_date = date(2026, 9, 27)
         done_task.status = TaskStatus.DONE.value
         done_task.completed_at = datetime(2026, 9, 25, 8, tzinfo=UTC)
+        customized_task.start_time = time(11)
+        customized_task.duration_minutes = 30
+        customized_task.end_time = time(11, 30)
+        customized_task.block_count = Decimal("2.0")
         db_session.add(
             build_task(
                 user=user,
@@ -244,6 +300,7 @@ def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
         )
     )
     assert {(task.occurrence_date, task.status) for task in remaining_tasks} == {
+        (date(2026, 9, 23), TaskStatus.PENDING.value),
         (date(2026, 9, 24), TaskStatus.PENDING.value),
         (date(2026, 9, 25), TaskStatus.DONE.value),
     }
@@ -367,6 +424,7 @@ def build_task(
         occurrence_date=occurrence_date,
         scheduled_date=occurrence_date,
         start_time=time(9),
+        duration_minutes=60,
         end_time=time(10),
         block_count=Decimal("1.0"),
         period_start=date(2026, 9, 21),
@@ -441,9 +499,9 @@ def create_rule(
     *,
     goal_id: str,
     byweekday: list[int],
-    start_time: str,
-    duration_minutes: int,
-    block_count: float,
+    start_time: str | None,
+    duration_minutes: int | None,
+    block_count: float | None,
 ) -> dict[str, object]:
     response = client.post(
         f"/api/v1/goals/{goal_id}/rules",

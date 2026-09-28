@@ -138,6 +138,9 @@ class TaskRepository:
         rule_id: int,
         user_id: int,
         from_date: date,
+        start_time: time | None,
+        duration_minutes: int | None,
+        block_count: Decimal | None,
     ) -> None:
         query = delete(Task).where(
             Task.rule_id == rule_id,
@@ -145,6 +148,17 @@ class TaskRepository:
             Task.occurrence_date >= from_date,
             Task.status == TaskStatus.PENDING.value,
             Task.scheduled_date == Task.occurrence_date,
+            Task.start_time.is_(None) if start_time is None else Task.start_time == start_time,
+            (
+                Task.duration_minutes.is_(None)
+                if duration_minutes is None
+                else Task.duration_minutes == duration_minutes
+            ),
+            (
+                Task.block_count.is_(None)
+                if block_count is None
+                else Task.block_count == block_count
+            ),
         )
         self.session.execute(query)
 

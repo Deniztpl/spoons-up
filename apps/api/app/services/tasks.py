@@ -77,9 +77,7 @@ class TaskService:
 
             start_time = payload.start_time if "start_time" in fields else task.start_time
             duration_minutes = (
-                payload.duration_minutes
-                if "duration_minutes" in fields
-                else task.duration_minutes
+                payload.duration_minutes if "duration_minutes" in fields else task.duration_minutes
             )
             update_end_time = bool({"start_time", "duration_minutes"} & fields)
             self.task_repository.update(
@@ -156,14 +154,17 @@ class TaskService:
     def delete_untouched_pending_tasks_for_rule(
         self,
         *,
-        rule_id: int,
+        rule: GoalRule,
         user_id: int,
         from_date: date,
     ) -> None:
         self.task_repository.delete_untouched_pending_tasks_for_rule(
-            rule_id=rule_id,
+            rule_id=rule.id,
             user_id=user_id,
             from_date=from_date,
+            start_time=rule.start_time,
+            duration_minutes=rule.duration_minutes,
+            block_count=rule.block_count,
         )
 
     def delete_pending_tasks_for_area(
