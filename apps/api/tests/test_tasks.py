@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Task, TaskStatus, User
+from app.models import GoalRule, Task, TaskStatus, User
 from app.services import tasks as tasks_service_module
 
 pytestmark = pytest.mark.integration
@@ -45,6 +45,7 @@ def test_task_completion_is_idempotent_and_reversible(
         "occurrence_date": None,
         "scheduled_date": "2026-09-20",
         "start_time": "09:00",
+        "duration_minutes": None,
         "end_time": "10:00",
         "block_count": 2.0,
         "period_start": "2026-09-14",
@@ -122,6 +123,180 @@ def test_task_completion_is_scoped_and_excludes_unavailable_tasks(
     assert unauthorized.status_code == 401
 
 
+def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
+    headers = bearer(register(client, "create-task@example.com"))
+    stranger_headers = bearer(register(client, "create-task-stranger@example.com"))
+    area = create_area(client, headers, "Work")
+    goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
+
+    standalone = client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "  Dentist  ",
+            "scheduled_date": "2026-09-27",
+        },
+        headers=headers,
+    )
+    linked = client.post(
+        "/api/v1/tasks",
+        json={
+            "goal_id": goal["id"],
+            "scheduled_date": "2026-09-27",
+            "start_time": "09:30",
+            "duration_minutes": 60,
+            "block_count": 1.5,
+        },
+        headers=headers,
+    )
+    missing_title = client.post(
+        "/api/v1/tasks",
+        json={"scheduled_date": "2026-09-27"},
+        headers=headers,
+    )
+    linked_title = client.post(
+        "/api/v1/tasks",
+        json={
+            "goal_id": goal["id"],
+            "title": "Override",
+            "scheduled_date": "2026-09-27",
+        },
+        headers=headers,
+    )
+    foreign_goal = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        headers=stranger_headers,
+    )
+
+    assert standalone.status_code == 201
+    assert standalone.json() | {"id": "ignored", "completed_at": None} == {
+        "id": "ignored",
+        "goal_id": None,
+        "rule_id": None,
+        "title": "Dentist",
+        "occurrence_date": None,
+        "scheduled_date": "2026-09-27",
+        "start_time": None,
+        "duration_minutes": None,
+        "end_time": None,
+        "block_count": None,
+        "period_start": "2026-09-21",
+        "status": "PENDING",
+        "completed_at": None,
+    }
+    assert linked.status_code == 201
+    assert linked.json()["title"] == "Deep work"
+    assert linked.json()["goal_id"] == goal["id"]
+    assert linked.json()["end_time"] == "10:30"
+    assert linked.json()["block_count"] == 1.5
+    assert missing_title.status_code == 422
+    assert missing_title.json()["fields"] == {"title": "Title is required without a goal"}
+    assert linked_title.status_code == 422
+    assert linked_title.json()["fields"] == {"title": "Title comes from the selected goal"}
+    assert foreign_goal.status_code == 404
+
+
+def test_update_task_changes_only_editable_task_values(client: TestClient) -> None:
+    headers = bearer(register(client, "update-task@example.com"))
+    area = create_area(client, headers, "Work")
+    goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
+    standalone = client.post(
+        "/api/v1/tasks",
+        json={"title": "Draft", "scheduled_date": "2026-09-27"},
+        headers=headers,
+    ).json()
+    linked = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        headers=headers,
+    ).json()
+
+    updated = client.patch(
+        f"/api/v1/tasks/{standalone['id']}",
+        json={
+            "title": "  Appointment  ",
+            "scheduled_date": "2026-10-01",
+            "start_time": "23:30",
+            "duration_minutes": 90,
+            "block_count": 2,
+        },
+        headers=headers,
+    )
+    cleared = client.patch(
+        f"/api/v1/tasks/{standalone['id']}",
+        json={"start_time": None, "duration_minutes": None, "block_count": None},
+        headers=headers,
+    )
+    linked_title = client.patch(
+        f"/api/v1/tasks/{linked['id']}",
+        json={"title": "Override"},
+        headers=headers,
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "Appointment"
+    assert updated.json()["scheduled_date"] == "2026-10-01"
+    assert updated.json()["end_time"] == "01:00"
+    assert updated.json()["block_count"] == 2
+    assert updated.json()["period_start"] == "2026-09-21"
+    assert cleared.status_code == 200
+    assert cleared.json()["start_time"] is None
+    assert cleared.json()["duration_minutes"] is None
+    assert cleared.json()["end_time"] is None
+    assert cleared.json()["block_count"] is None
+    assert linked_title.status_code == 422
+    assert linked_title.json()["fields"] == {"title": "A goal-linked task uses its goal title"}
+
+
+def test_delete_is_hard_for_ad_hoc_and_soft_for_generated_tasks(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "delete-task@example.com"))
+    area = create_area(client, headers, "Work")
+    goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
+    ad_hoc = client.post(
+        "/api/v1/tasks",
+        json={"title": "One off", "scheduled_date": "2026-09-27"},
+        headers=headers,
+    ).json()
+
+    with db_session.begin():
+        user = get_user(db_session, "delete-task@example.com")
+        rule = GoalRule(
+            goal_id=int(str(goal["id"])),
+            byweekday=[7],
+            start_time=None,
+            duration_minutes=None,
+            block_count=None,
+        )
+        db_session.add(rule)
+        db_session.flush()
+        generated = build_task(
+            user_id=user.id,
+            goal_id=int(str(goal["id"])),
+            rule_id=rule.id,
+            occurrence_date=date(2026, 9, 27),
+        )
+        db_session.add(generated)
+        db_session.flush()
+        generated_id = str(generated.id)
+
+    ad_hoc_deleted = client.delete(f"/api/v1/tasks/{ad_hoc['id']}", headers=headers)
+    generated_deleted = client.delete(f"/api/v1/tasks/{generated_id}", headers=headers)
+
+    assert ad_hoc_deleted.status_code == 204
+    assert generated_deleted.status_code == 204
+    with db_session.begin():
+        assert db_session.get(Task, int(ad_hoc["id"])) is None
+        stored_generated = db_session.get(Task, int(generated_id))
+        assert stored_generated is not None
+        assert stored_generated.status == TaskStatus.DELETED.value
+        assert stored_generated.completed_at is None
+
+    assert client.post(f"/api/v1/tasks/{generated_id}/check", headers=headers).status_code == 404
+
+
 def freeze_task_service_time(monkeypatch: pytest.MonkeyPatch) -> None:
     class FixedDateTime(datetime):
         @classmethod
@@ -184,14 +359,16 @@ def build_task(
     *,
     user_id: int,
     goal_id: int | None,
+    rule_id: int | None = None,
+    occurrence_date: date | None = None,
     status: TaskStatus = TaskStatus.PENDING,
 ) -> Task:
     return Task(
         user_id=user_id,
         goal_id=goal_id,
-        rule_id=None,
+        rule_id=rule_id,
         title="Deep work",
-        occurrence_date=None,
+        occurrence_date=occurrence_date,
         scheduled_date=date(2026, 9, 20),
         start_time=time(9),
         end_time=time(10),

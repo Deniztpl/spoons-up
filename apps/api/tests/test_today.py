@@ -280,11 +280,21 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             block_count=Decimal("2.0"),
             occurrence_date=date(2026, 9, 23),
         )
+        untimed = build_today_task(
+            user_id=user.id,
+            goal_id=None,
+            title="Untimed task",
+            scheduled_date=target_date,
+            start_time=None,
+            end_time=None,
+            block_count=None,
+        )
         db_session.add_all(
             [
                 morning,
                 standalone,
                 evening,
+                untimed,
                 build_today_task(
                     user_id=user.id,
                     goal_id=int(str(active_goal["id"])),
@@ -317,7 +327,12 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             ]
         )
         db_session.flush()
-        expected_ids = [str(morning.id), str(standalone.id), str(evening.id)]
+        expected_ids = [
+            str(morning.id),
+            str(standalone.id),
+            str(evening.id),
+            str(untimed.id),
+        ]
         task_count_before = db_session.scalar(select(func.count()).select_from(Task))
 
     archived = client.post(
@@ -339,8 +354,10 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
         {
             "id": expected_ids[0],
             "goal_id": active_goal["id"],
+            "rule_id": None,
             "title": "Morning block",
             "start_time": "08:00",
+            "duration_minutes": None,
             "end_time": "08:30",
             "block_count": 0.5,
             "status": "DONE",
@@ -351,8 +368,10 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
         {
             "id": expected_ids[1],
             "goal_id": None,
+            "rule_id": None,
             "title": "Standalone task",
             "start_time": "09:00",
+            "duration_minutes": None,
             "end_time": "10:00",
             "block_count": 1.0,
             "status": "PENDING",
@@ -363,13 +382,29 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
         {
             "id": expected_ids[2],
             "goal_id": active_goal["id"],
+            "rule_id": None,
             "title": "Evening block",
             "start_time": "18:00",
+            "duration_minutes": None,
             "end_time": "20:00",
             "block_count": 2.0,
             "status": "PENDING",
             "scheduled_date": "2026-09-24",
             "occurrence_date": "2026-09-23",
+            "period_start": "2026-09-21",
+        },
+        {
+            "id": expected_ids[3],
+            "goal_id": None,
+            "rule_id": None,
+            "title": "Untimed task",
+            "start_time": None,
+            "duration_minutes": None,
+            "end_time": None,
+            "block_count": None,
+            "status": "PENDING",
+            "scheduled_date": "2026-09-24",
+            "occurrence_date": None,
             "period_start": "2026-09-21",
         },
     ]
@@ -434,9 +469,9 @@ def build_today_task(
     goal_id: int | None,
     title: str,
     scheduled_date: date,
-    start_time: time,
-    end_time: time,
-    block_count: Decimal,
+    start_time: time | None,
+    end_time: time | None,
+    block_count: Decimal | None,
     status: TaskStatus = TaskStatus.PENDING,
     occurrence_date: date | None = None,
 ) -> Task:

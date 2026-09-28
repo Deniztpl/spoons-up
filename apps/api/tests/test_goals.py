@@ -154,7 +154,7 @@ def test_goal_rule_crud_and_nested_response(client: TestClient) -> None:
     assert default_rule["byweekday"] == [1, 3, 5]
     assert default_rule["start_time"] == "19:00"
     assert default_rule["duration_minutes"] == 60
-    assert default_rule["block_count"] == 1
+    assert default_rule["block_count"] is None
 
     updated = client.patch(
         f"/api/v1/rules/{default_rule['id']}",
