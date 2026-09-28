@@ -58,8 +58,8 @@ function weekResponse(start = "2026-09-21") {
     later_tasks: {
       count: 2,
       items: [
-        { scheduled_date: "2026-10-08", start_time: "14:30", title: "Tax meeting" },
-        { scheduled_date: "2026-10-12", start_time: null, title: "Renew passport" },
+        task("51", "Tax meeting", "2026-10-08", "14:30"),
+        task("52", "Renew passport", "2026-10-12", null),
       ],
     },
   };
@@ -174,6 +174,45 @@ describe("Week page", () => {
     expect(within(dialog).getByText("14:30")).toBeInTheDocument();
     expect(within(dialog).getByText("Renew passport")).toBeInTheDocument();
     expect(within(dialog).getByText("No time")).toBeInTheDocument();
+  });
+
+  it("opens a later task in the shared form to delete it", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json(weekResponse());
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/v1/tasks/51") {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "2 later tasks" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Later tasks" })).getByRole("button", {
+        name: /Tax meeting/,
+      }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Edit task" });
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-08");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await user.click(within(dialog).getByRole("button", { name: "Delete task" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([request]) =>
+            request.method === "DELETE" && new URL(request.url).pathname === "/api/v1/tasks/51",
+        ),
+      ).toBe(true);
+    });
   });
 
   it("moves a task to a future calendar slot with PATCH", async () => {

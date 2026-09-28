@@ -9,7 +9,6 @@ from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.schemas.today import TodayTaskResponse
 from app.schemas.week import (
-    LaterTaskResponse,
     LaterTasksResponse,
     WeekDayResponse,
     WeekResponse,
@@ -62,14 +61,7 @@ class WeekService:
                 user_id=user_id,
                 cutoff_date=following_week_end,
             )
-            later_items = [
-                LaterTaskResponse(
-                    scheduled_date=task.scheduled_date,
-                    start_time=task.start_time,
-                    title=task.title,
-                )
-                for task in later_tasks
-            ]
+            later_items = [TodayTaskResponse.model_validate(task) for task in later_tasks]
 
             return WeekResponse(
                 period_start=period_start,

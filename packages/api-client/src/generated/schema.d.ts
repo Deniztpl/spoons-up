@@ -537,24 +537,12 @@ export interface components {
             /** Title */
             title: string;
         };
-        /** LaterTaskResponse */
-        LaterTaskResponse: {
-            /**
-             * Scheduled Date
-             * Format: date
-             */
-            scheduled_date: string;
-            /** Start Time */
-            start_time: string | null;
-            /** Title */
-            title: string;
-        };
         /** LaterTasksResponse */
         LaterTasksResponse: {
             /** Count */
             count: number;
             /** Items */
-            items: components["schemas"]["LaterTaskResponse"][];
+            items: components["schemas"]["TodayTaskResponse"][];
         };
         /** LoginRequest */
         LoginRequest: {

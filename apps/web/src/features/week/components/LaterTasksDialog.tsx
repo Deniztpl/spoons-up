@@ -2,7 +2,7 @@ import { useId, useRef } from "react";
 
 import { CloseIcon } from "../../../components/ui/CloseIcon";
 import { ModalDialog } from "../../../components/ui/ModalDialog";
-import type { LaterTask } from "../api/weekApi";
+import type { WeekTask } from "../api/weekApi";
 
 const dateFormat = new Intl.DateTimeFormat("en", {
   weekday: "short",
@@ -13,9 +13,11 @@ const dateFormat = new Intl.DateTimeFormat("en", {
 
 export function LaterTasksDialog({
   tasks,
+  onSelect,
   onClose,
 }: {
-  tasks: LaterTask[];
+  tasks: WeekTask[];
+  onSelect: (task: WeekTask) => void;
   onClose: () => void;
 }) {
   const headingId = useId();
@@ -39,18 +41,21 @@ export function LaterTasksDialog({
       </header>
 
       <ul aria-label="Later tasks" className="-mt-1.5">
-        {tasks.map((task, index) => (
-          <li
-            key={`${task.scheduled_date}-${task.start_time ?? "untimed"}-${task.title}-${index}`}
-            className="grid grid-cols-[118px_52px_minmax(0,1fr)] items-baseline gap-2.5 border-t border-line py-[11px] text-[13.5px]"
-          >
-            <span className="whitespace-nowrap text-ink-soft">
-              {dateFormat.format(localDate(task.scheduled_date))}
-            </span>
-            <span className="whitespace-nowrap text-ink-soft tabular-nums">
-              {task.start_time ?? "No time"}
-            </span>
-            <span className="min-w-0 break-words">{task.title}</span>
+        {tasks.map((task) => (
+          <li key={task.id} className="border-t border-line">
+            <button
+              type="button"
+              className="grid w-full grid-cols-[118px_52px_minmax(0,1fr)] items-baseline gap-2.5 rounded-md py-[11px] text-left text-[13.5px] transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={() => onSelect(task)}
+            >
+              <span className="whitespace-nowrap text-ink-soft">
+                {dateFormat.format(localDate(task.scheduled_date))}
+              </span>
+              <span className="whitespace-nowrap text-ink-soft tabular-nums">
+                {task.start_time ?? "No time"}
+              </span>
+              <span className="min-w-0 break-words">{task.title}</span>
+            </button>
           </li>
         ))}
       </ul>

@@ -253,26 +253,17 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
     response = client.get("/api/v1/week", headers=headers)
 
     assert response.status_code == 200
-    assert response.json()["later_tasks"] == {
-        "count": 3,
-        "items": [
-            {
-                "scheduled_date": "2026-10-05",
-                "start_time": "09:00",
-                "title": "Timed manual",
-            },
-            {
-                "scheduled_date": "2026-10-05",
-                "start_time": None,
-                "title": "Untimed manual",
-            },
-            {
-                "scheduled_date": "2026-10-06",
-                "start_time": "08:00",
-                "title": "Moved generated",
-            },
-        ],
-    }
+    later_tasks = response.json()["later_tasks"]
+    assert later_tasks["count"] == 3
+    assert [
+        (item["scheduled_date"], item["start_time"], item["title"]) for item in later_tasks["items"]
+    ] == [
+        ("2026-10-05", "09:00", "Timed manual"),
+        ("2026-10-05", None, "Untimed manual"),
+        ("2026-10-06", "08:00", "Moved generated"),
+    ]
+    assert all(item["id"] for item in later_tasks["items"])
+    assert later_tasks["items"][2]["occurrence_date"] == "2026-09-28"
 
 
 def freeze_week_service_time(

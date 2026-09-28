@@ -1,6 +1,6 @@
-from datetime import date, time
+from datetime import date
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel
 
 from app.schemas.today import TodayTaskResponse
 
@@ -10,19 +10,9 @@ class WeekDayResponse(BaseModel):
     tasks: list[TodayTaskResponse]
 
 
-class LaterTaskResponse(BaseModel):
-    scheduled_date: date
-    start_time: time | None
-    title: str
-
-    @field_serializer("start_time")
-    def serialize_time(self, value: time | None) -> str | None:
-        return value.strftime("%H:%M") if value is not None else None
-
-
 class LaterTasksResponse(BaseModel):
     count: int
-    items: list[LaterTaskResponse]
+    items: list[TodayTaskResponse]
 
 
 class WeekResponse(BaseModel):

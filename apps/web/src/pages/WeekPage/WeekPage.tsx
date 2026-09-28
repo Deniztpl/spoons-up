@@ -155,7 +155,14 @@ export function WeekPage({
       ) : null}
 
       {isLaterOpen && week ? (
-        <LaterTasksDialog tasks={week.later_tasks.items} onClose={() => setIsLaterOpen(false)} />
+        <LaterTasksDialog
+          tasks={week.later_tasks.items}
+          onSelect={(task) => {
+            setIsLaterOpen(false);
+            taskForm.openEdit(task);
+          }}
+          onClose={() => setIsLaterOpen(false)}
+        />
       ) : null}
     </AppLayout>
   );

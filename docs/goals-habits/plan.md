@@ -100,7 +100,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Wire a today-or-future slot click to the shared form with the clicked date and time; wire the header add-task button with today's date
 - Move tasks by drag or date selection through `PATCH /tasks/{id}`
 - Edit tasks with the shared form and expose the existing delete behaviour: soft delete for rule-generated tasks, hard delete for ad-hoc tasks
-- Show a small info button when `later_tasks.count > 0`; display the response's date, optional time and title items as a simple bullet list when opened
+- Show a small info button when `later_tasks.count > 0`; display the response's date, optional time and title items as a simple bullet list when opened; choosing an item opens the shared task form to edit or delete it
 
 ### Block 4b — Repeat while editing — DONE
 

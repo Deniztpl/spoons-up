@@ -538,37 +538,6 @@
         "title": "HabitResponse",
         "type": "object"
       },
-      "LaterTaskResponse": {
-        "properties": {
-          "scheduled_date": {
-            "format": "date",
-            "title": "Scheduled Date",
-            "type": "string"
-          },
-          "start_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start Time"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "scheduled_date",
-          "start_time",
-          "title"
-        ],
-        "title": "LaterTaskResponse",
-        "type": "object"
-      },
       "LaterTasksResponse": {
         "properties": {
           "count": {
@@ -577,7 +546,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/LaterTaskResponse"
+              "$ref": "#/components/schemas/TodayTaskResponse"
             },
             "title": "Items",
             "type": "array"

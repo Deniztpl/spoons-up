@@ -631,17 +631,14 @@ Any date inside the current or following week works — the server resolves it t
   ],
   "later_tasks": {
     "count": 2,
-    "items": [
-      { "scheduled_date": "2026-09-28", "start_time": "14:00", "title": "Dentist" },
-      { "scheduled_date": "2026-10-03", "start_time": null, "title": "CS Block" }
-    ]
+    "items": [ ... ]
   }
 }
 ```
 
 `days` always holds seven entries in order, so the client draws columns without knowing `week_start_day`. Task objects are the same shape as in `/today`.
 
-`later_tasks` makes tasks after the following week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They contain only the date, nullable time and title needed by the simple bullet list.
+`later_tasks` makes tasks after the following week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They are full task objects, the same shape as in `days`, so the client can open one in the task form to edit or delete it.
 
 The list includes non-deleted ad-hoc tasks (`occurrence_date` is null) and rule-generated tasks the user moved there (`scheduled_date != occurrence_date`). Untouched occurrences generated automatically by rules are excluded. The normal visibility rule still applies: tasks under an archived area are excluded.
 
