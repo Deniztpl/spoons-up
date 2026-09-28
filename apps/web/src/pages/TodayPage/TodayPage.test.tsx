@@ -413,6 +413,8 @@ describe("Today page", () => {
 
     await user.click(await screen.findByRole("button", { name: "Add task" }));
     const dialog = screen.getByRole("dialog", { name: "New task" });
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-24");
+    expect(within(dialog).getByLabelText("Date")).toBeDisabled();
     const goalSelect = within(dialog).getByLabelText("Goal");
     await within(goalSelect).findByRole("option", { name: "Finance - CS Block" });
     expect(within(dialog).queryByLabelText("Area")).not.toBeInTheDocument();

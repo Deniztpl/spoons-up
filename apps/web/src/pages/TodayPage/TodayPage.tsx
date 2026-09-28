@@ -87,7 +87,7 @@ export function TodayPage({
               <button
                 type="button"
                 className="flex h-8 items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-left text-[13.5px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                onClick={() => taskForm.openCreate(today.date)}
+                onClick={() => taskForm.openCreate({ scheduledDate: today.date })}
               >
                 <span aria-hidden="true" className="w-4 text-center text-base leading-none">
                   +
@@ -128,6 +128,8 @@ export function TodayPage({
       {taskForm.draft ? (
         <TaskFormDialog
           draft={taskForm.draft}
+          dateMode="fixed"
+          minimumScheduledDate={today?.date ?? taskForm.draft.scheduledDate}
           areas={taskForm.areas}
           goals={taskForm.goals}
           optionsError={taskForm.optionsError}
@@ -136,6 +138,7 @@ export function TodayPage({
           isConfirmingDelete={taskForm.isConfirmingDelete}
           onGoalChange={taskForm.setGoalId}
           onTitleChange={taskForm.setTitle}
+          onScheduledDateChange={taskForm.setScheduledDate}
           onStartTimeChange={taskForm.setStartTime}
           onDurationChange={taskForm.setDurationMinutes}
           onBlockCountChange={taskForm.setBlockCount}

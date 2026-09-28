@@ -14,6 +14,8 @@ import { TaskDeleteConfirmation } from "./TaskDeleteConfirmation";
 
 type TaskFormDialogProps = {
   draft: TaskDraft;
+  dateMode: "fixed" | "editable";
+  minimumScheduledDate: string;
   areas: Area[] | null;
   goals: Goal[] | null;
   optionsError: string | null;
@@ -22,6 +24,7 @@ type TaskFormDialogProps = {
   isConfirmingDelete: boolean;
   onGoalChange: (goalId: string) => void;
   onTitleChange: (title: string) => void;
+  onScheduledDateChange: (scheduledDate: string) => void;
   onStartTimeChange: (startTime: string) => void;
   onDurationChange: (durationMinutes: string) => void;
   onBlockCountChange: (blockCount: string) => void;
@@ -54,6 +57,8 @@ const secondaryButtonClassName =
 
 export function TaskFormDialog({
   draft,
+  dateMode,
+  minimumScheduledDate,
   areas,
   goals,
   optionsError,
@@ -62,6 +67,7 @@ export function TaskFormDialog({
   isConfirmingDelete,
   onGoalChange,
   onTitleChange,
+  onScheduledDateChange,
   onStartTimeChange,
   onDurationChange,
   onBlockCountChange,
@@ -84,7 +90,9 @@ export function TaskFormDialog({
   const scheduleChanged = isScheduleChanged(draft);
   const canSave =
     isTaskDraftComplete(draft) && (!isEditing || taskChanged || scheduleChanged);
-  const selectedWeekday = weekdayForDate(draft.scheduledDate);
+  const selectedWeekday = draft.scheduledDate
+    ? weekdayForDate(draft.scheduledDate)
+    : undefined;
   const shownDurations = withNumberValue(durationOptions, draft.durationMinutes);
   const shownBlocks = withStringValue(blockOptions, draft.blockCount);
   const areaNames = new Map(areas?.map((area) => [area.id, area.name]));
@@ -167,6 +175,19 @@ export function TaskFormDialog({
             ) : null}
           </>
         )}
+
+        <label className="flex flex-col gap-1.5">
+          <span className={fieldLabelClassName}>Date</span>
+          <input
+            type="date"
+            required
+            value={draft.scheduledDate}
+            min={dateMode === "editable" ? minimumScheduledDate : undefined}
+            disabled={dateMode === "fixed" || isSaving}
+            className={`${fieldClassName} disabled:cursor-not-allowed disabled:bg-well disabled:text-ink-soft`}
+            onChange={(event) => onScheduledDateChange(event.target.value)}
+          />
+        </label>
 
         <div className="grid grid-cols-2 gap-2.5">
           <label className="flex flex-col gap-1.5">

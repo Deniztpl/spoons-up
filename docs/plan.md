@@ -84,13 +84,12 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Return `later_tasks` in the same response, with both `count` and the complete date/time/title list for tasks after the following week
 - Include ad-hoc tasks and rule-generated tasks the user moved; exclude untouched occurrences generated automatically by rules
 
-### Block 3 — Shared task form
+### Block 3 — Shared task form — DONE
 
 - Add `scheduled_date` to the form shared by Today and Week
 - On Today, show today and disable the date field
 - On Week, allow the date to change from today onward with no maximum
-- A today-or-future calendar slot click opens the form with the clicked date and time
-- The Week header add-task button opens the form with today's date
+- Allow callers to open the form with a prefilled date and optional time, ready for Week's slot and header entry points
 - Keep Repeat, goal selection, standalone title, time, duration and block behaviour shared with Today
 
 ### Block 4 — Week calendar interactions
@@ -98,6 +97,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Add the Week route, page and active sidebar navigation
 - Show the current week first and allow navigation only to the following week and back
 - Keep elapsed slots in the current week visible but unavailable for task creation or moving
+- Wire a today-or-future slot click to the shared form with the clicked date and time; wire the header add-task button with today's date
 - Move tasks by drag or date selection through `PATCH /tasks/{id}`
 - Edit tasks with the shared form and expose the existing delete behaviour: soft delete for rule-generated tasks, hard delete for ad-hoc tasks
 - Show a small info button when `later_tasks.count > 0`; display the response's date, optional time and title items as a simple bullet list when opened

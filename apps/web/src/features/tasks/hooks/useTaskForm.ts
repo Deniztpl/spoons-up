@@ -44,6 +44,11 @@ type TaskFormCallbacks = {
   onDeleted: () => void;
 };
 
+export type NewTaskDefaults = {
+  scheduledDate: string;
+  startTime?: string;
+};
+
 export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [areas, setAreas] = useState<Area[] | null>(null);
@@ -106,14 +111,14 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
     }
   };
 
-  const openCreate = (scheduledDate: string) => {
+  const openCreate = ({ scheduledDate, startTime = "" }: NewTaskDefaults) => {
     formRequest.current += 1;
     setDraft({
       task: null,
       scheduledDate,
       goalId: "",
       title: "",
-      startTime: "",
+      startTime,
       durationMinutes: "",
       blockCount: "",
       isRepeating: false,
@@ -170,13 +175,20 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
     updateDraft((current) => ({
       ...current,
       isRepeating,
-      byweekday: isRepeating ? [weekdayForDate(current.scheduledDate)] : [],
+      byweekday:
+        isRepeating && current.scheduledDate
+          ? [weekdayForDate(current.scheduledDate)]
+          : [],
     }));
 
   const toggleWeekday = (weekday: number) =>
     updateDraft((current) => {
       const isCreateOccurrence = current.task === null && current.isRepeating;
-      if (isCreateOccurrence && weekday === weekdayForDate(current.scheduledDate)) {
+      if (
+        isCreateOccurrence &&
+        current.scheduledDate !== "" &&
+        weekday === weekdayForDate(current.scheduledDate)
+      ) {
         return current;
       }
       return {
@@ -220,6 +232,7 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
                     block_count: data.block_count,
                   },
                   title: data.title,
+                  scheduledDate: data.scheduled_date,
                   startTime: data.start_time ?? "",
                   durationMinutes:
                     data.duration_minutes === null ? "" : String(data.duration_minutes),
@@ -317,6 +330,37 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
         byweekday: goalId === "" ? [] : current.byweekday,
       })),
     setTitle: (title: string) => updateDraft((current) => ({ ...current, title })),
+    setScheduledDate: (scheduledDate: string) =>
+      updateDraft((current) => {
+        if (current.task !== null || !current.isRepeating) {
+          return { ...current, scheduledDate };
+        }
+        const previousWeekday = current.scheduledDate
+          ? weekdayForDate(current.scheduledDate)
+          : null;
+        if (scheduledDate === "") {
+          return {
+            ...current,
+            scheduledDate,
+            byweekday: current.byweekday.filter(
+              (weekday) => previousWeekday === null || weekday !== previousWeekday,
+            ),
+          };
+        }
+        const nextWeekday = weekdayForDate(scheduledDate);
+        return {
+          ...current,
+          scheduledDate,
+          byweekday: [
+            ...current.byweekday.filter(
+              (weekday) => previousWeekday === null || weekday !== previousWeekday,
+            ),
+            nextWeekday,
+          ]
+            .filter((weekday, index, values) => values.indexOf(weekday) === index)
+            .sort((a, b) => a - b),
+        };
+      }),
     setStartTime: (startTime: string) =>
       updateDraft((current) => ({ ...current, startTime })),
     setDurationMinutes: (durationMinutes: string) =>
@@ -336,6 +380,9 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
 }
 
 export function isTaskDraftComplete(draft: TaskDraft) {
+  if (draft.scheduledDate === "") {
+    return false;
+  }
   const hasWork = draft.goalId === "" ? draft.title.trim().length > 0 : true;
   const canCreateRepeat =
     !draft.isRepeating ||
@@ -374,6 +421,9 @@ function taskChanges(draft: TaskDraft) {
   if (task.goal_id === null && draft.title.trim() !== task.title) {
     changes.title = draft.title.trim();
   }
+  if (draft.scheduledDate !== task.scheduled_date) {
+    changes.scheduled_date = draft.scheduledDate;
+  }
   if (values.start_time !== task.start_time) {
     changes.start_time = values.start_time;
   }
@@ -405,6 +455,12 @@ function taskErrorMessage(error: unknown, fallback: string) {
   }
   if (value.code === "validation_error" && typeof value.fields?.title === "string") {
     return value.fields.title;
+  }
+  if (
+    value.code === "validation_error" &&
+    typeof value.fields?.scheduled_date === "string"
+  ) {
+    return value.fields.scheduled_date;
   }
   return typeof value.message === "string" ? value.message : fallback;
 }
