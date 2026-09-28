@@ -69,7 +69,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 ## Slice 4 — Calendar
 
-### Block 1 — Task date rules
+### Block 1 — Task date rules — DONE
 
 - `POST /tasks` rejects a `scheduled_date` before today in the user's timezone with 422
 - `PATCH /tasks/{id}` does the same when `scheduled_date` is supplied

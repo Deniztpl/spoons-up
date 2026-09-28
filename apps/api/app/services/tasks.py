@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -31,6 +32,11 @@ class TaskService:
             user = self.user_repository.get_by_id(user_id)
             if user is None:
                 raise NotFoundError
+
+            self._validate_scheduled_date(
+                scheduled_date=payload.scheduled_date,
+                timezone=user.timezone,
+            )
 
             goal_id = int(payload.goal_id) if payload.goal_id is not None else None
             if goal_id is None:
@@ -72,6 +78,14 @@ class TaskService:
         with self.session.begin():
             task = self._get_owned_task(task_id=task_id, user_id=user_id)
             fields = payload.model_fields_set
+            if "scheduled_date" in fields:
+                user = self.user_repository.get_by_id(user_id)
+                if user is None:
+                    raise NotFoundError
+                self._validate_scheduled_date(
+                    scheduled_date=payload.scheduled_date,
+                    timezone=user.timezone,
+                )
             if task.goal_id is not None and "title" in fields:
                 raise ValidationAppError({"title": "A goal-linked task uses its goal title"})
 
@@ -224,6 +238,14 @@ class TaskService:
         if task is None:
             raise NotFoundError
         return task
+
+    @staticmethod
+    def _validate_scheduled_date(*, scheduled_date: date | None, timezone: str) -> None:
+        if scheduled_date is None:
+            return
+        today = datetime.now(ZoneInfo(timezone)).date()
+        if scheduled_date < today:
+            raise ValidationAppError({"scheduled_date": "Scheduled date cannot be before today"})
 
 
 def _add_minutes(value: time | None, minutes: int | None) -> time | None:

@@ -14,12 +14,15 @@ pytestmark = pytest.mark.integration
 COMPLETED_AT = datetime(2026, 9, 27, 12, tzinfo=UTC)
 
 
+@pytest.fixture(autouse=True)
+def fixed_task_service_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    freeze_task_service_time(monkeypatch)
+
+
 def test_task_completion_is_idempotent_and_reversible(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    freeze_task_service_time(monkeypatch)
     headers = bearer(register(client, "complete-task@example.com"))
     area = create_area(client, headers, "Work")
     goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
@@ -196,6 +199,38 @@ def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
     assert foreign_goal.status_code == 404
 
 
+def test_create_rejects_a_date_before_today_in_the_user_timezone(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_task_service_time(
+        monkeypatch,
+        observed_at=datetime(2026, 9, 27, 22, 30, tzinfo=UTC),
+    )
+    headers = bearer(register(client, "create-task-date@example.com"))
+
+    past = client.post(
+        "/api/v1/tasks",
+        json={"title": "Past", "scheduled_date": "2026-09-27"},
+        headers=headers,
+    )
+    today = client.post(
+        "/api/v1/tasks",
+        json={"title": "Today", "scheduled_date": "2026-09-28"},
+        headers=headers,
+    )
+    future = client.post(
+        "/api/v1/tasks",
+        json={"title": "Future", "scheduled_date": "2030-01-01"},
+        headers=headers,
+    )
+
+    assert past.status_code == 422
+    assert past.json()["fields"] == {"scheduled_date": "Scheduled date cannot be before today"}
+    assert today.status_code == 201
+    assert future.status_code == 201
+
+
 def test_update_task_changes_only_editable_task_values(client: TestClient) -> None:
     headers = bearer(register(client, "update-task@example.com"))
     area = create_area(client, headers, "Work")
@@ -248,6 +283,80 @@ def test_update_task_changes_only_editable_task_values(client: TestClient) -> No
     assert linked_title.json()["fields"] == {"title": "A goal-linked task uses its goal title"}
 
 
+def test_update_rejects_a_supplied_past_date_but_allows_other_changes(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = bearer(register(client, "update-task-date@example.com"))
+    task = client.post(
+        "/api/v1/tasks",
+        json={"title": "Draft", "scheduled_date": "2026-09-27"},
+        headers=headers,
+    ).json()
+    freeze_task_service_time(
+        monkeypatch,
+        observed_at=datetime(2026, 9, 28, 22, 30, tzinfo=UTC),
+    )
+
+    title_only = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"title": "Updated draft"},
+        headers=headers,
+    )
+    past_date = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"scheduled_date": "2026-09-28"},
+        headers=headers,
+    )
+
+    assert title_only.status_code == 200
+    assert title_only.json()["title"] == "Updated draft"
+    assert title_only.json()["scheduled_date"] == "2026-09-27"
+    assert past_date.status_code == 422
+    assert past_date.json()["fields"] == {"scheduled_date": "Scheduled date cannot be before today"}
+
+
+def test_moving_a_generated_task_keeps_its_occurrence_and_period(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "move-generated-task@example.com"))
+    area = create_area(client, headers, "Work")
+    goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
+
+    with db_session.begin():
+        user = get_user(db_session, "move-generated-task@example.com")
+        rule = GoalRule(
+            goal_id=int(str(goal["id"])),
+            byweekday=[7],
+            start_time=None,
+            duration_minutes=None,
+            block_count=None,
+        )
+        db_session.add(rule)
+        db_session.flush()
+        generated = build_task(
+            user_id=user.id,
+            goal_id=int(str(goal["id"])),
+            rule_id=rule.id,
+            occurrence_date=date(2026, 9, 20),
+        )
+        db_session.add(generated)
+        db_session.flush()
+        task_id = str(generated.id)
+
+    moved = client.patch(
+        f"/api/v1/tasks/{task_id}",
+        json={"scheduled_date": "2026-10-01"},
+        headers=headers,
+    )
+
+    assert moved.status_code == 200
+    assert moved.json()["scheduled_date"] == "2026-10-01"
+    assert moved.json()["occurrence_date"] == "2026-09-20"
+    assert moved.json()["period_start"] == "2026-09-14"
+
+
 def test_delete_is_hard_for_ad_hoc_and_soft_for_generated_tasks(
     client: TestClient,
     db_session: Session,
@@ -297,11 +406,15 @@ def test_delete_is_hard_for_ad_hoc_and_soft_for_generated_tasks(
     assert client.post(f"/api/v1/tasks/{generated_id}/check", headers=headers).status_code == 404
 
 
-def freeze_task_service_time(monkeypatch: pytest.MonkeyPatch) -> None:
+def freeze_task_service_time(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    observed_at: datetime = COMPLETED_AT,
+) -> None:
     class FixedDateTime(datetime):
         @classmethod
         def now(cls, tz=None):  # type: ignore[no-untyped-def]
-            return COMPLETED_AT if tz is None else COMPLETED_AT.astimezone(tz)
+            return observed_at if tz is None else observed_at.astimezone(tz)
 
     monkeypatch.setattr(tasks_service_module, "datetime", FixedDateTime)
 
