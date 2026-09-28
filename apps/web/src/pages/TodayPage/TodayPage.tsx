@@ -3,8 +3,8 @@ import { Link } from "react-router";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
-import { GoalFormDialog } from "../../features/goals/components/GoalFormDialog";
-import { useGoalForm } from "../../features/goals/hooks/useGoalForm";
+import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
+import { useTaskForm } from "../../features/tasks/hooks/useTaskForm";
 import type { Today } from "../../features/today/api/todayApi";
 import { TodayHabitList } from "../../features/today/components/TodayHabitList";
 import { TodayTaskList } from "../../features/today/components/TodayTaskList";
@@ -27,8 +27,7 @@ export function TodayPage({
   onLogout: () => Promise<AuthActionResult>;
 }) {
   const todayState = useToday();
-  // A saved goal can add tasks to today.
-  const goalForm = useGoalForm({
+  const taskForm = useTaskForm({
     onSaved: todayState.reload,
     onDeleted: todayState.reload,
   });
@@ -80,6 +79,7 @@ export function TodayPage({
                 tasks={tasks}
                 pendingTaskIds={todayState.pendingTaskIds}
                 onToggle={(task) => void todayState.toggleTask(task)}
+                onEdit={taskForm.openEdit}
               />
             ) : null}
 
@@ -87,12 +87,12 @@ export function TodayPage({
               <button
                 type="button"
                 className="flex h-8 items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-left text-[13.5px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                onClick={() => goalForm.openCreate(null)}
+                onClick={() => taskForm.openCreate(today.date)}
               >
                 <span aria-hidden="true" className="w-4 text-center text-base leading-none">
                   +
                 </span>
-                Add goal
+                Add task
               </button>
             ) : null}
 
@@ -125,26 +125,27 @@ export function TodayPage({
         </div>
       </div>
 
-      {goalForm.draft ? (
-        <GoalFormDialog
-          areaName={null}
-          areaOptions={goalForm.areaOptions}
-          draft={goalForm.draft}
-          error={goalForm.formError}
-          isSaving={goalForm.isSaving}
-          isConfirmingDelete={goalForm.isConfirmingDelete}
-          onAreaChange={goalForm.setAreaId}
-          onTitleChange={goalForm.setTitle}
-          onWeeklyTargetChange={goalForm.setWeeklyTarget}
-          onRepeatChange={goalForm.setRepeating}
-          onAddRule={goalForm.addRule}
-          onRuleChange={goalForm.changeRule}
-          onRemoveRule={goalForm.removeRule}
-          onSubmit={() => void goalForm.saveGoal()}
-          onClose={goalForm.closeForm}
-          onStartDeleting={goalForm.startDeleting}
-          onCancelDeleting={goalForm.cancelDeleting}
-          onDelete={() => void goalForm.deleteGoal()}
+      {taskForm.draft ? (
+        <TaskFormDialog
+          draft={taskForm.draft}
+          areas={taskForm.areas}
+          goals={taskForm.goals}
+          optionsError={taskForm.optionsError}
+          error={taskForm.formError}
+          isSaving={taskForm.isSaving}
+          isConfirmingDelete={taskForm.isConfirmingDelete}
+          onGoalChange={taskForm.setGoalId}
+          onTitleChange={taskForm.setTitle}
+          onStartTimeChange={taskForm.setStartTime}
+          onDurationChange={taskForm.setDurationMinutes}
+          onBlockCountChange={taskForm.setBlockCount}
+          onRepeatChange={taskForm.setRepeating}
+          onWeekdayToggle={taskForm.toggleWeekday}
+          onSubmit={() => void taskForm.saveTask()}
+          onClose={taskForm.closeForm}
+          onStartDeleting={taskForm.startDeleting}
+          onCancelDeleting={taskForm.cancelDeleting}
+          onDelete={() => void taskForm.deleteTask()}
         />
       ) : null}
     </AppLayout>

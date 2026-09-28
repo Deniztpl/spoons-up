@@ -14,15 +14,17 @@ function todayHabit(id: string, title: string, done: boolean) {
 function todayTask(
   id: string,
   title: string,
-  times: [string, string],
-  blockCount: number,
+  times: [string | null, string | null],
+  blockCount: number | null,
   status: "PENDING" | "DONE" = "PENDING",
 ) {
   return {
     id,
     goal_id: "7",
+    rule_id: "21",
     title,
     start_time: times[0],
+    duration_minutes: 60,
     end_time: times[1],
     block_count: blockCount,
     status,
@@ -82,7 +84,7 @@ describe("Today page", () => {
     expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByText("Thursday, Sep 24")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Stretch" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Add goal" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Add task" })).toBeEnabled();
 
     const views = screen.getByRole("group", { name: "Today views" });
     expect(within(views).getByRole("button", { name: "Daily" })).toHaveAttribute(
@@ -94,7 +96,7 @@ describe("Today page", () => {
     expect(screen.getByText("Sep 21 – 27")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Call home" })).not.toBeChecked();
     expect(screen.queryByRole("checkbox", { name: "Read" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Add goal/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add task/ })).not.toBeInTheDocument();
   });
 
   it("checks off and undoes habits with the date from the today response", async () => {
@@ -210,7 +212,7 @@ describe("Today page", () => {
     expect(within(tasks).getByText("½")).toBeInTheDocument();
     expect(within(tasks).getByText("×2")).toBeInTheDocument();
 
-    const addGoal = screen.getByRole("button", { name: "Add goal" });
+    const addGoal = screen.getByRole("button", { name: "Add task" });
     const firstHabit = screen.getByRole("checkbox", { name: "Read" });
     expect(tasks.compareDocumentPosition(addGoal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(addGoal.compareDocumentPosition(firstHabit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -257,6 +259,95 @@ describe("Today page", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("edits a task and its linked schedule with one save, then deletes the task", async () => {
+    let task = todayTask("483", "CS Block", ["19:00", "20:00"], 2);
+    let hasTask = true;
+    let weekdays = [4];
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return todayResponse({ tasks: hasTask ? [task] : [] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals/7") {
+        return Response.json({
+          id: "7",
+          area_id: "3",
+          title: "CS Block",
+          weekly_target: 3,
+          created_at: "2026-09-20T07:00:00Z",
+          rules: [
+            {
+              id: "21",
+              goal_id: "7",
+              byweekday: weekdays,
+              start_time: "19:00",
+              duration_minutes: 60,
+              block_count: 2,
+            },
+          ],
+        });
+      }
+      if (request.method === "PATCH" && url.pathname === "/api/v1/tasks/483") {
+        expect(await request.clone().json()).toEqual({ start_time: "20:00" });
+        task = { ...task, start_time: "20:00", end_time: "21:00" };
+        return Response.json({ ...task, completed_at: null });
+      }
+      if (request.method === "PATCH" && url.pathname === "/api/v1/rules/21") {
+        expect(await request.clone().json()).toEqual({ byweekday: [4, 5] });
+        weekdays = [4, 5];
+        return Response.json({
+          id: "21",
+          goal_id: "7",
+          byweekday: weekdays,
+          start_time: "19:00",
+          duration_minutes: 60,
+          block_count: 2,
+        });
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/v1/tasks/483") {
+        hasTask = false;
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "CS Block" }));
+    const editDialog = screen.getByRole("dialog", { name: "Edit task" });
+    fireEvent.change(within(editDialog).getByLabelText("Start time"), {
+      target: { value: "20:00" },
+    });
+    await user.click(await within(editDialog).findByRole("button", { name: "Friday" }));
+    await user.click(within(editDialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(
+      fetchMock.mock.calls.filter(
+        ([request]) => request.method === "PATCH" && new URL(request.url).pathname === "/api/v1/tasks/483",
+      ),
+    ).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([request]) => request.method === "PATCH" && new URL(request.url).pathname === "/api/v1/rules/21",
+      ),
+    ).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "CS Block" }));
+    const deleteDialog = screen.getByRole("dialog", { name: "Edit task" });
+    await user.click(within(deleteDialog).getByRole("button", { name: "Delete" }));
+    expect(
+      within(deleteDialog).getByText(/goal and any repeating schedule stay unchanged/),
+    ).toBeInTheDocument();
+    await user.click(within(deleteDialog).getByRole("button", { name: "Delete task" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "CS Block" })).not.toBeInTheDocument();
+    });
+  });
+
   it("keeps a task open and explains why when completing it fails", async () => {
     vi.stubGlobal(
       "fetch",
@@ -275,47 +366,43 @@ describe("Today page", () => {
     expect(screen.getByRole("checkbox", { name: "CS Block" })).not.toBeChecked();
   });
 
-  it("adds a goal from today in the chosen area and shows its task", async () => {
-    let hasGoal = false;
+  it("adds a repeating goal task without creating a duplicate ad-hoc task", async () => {
+    let hasTask = false;
     const fetchMock = vi.fn(async (request: Request) => {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/api/v1/today") {
         return todayResponse({
-          tasks: hasGoal ? [todayTask("490", "CS Block", ["19:00", "20:00"], 2)] : [],
+          tasks: hasTask ? [todayTask("490", "CS Block", ["19:00", "20:00"], 2)] : [],
         });
       }
       if (request.method === "GET" && url.pathname === "/api/v1/areas") {
-        // Only active areas can take a new goal.
         expect(url.searchParams.has("include_archived")).toBe(false);
         return Response.json({ areas: [area("3", "SWE"), area("4", "Finance")] });
       }
-      if (request.method === "POST" && url.pathname === "/api/v1/goals") {
-        expect(await request.clone().json()).toEqual({
-          area_id: "4",
-          title: "CS Block",
-          weekly_target: null,
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        expect(url.searchParams.has("area_id")).toBe(false);
+        return Response.json({
+          goals: [
+            {
+              id: "7",
+              area_id: "4",
+              title: "CS Block",
+              weekly_target: null,
+              created_at: "2026-09-24T07:00:00Z",
+              rules: [],
+            },
+          ],
         });
-        return Response.json(
-          {
-            id: "7",
-            area_id: "4",
-            title: "CS Block",
-            weekly_target: null,
-            created_at: "2026-09-24T07:00:00Z",
-            rules: [],
-          },
-          { status: 201 },
-        );
       }
       if (request.method === "POST" && url.pathname === "/api/v1/goals/7/rules") {
         const body = await request.clone().json();
         expect(body).toEqual({
-          byweekday: [4],
+          byweekday: [4, 6],
           start_time: "19:00",
           duration_minutes: 60,
           block_count: 2,
         });
-        hasGoal = true;
+        hasTask = true;
         return Response.json({ id: "21", goal_id: "7", ...body }, { status: 201 });
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
@@ -324,47 +411,109 @@ describe("Today page", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Add goal" }));
-    const dialog = screen.getByRole("dialog", { name: "New goal" });
-    const areaSelect = within(dialog).getByLabelText("Area");
-    await within(dialog).findByRole("option", { name: "Finance" });
-    expect(areaSelect).toHaveValue("");
-    await user.type(within(dialog).getByLabelText("Title"), "CS Block");
-    const rule = within(dialog).getByRole("group", { name: "Rule 1" });
-    await user.click(within(rule).getByRole("button", { name: "Thursday" }));
-    fireEvent.change(within(rule).getByLabelText("Start time"), {
+    await user.click(await screen.findByRole("button", { name: "Add task" }));
+    const dialog = screen.getByRole("dialog", { name: "New task" });
+    const goalSelect = within(dialog).getByLabelText("Goal");
+    await within(goalSelect).findByRole("option", { name: "Finance - CS Block" });
+    expect(within(dialog).queryByLabelText("Area")).not.toBeInTheDocument();
+    expect(goalSelect).toHaveValue("");
+    await user.selectOptions(goalSelect, "7");
+    fireEvent.change(within(dialog).getByLabelText("Start time"), {
       target: { value: "19:00" },
     });
-    await user.click(within(rule).getByRole("radio", { name: "2 blocks" }));
-    // The goal needs an area before it can be saved.
-    expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
-    await user.selectOptions(areaSelect, "4");
+    await user.selectOptions(within(dialog).getByLabelText("Duration"), "60");
+    await user.click(within(dialog).getByRole("radio", { name: "2 blocks" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Repeat" }));
+    expect(within(dialog).getByRole("button", { name: "Thursday, task date" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Saturday" }));
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
     const task = await screen.findByRole("checkbox", { name: "CS Block" });
     expect(task).not.toBeChecked();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(
+        ([request]) => request.method === "POST" && new URL(request.url).pathname === "/api/v1/tasks",
+      ),
+    ).toHaveLength(0);
   });
 
-  it("chooses the only active area for a goal added from today", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (request: Request) =>
-        new URL(request.url).pathname === "/api/v1/areas"
-          ? Response.json({ areas: [area("3", "SWE")] })
-          : todayResponse(),
-      ),
-    );
+  it("adds a standalone task without requiring schedule values", async () => {
+    let hasTask = false;
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return todayResponse({
+          tasks: hasTask
+            ? [
+                {
+                  ...todayTask("491", "Dentist", [null, null], null),
+                  goal_id: null,
+                  rule_id: null,
+                  duration_minutes: null,
+                  occurrence_date: null,
+                },
+              ]
+            : [],
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+        return Response.json({ areas: [area("3", "SWE")] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        expect(url.searchParams.has("area_id")).toBe(false);
+        return Response.json({ goals: [] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/tasks") {
+        expect(await request.clone().json()).toEqual({
+          goal_id: null,
+          title: "Dentist",
+          scheduled_date: "2026-09-24",
+          start_time: null,
+          duration_minutes: null,
+          block_count: null,
+        });
+        hasTask = true;
+        return Response.json(
+          {
+            id: "491",
+            goal_id: null,
+            rule_id: null,
+            title: "Dentist",
+            occurrence_date: null,
+            scheduled_date: "2026-09-24",
+            start_time: null,
+            duration_minutes: null,
+            end_time: null,
+            block_count: null,
+            period_start: "2026-09-21",
+            status: "PENDING",
+            completed_at: null,
+          },
+          { status: 201 },
+        );
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Add goal" }));
-    const areaSelect = within(screen.getByRole("dialog", { name: "New goal" })).getByLabelText(
-      "Area",
-    );
-    await waitFor(() => {
-      expect(areaSelect).toHaveValue("3");
-    });
+    await user.click(await screen.findByRole("button", { name: "Add task" }));
+    const dialog = screen.getByRole("dialog", { name: "New task" });
+    const goalSelect = within(dialog).getByLabelText("Goal");
+    await waitFor(() => expect(goalSelect).toBeEnabled());
+    expect(within(goalSelect).getAllByRole("option")).toHaveLength(1);
+    expect(within(goalSelect).getByRole("option", { name: "No goal" })).toBeInTheDocument();
+    expect(within(dialog).queryByText("Add a goal in Areas")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Title"), "Dentist");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByRole("checkbox", { name: "Dentist" })).not.toBeChecked();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("points to areas when there are no habits yet", async () => {

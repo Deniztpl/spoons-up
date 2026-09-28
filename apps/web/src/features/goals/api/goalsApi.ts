@@ -8,9 +8,15 @@ export type GoalChanges = components["schemas"]["UpdateGoalRequest"];
 export type GoalRuleFields = components["schemas"]["CreateGoalRuleRequest"];
 export type GoalRuleChanges = components["schemas"]["UpdateGoalRuleRequest"];
 
-export function listGoals(areaId: string) {
+export function listGoals(areaId?: string) {
   return apiClient.GET("/api/v1/goals", {
-    params: { query: { area_id: areaId } },
+    params: { query: areaId ? { area_id: areaId } : {} },
+  });
+}
+
+export function getGoal(goalId: string) {
+  return apiClient.GET("/api/v1/goals/{goal_id}", {
+    params: { path: { goal_id: goalId } },
   });
 }
 
