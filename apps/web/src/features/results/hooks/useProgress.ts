@@ -37,6 +37,7 @@ export function useProgress() {
   }, [requestCount]);
 
   return {
+    areas: progress?.areas ?? null,
     areasById: progress
       ? new Map<string, AreaResult>(progress.areas.map((area) => [area.area_id, area]))
       : null,

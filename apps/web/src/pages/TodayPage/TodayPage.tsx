@@ -3,11 +3,13 @@ import { Link } from "react-router";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
+import { useProgress } from "../../features/results/hooks/useProgress";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
 import { useTaskForm } from "../../features/tasks/hooks/useTaskForm";
 import type { Today } from "../../features/today/api/todayApi";
 import { TodayHabitList } from "../../features/today/components/TodayHabitList";
 import { TodayTaskList } from "../../features/today/components/TodayTaskList";
+import { TodayWeekPanel } from "../../features/today/components/TodayWeekPanel";
 import {
   type TodayView,
   TodayViewSelector,
@@ -27,9 +29,19 @@ export function TodayPage({
   onLogout: () => Promise<AuthActionResult>;
 }) {
   const todayState = useToday();
+  const progressState = useProgress();
+  // Checking work off or changing a task moves this week's progress.
+  const reloadAll = () => {
+    todayState.reload();
+    progressState.reload();
+  };
+  const refreshProgressAfter = async (change: Promise<unknown>) => {
+    await change;
+    progressState.reload();
+  };
   const taskForm = useTaskForm({
-    onSaved: todayState.reload,
-    onDeleted: todayState.reload,
+    onSaved: reloadAll,
+    onDeleted: reloadAll,
   });
   const [view, setView] = useState<TodayView>("daily");
   const { today } = todayState;
@@ -38,91 +50,94 @@ export function TodayPage({
 
   return (
     <AppLayout onLogout={onLogout}>
-      <div className="flex flex-1 justify-center px-4 py-6 sm:px-8 sm:py-8 lg:px-[30px] lg:pt-[34px]">
-        <div className="grid w-full max-w-[464px] content-start gap-y-5 sm:grid-cols-[96px_minmax(0,340px)] sm:gap-x-7 sm:gap-y-[26px]">
-          <div className="flex items-baseline justify-between gap-3.5 sm:col-start-2">
-            <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.02em]">Today</h1>
-            {today ? (
-              <span className="whitespace-nowrap text-[13px] text-ink-soft">
-                {dateLabel(today, view)}
-              </span>
-            ) : null}
-          </div>
-
-          <TodayViewSelector value={view} onChange={setView} />
-
-          {/* The left gutter holds the task list's progress rail. */}
-          <section
-            aria-label={view === "daily" ? "Today's tasks and habits" : "Weekly habits"}
-            className="flex min-w-0 flex-col gap-2 pl-[26px]"
-          >
-            {todayState.isLoading ? (
-              <p role="status" className="text-ink-soft">
-                Loading today…
-              </p>
-            ) : null}
-
-            {todayState.loadError ? (
-              <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
-                {todayState.loadError}
-              </p>
-            ) : null}
-
-            {todayState.actionError ? (
-              <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-[13px] text-danger">
-                {todayState.actionError}
-              </p>
-            ) : null}
-
-            {tasks.length > 0 ? (
-              <TodayTaskList
-                tasks={tasks}
-                pendingTaskIds={todayState.pendingTaskIds}
-                onToggle={(task) => void todayState.toggleTask(task)}
-                onEdit={taskForm.openEdit}
-              />
-            ) : null}
-
-            {today && view === "daily" ? (
-              <button
-                type="button"
-                className="flex h-8 items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-left text-[13.5px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                onClick={() => taskForm.openCreate({ scheduledDate: today.date })}
-              >
-                <span aria-hidden="true" className="w-4 text-center text-base leading-none">
-                  +
+      <div className="flex flex-1 flex-col md:flex-row">
+        <div className="flex flex-1 justify-center px-4 py-6 sm:px-8 sm:py-8 lg:px-[30px] lg:pt-[34px]">
+          <div className="grid w-full max-w-[464px] content-start gap-y-5 sm:grid-cols-[96px_minmax(0,340px)] sm:gap-x-7 sm:gap-y-[26px]">
+            <div className="flex items-baseline justify-between gap-3.5 sm:col-start-2">
+              <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.02em]">Today</h1>
+              {today ? (
+                <span className="whitespace-nowrap text-[13px] text-ink-soft">
+                  {dateLabel(today, view)}
                 </span>
-                Add task
-              </button>
-            ) : null}
+              ) : null}
+            </div>
 
-            {today && habits.length > 0 ? (
-              <TodayHabitList
-                habits={habits}
-                pendingHabitIds={todayState.pendingHabitIds}
-                onToggle={(habit) => void todayState.toggleHabit(habit)}
-              />
-            ) : null}
+            <TodayViewSelector value={view} onChange={setView} />
 
-            {today && habits.length === 0 && tasks.length === 0 ? (
-              <div className="rounded-[10px] border border-dashed border-ink/16 px-5 py-7 text-center">
-                <h2 className="text-[13.5px] font-medium">
-                  {view === "daily" ? "No daily habits yet" : "No weekly habits yet"}
-                </h2>
-                <p className="mt-1 text-[13px] leading-5 text-ink-soft">
-                  Add habits to an area and they will show up here.
+            {/* The left gutter holds the task list's progress rail. */}
+            <section
+              aria-label={view === "daily" ? "Today's tasks and habits" : "Weekly habits"}
+              className="flex min-w-0 flex-col gap-2 pl-[26px]"
+            >
+              {todayState.isLoading ? (
+                <p role="status" className="text-ink-soft">
+                  Loading today…
                 </p>
-                <Link
-                  to="/areas"
-                  className="mt-3 inline-block text-[13px] font-medium text-accent underline decoration-accent/40 underline-offset-4 transition hover:text-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              ) : null}
+
+              {todayState.loadError ? (
+                <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-danger">
+                  {todayState.loadError}
+                </p>
+              ) : null}
+
+              {todayState.actionError ? (
+                <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-[13px] text-danger">
+                  {todayState.actionError}
+                </p>
+              ) : null}
+
+              {tasks.length > 0 ? (
+                <TodayTaskList
+                  tasks={tasks}
+                  pendingTaskIds={todayState.pendingTaskIds}
+                  onToggle={(task) => void refreshProgressAfter(todayState.toggleTask(task))}
+                  onEdit={taskForm.openEdit}
+                />
+              ) : null}
+
+              {today && view === "daily" ? (
+                <button
+                  type="button"
+                  className="flex h-8 items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-left text-[13.5px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  onClick={() => taskForm.openCreate({ scheduledDate: today.date })}
                 >
-                  Go to Areas
-                </Link>
-              </div>
-            ) : null}
-          </section>
-          {/* TODO(slice-5): add weekly area progress. */}
+                  <span aria-hidden="true" className="w-4 text-center text-base leading-none">
+                    +
+                  </span>
+                  Add task
+                </button>
+              ) : null}
+
+              {today && habits.length > 0 ? (
+                <TodayHabitList
+                  habits={habits}
+                  pendingHabitIds={todayState.pendingHabitIds}
+                  onToggle={(habit) => void refreshProgressAfter(todayState.toggleHabit(habit))}
+                />
+              ) : null}
+
+              {today && habits.length === 0 && tasks.length === 0 ? (
+                <div className="rounded-[10px] border border-dashed border-ink/16 px-5 py-7 text-center">
+                  <h2 className="text-[13.5px] font-medium">
+                    {view === "daily" ? "No daily habits yet" : "No weekly habits yet"}
+                  </h2>
+                  <p className="mt-1 text-[13px] leading-5 text-ink-soft">
+                    Add habits to an area and they will show up here.
+                  </p>
+                  <Link
+                    to="/areas"
+                    className="mt-3 inline-block text-[13px] font-medium text-accent underline decoration-accent/40 underline-offset-4 transition hover:text-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    Go to Areas
+                  </Link>
+                </div>
+              ) : null}
+            </section>
+          </div>
         </div>
+
+        <TodayWeekPanel areas={progressState.areas} loadError={progressState.loadError} />
       </div>
 
       {taskForm.draft ? (

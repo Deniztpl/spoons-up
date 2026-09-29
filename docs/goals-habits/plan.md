@@ -142,7 +142,7 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - The area panel shows seven day bars, the percent, met/total, and the weekly done state on its goals and habits
 - Progress refreshes after goals, habits and areas change
 
-### Block 4 — Today week panel
+### Block 4 — Today week panel — DONE
 
 - The right panel shows this week's met/total per area from `/progress`, as tiles (Today v2 design, variant B)
 - It refreshes after tasks and habits are checked

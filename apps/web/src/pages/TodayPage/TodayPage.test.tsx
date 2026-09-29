@@ -59,6 +59,24 @@ function todayResponse(overrides: Record<string, unknown> = {}) {
   });
 }
 
+function progressResponse(areas: unknown[] = []) {
+  return {
+    period_start: "2026-09-21",
+    period_end: "2026-09-27",
+    percent: areas.length > 0 ? 50 : null,
+    areas,
+  };
+}
+
+// The page also reads this week's progress for its side panel.
+function stubFetch(handler: (request: Request) => Promise<Response>) {
+  vi.stubGlobal("fetch", async (request: Request) =>
+    new URL(request.url).pathname === "/api/v1/progress"
+      ? Response.json(progressResponse())
+      : handler(request),
+  );
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/today"]}>
@@ -73,8 +91,7 @@ describe("Today page", () => {
   });
 
   it("shows today's daily habits and switches to the week's habits", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async () => todayResponse()),
     );
     const user = userEvent.setup();
@@ -123,7 +140,7 @@ describe("Today page", () => {
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -139,9 +156,76 @@ describe("Today page", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("shows each area's week beside the day and refreshes it after a check-off", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/progress") {
+        return Response.json(
+          progressResponse([
+            {
+              area_id: "3",
+              name: "SWE",
+              percent: 100,
+              days: [],
+              requirements: [
+                { ref_type: "HABIT", ref_id: "13", title: "Stretch", target: 1, done: 1 },
+              ],
+            },
+            {
+              area_id: "4",
+              name: "Finance",
+              percent: 17,
+              days: [],
+              requirements: [
+                { ref_type: "GOAL", ref_id: "7", title: "CS Block", target: 3, done: 1 },
+                { ref_type: "HABIT", ref_id: "12", title: "Read", target: 7, done: 0 },
+              ],
+            },
+          ]),
+        );
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return todayResponse();
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/habits/12/check") {
+        return Response.json(
+          {
+            habit_id: "12",
+            period_type: "DAY",
+            period_start: "2026-09-24",
+            completed_at: "2026-09-24T07:30:00Z",
+          },
+          { status: 201 },
+        );
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    const panel = await screen.findByRole("complementary", { name: "This week" });
+    const areas = await within(panel).findByRole("list", { name: "Areas this week" });
+    expect(within(panel).getByText("1/3")).toBeInTheDocument();
+    const [swe, finance] = within(areas).getAllByRole("listitem");
+    expect(swe).toHaveTextContent("SWE");
+    expect(swe).toHaveTextContent("1 of 1 done");
+    expect(finance).toHaveTextContent("Finance");
+    expect(finance).toHaveTextContent("0 of 2 done");
+
+    await user.click(await screen.findByRole("checkbox", { name: "Read" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(
+          ([request]) => new URL(request.url).pathname === "/api/v1/progress",
+        ),
+      ).toHaveLength(2);
+    });
+  });
+
   it("treats a habit that is already checked off as done", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async (request: Request) =>
         request.method === "POST"
           ? Response.json(
@@ -163,8 +247,7 @@ describe("Today page", () => {
   });
 
   it("keeps a habit unchecked and explains why when check-off fails", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async (request: Request) =>
         request.method === "POST"
           ? Response.json({ code: "not_found", message: "Not found" }, { status: 404 })
@@ -183,8 +266,7 @@ describe("Today page", () => {
   });
 
   it("shows the day's tasks above the habits, sized by their blocks", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async () =>
         todayResponse({
           tasks: [
@@ -228,8 +310,7 @@ describe("Today page", () => {
   it("completes and undoes a task", async () => {
     const pending = todayTask("483", "CS Block", ["19:00", "21:00"], 2);
     const done = todayTask("481", "Review PR", ["09:30", "10:30"], 1, "DONE");
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async (request: Request) => {
         const url = new URL(request.url);
         if (request.method === "GET" && url.pathname === "/api/v1/today") {
@@ -310,7 +391,7 @@ describe("Today page", () => {
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -366,7 +447,7 @@ describe("Today page", () => {
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -431,7 +512,7 @@ describe("Today page", () => {
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -459,8 +540,7 @@ describe("Today page", () => {
   });
 
   it("keeps a task open and explains why when completing it fails", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async (request: Request) =>
         request.method === "POST"
           ? Response.json({ code: "not_found", message: "Not found" }, { status: 404 })
@@ -517,7 +597,7 @@ describe("Today page", () => {
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -610,7 +690,7 @@ describe("Today page", () => {
       }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -629,8 +709,7 @@ describe("Today page", () => {
   });
 
   it("points to areas when there are no habits yet", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async () => todayResponse({ daily_habits: [], weekly_habits: [] })),
     );
     renderPage();
@@ -645,8 +724,7 @@ describe("Today page", () => {
   });
 
   it("shows an error when today cannot be loaded", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn(async () => {
         throw new TypeError("Network unavailable");
       }),
