@@ -43,6 +43,22 @@ function rule(
   };
 }
 
+function progress(areas: unknown[] = []) {
+  return {
+    period_start: "2026-09-21",
+    period_end: "2026-09-27",
+    percent: areas.length > 0 ? 64 : null,
+    areas,
+  };
+}
+
+function weekDays(doneCount: number) {
+  return ["21", "22", "23", "24", "25", "26", "27"].map((day, index) => ({
+    date: `2026-09-${day}`,
+    done: index < doneCount,
+  }));
+}
+
 function requestsTo(fetchMock: ReturnType<typeof vi.fn>, method: string, pathname: string) {
   return fetchMock.mock.calls
     .map(([request]) => request as Request)
@@ -59,6 +75,9 @@ function respondWithAreas(areas: unknown[]) {
     }
     if (pathname === "/api/v1/goals") {
       return Response.json({ goals: [] });
+    }
+    if (pathname === "/api/v1/progress") {
+      return Response.json(progress());
     }
     return Response.json({ areas });
   });
@@ -321,6 +340,80 @@ describe("Areas page", () => {
     expect(menuButton).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("shows this week's progress on the area rows and in the panel", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+        return Response.json({ areas: [area("1", "SWE"), area("2", "Finance")] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [goal("7", "CS Block", 2), goal("8", "Ship", 2)] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/habits") {
+        return Response.json({ habits: [habit("10", "Read", "DAILY")] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/progress") {
+        return Response.json(
+          progress([
+            {
+              area_id: "1",
+              name: "SWE",
+              percent: 64,
+              days: weekDays(2),
+              requirements: [
+                { ref_type: "GOAL", ref_id: "7", title: "CS Block", target: 2, done: 2 },
+                { ref_type: "GOAL", ref_id: "8", title: "Ship", target: 2, done: 1.5 },
+                { ref_type: "HABIT", ref_id: "10", title: "Read", target: 7, done: 2 },
+              ],
+            },
+          ]),
+        );
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/habits") {
+        return Response.json(habit("11", "Stretch", "WEEKLY"), { status: 201 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    const csBlock = await screen.findByRole("button", {
+      name: "CS Block, goal, 2 of 2 this week",
+    });
+    expect(within(csBlock).getByText("2/2")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: "Ship, goal, 1.5 of 2 this week" })).getByText(
+        "1½/2",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SWE" })).toHaveAccessibleDescription(
+      "64% this week",
+    );
+    expect(screen.getByRole("button", { name: "Finance" })).toHaveAccessibleDescription(
+      "Nothing to measure this week",
+    );
+    expect(screen.getByText("1/3 done")).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("button", { name: "Read, daily habit, 2 of 7 this week" }),
+      ).getByText("2/7"),
+    ).toBeInTheDocument();
+    const days = screen.getByRole("list", { name: "Daily habits this week" });
+    expect(within(days).getAllByRole("listitem")).toHaveLength(7);
+    expect(within(days).getByText("Monday: every daily habit done")).toBeInTheDocument();
+    expect(within(days).getByText("Wednesday: not done")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add habit" }));
+    const dialog = screen.getByRole("dialog", { name: "New habit" });
+    await user.type(within(dialog).getByLabelText("Title"), "Stretch");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(requestsTo(fetchMock, "GET", "/api/v1/progress")).toHaveLength(2);
+    });
+  });
+
   it("adds, edits, and deletes habits from the area panel", async () => {
     const fetchMock = vi.fn(async (request: Request) => {
       const url = new URL(request.url);
@@ -572,6 +665,9 @@ describe("Areas page", () => {
       }
       if (request.method === "GET" && url.pathname === "/api/v1/goals") {
         return Response.json({ goals: [savedGoal] });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/progress") {
+        return Response.json(progress());
       }
       writes.push(`${request.method} ${url.pathname}`);
       if (request.method === "PATCH" && url.pathname === "/api/v1/goals/7") {

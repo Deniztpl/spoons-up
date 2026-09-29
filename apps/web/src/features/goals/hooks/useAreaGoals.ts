@@ -3,21 +3,25 @@ import { useEffect, useState } from "react";
 import { listGoals, type Goal } from "../api/goalsApi";
 import { goalErrorMessage, useGoalForm } from "./useGoalForm";
 
-export function useAreaGoals(areaId: string | null) {
+export function useAreaGoals(areaId: string | null, onChange?: () => void) {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loadedAreaId, setLoadedAreaId] = useState<string | null>(null);
   const [failedLoad, setFailedLoad] = useState<{ areaId: string; message: string } | null>(
     null,
   );
   const goalForm = useGoalForm({
-    onSaved: (goal) =>
+    onSaved: (goal) => {
       setGoals((current) =>
         current.some((item) => item.id === goal.id)
           ? current.map((item) => (item.id === goal.id ? goal : item))
           : [...current, goal],
-      ),
-    onDeleted: (goalId) =>
-      setGoals((current) => current.filter((goal) => goal.id !== goalId)),
+      );
+      onChange?.();
+    },
+    onDeleted: (goalId) => {
+      setGoals((current) => current.filter((goal) => goal.id !== goalId));
+      onChange?.();
+    },
   });
 
   const loadError = failedLoad && failedLoad.areaId === areaId ? failedLoad.message : null;

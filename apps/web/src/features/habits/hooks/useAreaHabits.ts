@@ -16,7 +16,7 @@ type HabitDraft = {
   mode: HabitMode;
 };
 
-export function useAreaHabits(areaId: string | null) {
+export function useAreaHabits(areaId: string | null, onChange?: () => void) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loadedAreaId, setLoadedAreaId] = useState<string | null>(null);
   const [failedLoad, setFailedLoad] = useState<{ areaId: string; message: string } | null>(
@@ -111,6 +111,7 @@ export function useAreaHabits(areaId: string | null) {
           : [...current, data],
       );
       setDraft(null);
+      onChange?.();
     } catch {
       setFormError("We couldn't reach Spoons Up. Please try again.");
     } finally {
@@ -134,6 +135,7 @@ export function useAreaHabits(areaId: string | null) {
       setHabits((current) => current.filter((habit) => habit.id !== habitId));
       setDraft(null);
       setIsConfirmingDelete(false);
+      onChange?.();
     } catch {
       setFormError("We couldn't reach Spoons Up. Please try again.");
     } finally {

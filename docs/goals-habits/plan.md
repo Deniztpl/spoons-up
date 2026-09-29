@@ -136,7 +136,7 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - `GET /growth?weeks=` reads closed weeks from `period_results`, newest first; day squares come from habit entries
 - API tests cover timezones, custom week starts, repeated runs, a missed week turn and an area delete that keeps its rows
 
-### Block 3 — Areas screen
+### Block 3 — Areas screen — DONE
 
 - Area rows show the week's seven day dots and percent bar from `/progress`
 - The area panel shows seven day bars, the percent, met/total, and the weekly done state on its goals and habits

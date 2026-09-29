@@ -12,6 +12,9 @@ import { useAreaGoals } from "../../features/goals/hooks/useAreaGoals";
 import { AreaHabitList } from "../../features/habits/components/AreaHabitList";
 import { HabitFormDialog } from "../../features/habits/components/HabitFormDialog";
 import { useAreaHabits } from "../../features/habits/hooks/useAreaHabits";
+import type { AreaResult } from "../../features/results/api/resultsApi";
+import { AreaWeekProgress } from "../../features/results/components/AreaWeekProgress";
+import { useProgress } from "../../features/results/hooks/useProgress";
 
 type AreaView = "active" | "archived";
 
@@ -24,6 +27,7 @@ export function AreasPage({
   onLogout: () => Promise<AuthActionResult>;
 }) {
   const areaState = useAreas();
+  const progressState = useProgress();
   const [view, setView] = useState<AreaView>("active");
   const activeAreas = areaState.areas.filter((area) => area.archived_at === null);
   const archivedAreas = areaState.areas.filter((area) => area.archived_at !== null);
@@ -37,13 +41,15 @@ export function AreasPage({
       : null;
   const activeAreaId =
     selectedArea && selectedArea.archived_at === null ? selectedArea.id : null;
-  const areaGoals = useAreaGoals(activeAreaId);
-  const areaHabits = useAreaHabits(activeAreaId);
+  const areaGoals = useAreaGoals(activeAreaId, progressState.reload);
+  const areaHabits = useAreaHabits(activeAreaId, progressState.reload);
   const goalDraft = areaGoals.draft;
   const habitDraft = areaHabits.draft;
   const isLoadingItems = areaGoals.isLoading || areaHabits.isLoading;
   const itemsError = areaGoals.loadError ?? areaHabits.loadError;
   const hasItems = areaGoals.goals.length > 0 || areaHabits.habits.length > 0;
+  const selectedResult =
+    activeAreaId !== null ? progressState.areasById?.get(activeAreaId) : undefined;
 
   const showView = (nextView: AreaView) => {
     const firstArea = (nextView === "active" ? activeAreas : archivedAreas)[0];
@@ -67,6 +73,8 @@ export function AreasPage({
   const restoreArea = async () => {
     if (await areaState.restoreArea()) {
       setView("active");
+      // Archived areas are left out of this week's progress.
+      progressState.reload();
     }
   };
 
@@ -123,9 +131,16 @@ export function AreasPage({
             ) : null}
           </div>
 
+          {progressState.loadError ? (
+            <p role="alert" className="mb-3 rounded-lg bg-danger-soft px-4 py-3 text-[13px] text-danger">
+              {progressState.loadError}
+            </p>
+          ) : null}
+
           <AreaList
             areas={view === "archived" ? archivedAreas : activeAreas}
             view={view}
+            progress={progressState.areasById}
             selectedAreaId={areaState.selectedAreaId}
             isLoading={areaState.isLoading}
             isAdding={areaState.isAdding}
@@ -167,6 +182,8 @@ export function AreasPage({
           onDelete={() => void areaState.deleteArea()}
         >
           <div className="flex flex-col gap-4">
+            {selectedResult ? <AreaWeekProgress result={selectedResult} /> : null}
+
             {isLoadingItems ? (
               <p role="status" className="text-[13px] text-ink-soft">
                 Loading goals and habits…
@@ -194,10 +211,18 @@ export function AreasPage({
             {hasItems ? (
               <div className="flex flex-col gap-1">
                 {areaGoals.goals.length > 0 ? (
-                  <AreaGoalList goals={areaGoals.goals} onEdit={areaGoals.openEdit} />
+                  <AreaGoalList
+                    goals={areaGoals.goals}
+                    weekResults={weekResults(selectedResult, "GOAL")}
+                    onEdit={areaGoals.openEdit}
+                  />
                 ) : null}
                 {areaHabits.habits.length > 0 ? (
-                  <AreaHabitList habits={areaHabits.habits} onEdit={areaHabits.openEdit} />
+                  <AreaHabitList
+                    habits={areaHabits.habits}
+                    weekResults={weekResults(selectedResult, "HABIT")}
+                    onEdit={areaHabits.openEdit}
+                  />
                 ) : null}
               </div>
             ) : null}
@@ -262,6 +287,14 @@ export function AreasPage({
         />
       ) : null}
     </AppLayout>
+  );
+}
+
+function weekResults(result: AreaResult | undefined, refType: "GOAL" | "HABIT") {
+  return new Map(
+    result?.requirements
+      .filter((item) => item.ref_type === refType)
+      .map((item) => [item.ref_id, item]),
   );
 }
 
