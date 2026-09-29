@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Select, and_, delete, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -77,6 +77,19 @@ class TaskRepository:
             )
         )
         return list(self.session.scalars(query))
+
+    def sum_done_blocks_by_goal(self, *, user_id: int, period_start: date) -> dict[int, Decimal]:
+        query = (
+            select(Task.goal_id, func.coalesce(func.sum(Task.block_count), 0))
+            .where(
+                Task.user_id == user_id,
+                Task.goal_id.is_not(None),
+                Task.period_start == period_start,
+                Task.status == TaskStatus.DONE.value,
+            )
+            .group_by(Task.goal_id)
+        )
+        return {goal_id: Decimal(done) for goal_id, done in self.session.execute(query)}
 
     def get_task_and_lock(self, *, task_id: int, user_id: int) -> Task | None:
         return self.session.scalar(

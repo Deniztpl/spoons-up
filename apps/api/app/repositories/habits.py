@@ -51,6 +51,33 @@ class HabitRepository:
         )
         return [(habit, done) for habit, done in self.session.execute(query)]
 
+    def list_entries_for_week(
+        self,
+        *,
+        user_id: int,
+        week_start: date,
+        week_end: date,
+    ) -> list[HabitEntry]:
+        query = (
+            select(HabitEntry)
+            .join(Habit, HabitEntry.habit_id == Habit.id)
+            .where(
+                Habit.user_id == user_id,
+                or_(
+                    and_(
+                        HabitEntry.period_type == HabitPeriodType.DAY.value,
+                        HabitEntry.period_start >= week_start,
+                        HabitEntry.period_start <= week_end,
+                    ),
+                    and_(
+                        HabitEntry.period_type == HabitPeriodType.WEEK.value,
+                        HabitEntry.period_start == week_start,
+                    ),
+                ),
+            )
+        )
+        return list(self.session.scalars(query))
+
     def create(
         self,
         *,

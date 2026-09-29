@@ -234,6 +234,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Progress */
+        get: operations["get_progress_api_v1_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rules/{rule_id}": {
         parameters: {
             query?: never;
@@ -370,6 +387,19 @@ export interface components {
         AreaListResponse: {
             /** Areas */
             areas: components["schemas"]["AreaResponse"][];
+        };
+        /** AreaProgressResponse */
+        AreaProgressResponse: {
+            /** Area Id */
+            area_id: string;
+            /** Days */
+            days: components["schemas"]["ProgressDayResponse"][];
+            /** Name */
+            name: string;
+            /** Percent */
+            percent: number;
+            /** Requirements */
+            requirements: components["schemas"]["RequirementResponse"][];
         };
         /** AreaResponse */
         AreaResponse: {
@@ -559,6 +589,33 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /** ProgressDayResponse */
+        ProgressDayResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Done */
+            done: boolean;
+        };
+        /** ProgressResponse */
+        ProgressResponse: {
+            /** Areas */
+            areas: components["schemas"]["AreaProgressResponse"][];
+            /** Percent */
+            percent: number | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+        };
         /** RefreshTokenRequest */
         RefreshTokenRequest: {
             /** Refresh Token */
@@ -580,6 +637,22 @@ export interface components {
         RepeatTaskRequest: {
             /** Byweekday */
             byweekday: number[];
+        };
+        /** RequirementResponse */
+        RequirementResponse: {
+            /** Done */
+            done: number;
+            /** Ref Id */
+            ref_id: string;
+            /**
+             * Ref Type
+             * @enum {string}
+             */
+            ref_type: "GOAL" | "HABIT";
+            /** Target */
+            target: number;
+            /** Title */
+            title: string;
         };
         /** TaskResponse */
         TaskResponse: {
@@ -1879,6 +1952,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    get_progress_api_v1_progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

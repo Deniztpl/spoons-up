@@ -13,6 +13,7 @@ from app.services.areas import AreaService
 from app.services.auth import AuthService
 from app.services.goals import GoalService
 from app.services.habits import HabitService
+from app.services.results import ResultsService
 from app.services.tasks import TaskService
 from app.services.today import TodayService
 from app.services.user_activity import UserActivityService
@@ -124,3 +125,17 @@ def get_week_service(session: DatabaseSession) -> WeekService:
 
 
 WeekServiceDependency = Annotated[WeekService, Depends(get_week_service)]
+
+
+def get_results_service(session: DatabaseSession) -> ResultsService:
+    return ResultsService(
+        session,
+        AreaRepository(session),
+        GoalRepository(session),
+        HabitRepository(session),
+        TaskRepository(session),
+        UserRepository(session),
+    )
+
+
+ResultsServiceDependency = Annotated[ResultsService, Depends(get_results_service)]

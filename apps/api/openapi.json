@@ -30,6 +30,45 @@
         "title": "AreaListResponse",
         "type": "object"
       },
+      "AreaProgressResponse": {
+        "properties": {
+          "area_id": {
+            "title": "Area Id",
+            "type": "string"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressDayResponse"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "percent": {
+            "title": "Percent",
+            "type": "integer"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementResponse"
+            },
+            "title": "Requirements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "area_id",
+          "name",
+          "percent",
+          "days",
+          "requirements"
+        ],
+        "title": "AreaProgressResponse",
+        "type": "object"
+      },
       "AreaResponse": {
         "properties": {
           "archived_at": {
@@ -595,6 +634,65 @@
         "title": "LogoutRequest",
         "type": "object"
       },
+      "ProgressDayResponse": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "done"
+        ],
+        "title": "ProgressDayResponse",
+        "type": "object"
+      },
+      "ProgressResponse": {
+        "properties": {
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaProgressResponse"
+            },
+            "title": "Areas",
+            "type": "array"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "period_end": {
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_start",
+          "period_end",
+          "percent",
+          "areas"
+        ],
+        "title": "ProgressResponse",
+        "type": "object"
+      },
       "RefreshTokenRequest": {
         "properties": {
           "refresh_token": {
@@ -656,6 +754,43 @@
           "byweekday"
         ],
         "title": "RepeatTaskRequest",
+        "type": "object"
+      },
+      "RequirementResponse": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "number"
+          },
+          "ref_id": {
+            "title": "Ref Id",
+            "type": "string"
+          },
+          "ref_type": {
+            "enum": [
+              "GOAL",
+              "HABIT"
+            ],
+            "title": "Ref Type",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref_type",
+          "ref_id",
+          "title",
+          "target",
+          "done"
+        ],
+        "title": "RequirementResponse",
         "type": "object"
       },
       "TaskResponse": {
@@ -2861,6 +2996,52 @@
         "summary": "Check Habit",
         "tags": [
           "habits"
+        ]
+      }
+    },
+    "/api/v1/progress": {
+      "get": {
+        "operationId": "get_progress_api_v1_progress_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get Progress",
+        "tags": [
+          "progress"
         ]
       }
     },

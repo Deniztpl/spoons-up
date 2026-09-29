@@ -120,7 +120,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 The Areas screen and Today show the open week live; Growth shows closed weeks frozen in `period_results`. Both read the same per-area shape: requirements with `target` and `done`, a percent where every requirement counts equally, and seven day squares from `DAILY` habits.
 
-### Block 1 — Live weekly progress
+### Block 1 — Live weekly progress — DONE
 
 - `GET /progress` computes the open week for every active area with at least one requirement
 - Requirements follow active days: a `DAILY` habit's target is its active days, a `WEEKLY` habit's is 1, a goal keeps its full `weekly_target`; goals with no `weekly_target` are left out
