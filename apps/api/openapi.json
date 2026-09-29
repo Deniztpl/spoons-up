@@ -485,6 +485,10 @@
       },
       "GrowthResponse": {
         "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
           "weeks": {
             "items": {
               "$ref": "#/components/schemas/GrowthWeekResponse"
@@ -494,7 +498,8 @@
           }
         },
         "required": [
-          "weeks"
+          "weeks",
+          "has_more"
         ],
         "title": "GrowthResponse",
         "type": "object"
@@ -2641,11 +2646,28 @@
             "name": "weeks",
             "required": false,
             "schema": {
-              "default": 8,
+              "default": 12,
               "maximum": 52,
               "minimum": 1,
               "title": "Weeks",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
             }
           }
         ],

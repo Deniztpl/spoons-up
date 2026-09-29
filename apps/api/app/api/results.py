@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -42,5 +43,6 @@ def get_growth(
     current_user: CurrentUserDependency,
     results_service: ResultsServiceDependency,
     weeks: WeeksQuery = GROWTH_DEFAULT_WEEKS,
+    before: date | None = None,
 ) -> GrowthResponse:
-    return results_service.get_growth(user_id=current_user.id, weeks=weeks)
+    return results_service.get_growth(user_id=current_user.id, weeks=weeks, before=before)

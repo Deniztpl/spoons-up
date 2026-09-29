@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -76,6 +76,7 @@ def test_freeze_writes_each_closed_week_once_and_growth_reads_it(
     response = client.get("/api/v1/growth?weeks=2", headers=headers)
 
     assert response.status_code == 200
+    assert response.json()["has_more"] is True
     closed_week, earlier_week = response.json()["weeks"]
     assert closed_week["period_start"] == "2026-09-14"
     assert closed_week["period_end"] == "2026-09-20"
@@ -134,6 +135,30 @@ def test_freeze_waits_for_the_local_week_turn_and_catches_up_missed_weeks(
     assert new_york.last_frozen_week == date(2026, 9, 7)
 
 
+def test_freeze_first_run_reaches_back_to_signup_beyond_a_year(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "growth-year@example.com"))
+    area_id = str(create_area(client, headers, "Health")["id"])
+    create_habit(client, headers, area_id=area_id, title="Walk", mode="DAILY")
+
+    with db_session.begin():
+        user = get_user(db_session, "growth-year@example.com")
+        # Signed up on Tuesday 2025-06-03, 68 weeks before the last closed week ends.
+        user.created_at = datetime(2025, 6, 3, 9, tzinfo=UTC)
+        db_session.execute(
+            update(Habit).where(Habit.user_id == user.id).values(created_at=user.created_at)
+        )
+
+    run_results_freeze(db_session, now=FIXED_NOW)
+
+    weeks = frozen_weeks(db_session, user_id=user.id)
+    assert weeks[0] == date(2025, 6, 2)
+    assert weeks[-1] == date(2026, 9, 14)
+    assert len(weeks) == 68
+
+
 def test_freeze_judges_an_area_archived_mid_week_and_keeps_its_rows_after_delete(
     client: TestClient,
     db_session: Session,
@@ -171,12 +196,51 @@ def test_freeze_judges_an_area_archived_mid_week_and_keeps_its_rows_after_delete
     ]
 
 
-def test_growth_validates_weeks_and_requires_authentication(client: TestClient) -> None:
+def test_growth_pages_back_to_the_signup_week(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "growth-pages@example.com"))
+    new_headers = bearer(register(client, "growth-new@example.com"))
+    with db_session.begin():
+        # Signed up on Wednesday 2026-05-27, so Growth ends with the week of Monday 2026-05-25.
+        user = get_user(db_session, "growth-pages@example.com")
+        user.created_at = datetime(2026, 5, 27, 9, tzinfo=UTC)
+        # Signed up this week, so no week of theirs has closed yet.
+        new_user = get_user(db_session, "growth-new@example.com")
+        new_user.created_at = datetime(2026, 9, 22, 9, tzinfo=UTC)
+
+    first_page = client.get("/api/v1/growth", headers=headers).json()
+    older_page = client.get(
+        "/api/v1/growth",
+        params={"before": first_page["weeks"][-1]["period_start"]},
+        headers=headers,
+    ).json()
+
+    assert [week["period_start"] for week in first_page["weeks"]] == [
+        str(date(2026, 9, 14) - timedelta(weeks=offset)) for offset in range(12)
+    ]
+    assert first_page["has_more"] is True
+    assert [week["period_start"] for week in older_page["weeks"]] == [
+        "2026-06-22",
+        "2026-06-15",
+        "2026-06-08",
+        "2026-06-01",
+        "2026-05-25",
+    ]
+    assert older_page["has_more"] is False
+    assert client.get("/api/v1/growth", headers=new_headers).json() == {
+        "weeks": [],
+        "has_more": False,
+    }
+
+
+def test_growth_validates_its_query_and_requires_authentication(client: TestClient) -> None:
     headers = bearer(register(client, "growth-weeks@example.com"))
 
     assert client.get("/api/v1/growth?weeks=0", headers=headers).status_code == 422
     assert client.get("/api/v1/growth?weeks=53", headers=headers).status_code == 422
-    assert len(client.get("/api/v1/growth", headers=headers).json()["weeks"]) == 8
+    assert client.get("/api/v1/growth?before=soon", headers=headers).status_code == 422
     assert client.get("/api/v1/growth").status_code == 401
 
 

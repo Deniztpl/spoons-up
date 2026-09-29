@@ -41,3 +41,4 @@ class GrowthWeekResponse(BaseModel):
 
 class GrowthResponse(BaseModel):
     weeks: list[GrowthWeekResponse]
+    has_more: bool

@@ -540,6 +540,8 @@ export interface components {
         };
         /** GrowthResponse */
         GrowthResponse: {
+            /** Has More */
+            has_more: boolean;
             /** Weeks */
             weeks: components["schemas"]["GrowthWeekResponse"][];
         };
@@ -1697,6 +1699,7 @@ export interface operations {
         parameters: {
             query?: {
                 weeks?: number;
+                before?: string | null;
             };
             header?: never;
             path?: never;

@@ -60,7 +60,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Catch-up on return** — past dormant time is not generated. The first authenticated request after more than 30 days restores only the current 14-day window; older empty dates stay empty.
 
-**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; a user's first run reaches back to their signup week, at most 52 weeks. Each week is frozen once, tracked by `users.last_frozen_week`; reads never write.
+**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; a user's first run reaches back to their signup week. Each week is frozen once, tracked by `users.last_frozen_week`; reads never write.
 
 **Weekly target follows active days** — a requirement is judged only on the days it was actually active that week. A `DAILY` habit's target is the number of days between `max(week_start, created_at, area.unarchived_at)` and `min(week_end, area.archived_at)`, so a habit added on Wednesday needs 5 of 5, not 7 of 7. `WEEKLY` habits stay 1 as long as one day was active. Goals keep their full `weekly_target` even when active for only part of a week, and goals with no `weekly_target` are not requirements. A requirement with no active day in a week gets no `period_results` row and the week reads empty for it. The area's two timestamps cannot express more than one archive cycle inside a week; the last one wins.
 
@@ -70,7 +70,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Day squares** — each area shows its week as seven squares. A day is done when the area had at least one `DAILY` habit active that day and every one of them was checked. Goals and `WEEKLY` habits do not affect the squares. Squares are read from habit entries, for closed weeks too, so a deleted habit's squares go with it.
 
-**Progress and Growth** — the Areas screen and Today's week panel show the open week, computed live. Growth shows closed weeks from `period_results`. Both use the same per-area shape and calculation; they differ only in the week they read and where it comes from.
+**Progress and Growth** — the Areas screen and Today's week panel show the open week, computed live. Growth shows closed weeks from `period_results`, newest first, 12 at a time, back to the signup week. Both use the same per-area shape and calculation; they differ only in the week they read and where it comes from.
 
 **Only areas archive** — an area is a long-running commitment worth putting down and picking up, so it has `archived_at` and `unarchived_at`. Habits and goals don't: a habit is either tracked or dropped, and dropping one usually means replacing it. They have delete and nothing else.
 

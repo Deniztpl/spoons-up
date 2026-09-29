@@ -703,9 +703,10 @@ Closed weeks — the Growth screen.
 
 | Query | Default |
 |---|---|
-| `weeks` | 8 |
+| `weeks` | 12 |
+| `before` | — |
 
-Counts back from the last closed week, newest first. `weeks` is between 1 and 52.
+Counts back from the last closed week, newest first, `weeks` at a time, and stops at the week the user signed up. `weeks` is between 1 and 52. `before` continues from an earlier page: only weeks that start before it are returned, so the client passes the oldest `period_start` it already has. `has_more` says whether older weeks remain.
 
 **200**
 
@@ -718,17 +719,18 @@ Counts back from the last closed week, newest first. `weeks` is between 1 and 52
       "percent": 55,
       "areas": [ ... ]
     }
-  ]
+  ],
+  "has_more": true
 }
 ```
 
 `requirements` come from `period_results` and never change: `title`, `target` and `done` were snapshotted when the week closed, so a week still reads correctly after a habit or goal is renamed, retargeted or deleted. `days` are read from habit entries, so a deleted habit's squares go with it. A week with no results carries an empty `areas` list and a null `percent`.
 
-Closed weeks are snapshotted by the scheduled job at the week turn in the user's timezone; a closed week it missed is written on its next run, and a user's first run reaches back to their signup week, at most 52 weeks.
+Closed weeks are snapshotted by the scheduled job at the week turn in the user's timezone; a closed week it missed is written on its next run, and a user's first run reaches back to their signup week.
 
 | Error | When |
 |---|---|
-| 422 `validation_error` | `weeks` is below 1 or above 52 |
+| 422 `validation_error` | `weeks` is below 1 or above 52, or `before` is not a date |
 
 ---
 

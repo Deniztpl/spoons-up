@@ -133,7 +133,7 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 
 - `period_results` migration; `area_id` is nullable with `ON DELETE SET NULL`, so rows outlive their area
 - The hourly job snapshots each user's closed week at the week turn in their timezone and writes any closed week it missed; repeated runs write nothing new
-- `GET /growth?weeks=` reads closed weeks from `period_results`, newest first; day squares come from habit entries
+- `GET /growth` reads closed weeks from `period_results`, newest first, 12 at a time back to the signup week; day squares come from habit entries
 - API tests cover timezones, custom week starts, repeated runs, a missed week turn and an area delete that keeps its rows
 
 ### Block 3 — Areas screen — DONE

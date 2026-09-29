@@ -33,7 +33,7 @@ from app.schemas.results import (
     ResultDayResponse,
 )
 
-GROWTH_DEFAULT_WEEKS = 8
+GROWTH_DEFAULT_WEEKS = 12
 GROWTH_MAX_WEEKS = 52
 
 
@@ -122,23 +122,30 @@ class ResultsService:
             )
         return response
 
-    def get_growth(self, *, user_id: int, weeks: int) -> GrowthResponse:
+    def get_growth(self, *, user_id: int, weeks: int, before: date | None) -> GrowthResponse:
         with self.session.begin():
             user = self._get_user(user_id=user_id)
             timezone = ZoneInfo(user.timezone)
             today = datetime.now(timezone).date()
-            last_closed = get_week_start(today, week_start_day=user.week_start_day) - timedelta(
-                days=7
-            )
-            week_starts = [last_closed - timedelta(weeks=offset) for offset in range(weeks)]
+            newest = get_week_start(today, week_start_day=user.week_start_day) - timedelta(days=7)
+            if before is not None:
+                # A later page continues with the weeks that start before `before`.
+                newest = min(
+                    newest,
+                    get_week_start(before - timedelta(days=1), week_start_day=user.week_start_day),
+                )
+            signup_week = _signup_week(user, timezone)
+            count = max(0, min(weeks, (newest - signup_week).days // 7 + 1))
+            week_starts = [newest - timedelta(weeks=offset) for offset in range(count)]
             rows_by_area_week: defaultdict[tuple[date, int], list[PeriodResult]] = defaultdict(list)
-            for row in self.period_result_repository.list_for_user(
-                user_id=user_id,
-                from_period_start=week_starts[-1],
-                to_period_start=last_closed,
-            ):
-                if row.area_id is not None:
-                    rows_by_area_week[(row.period_start, row.area_id)].append(row)
+            if week_starts:
+                for row in self.period_result_repository.list_for_user(
+                    user_id=user_id,
+                    from_period_start=week_starts[-1],
+                    to_period_start=week_starts[0],
+                ):
+                    if row.area_id is not None:
+                        rows_by_area_week[(row.period_start, row.area_id)].append(row)
             areas = self.area_repository.list_for_user(user_id=user_id, include_archived=False)
             habits_by_area = _group_by_area(
                 self.habit_repository.list_for_user(user_id=user_id, area_id=None)
@@ -190,7 +197,10 @@ class ResultsService:
                     )
                 )
 
-            response = GrowthResponse(weeks=growth_weeks)
+            response = GrowthResponse(
+                weeks=growth_weeks,
+                has_more=bool(week_starts) and week_starts[-1] > signup_week,
+            )
         return response
 
     def freeze_closed_weeks(self, *, user: User, today: date) -> None:
@@ -200,12 +210,8 @@ class ResultsService:
         if user.last_frozen_week is not None:
             week_start = user.last_frozen_week + timedelta(days=7)
         else:
-            # A first run reaches back to the signup week, as far as Growth can show.
-            signup_week = get_week_start(
-                _local_date(user.created_at, timezone),
-                week_start_day=user.week_start_day,
-            )
-            week_start = max(signup_week, last_closed - timedelta(weeks=GROWTH_MAX_WEEKS - 1))
+            # A first run reaches back to the signup week.
+            week_start = _signup_week(user, timezone)
         if week_start > last_closed:
             return
 
@@ -422,6 +428,14 @@ def _week_days(week_start: date) -> list[date]:
 
 def _local_date(value: datetime, timezone: ZoneInfo) -> date:
     return value.astimezone(timezone).date()
+
+
+def _signup_week(user: User, timezone: ZoneInfo) -> date:
+    """The first week Growth covers."""
+    return get_week_start(
+        _local_date(user.created_at, timezone),
+        week_start_day=user.week_start_day,
+    )
 
 
 def _ratio(done: Decimal, target: int) -> Decimal:
