@@ -116,13 +116,48 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Web tests cover both form entry points, Today's disabled date, Week's minimum date, limited navigation, moving/deleting tasks and the later-task info list
 - **Done when:** a task moved across a week boundary still counts toward its original week; past and third-week navigation are unavailable; a manually placed task after next week appears in the info count and list while an untouched generated occurrence does not
 
-## Slice 5 — Weekly results
+## Slice 5 — Weekly progress and Growth
 
-33. `period_results` migration
-34. Live computation for the open week; goal `done` is `COALESCE(SUM(task.block_count), 0)` rather than task count, so it can be fractional and `period_results.done` is numeric. The daily job from slice 3 freezes each closed week at the week turn in the user's timezone. Targets follow active days: `created_at` and the area's `archived_at` / `unarchived_at` bound each requirement, and one with no active day is left out of the week
-35. Area result — every row for that week satisfies `done >= target`
-36. Web: area view showing weekly progress and past weeks
-37. **Done when:** a closed week's outcome does not move after `weekly_target` is changed
+The Areas screen and Today show the open week live; Growth shows closed weeks frozen in `period_results`. Both read the same per-area shape: requirements with `target` and `done`, a percent where every requirement counts equally, and seven day squares from `DAILY` habits.
+
+### Block 1 — Live weekly progress
+
+- `GET /progress` computes the open week for every active area with at least one requirement
+- Requirements follow active days: a `DAILY` habit's target is its active days, a `WEEKLY` habit's is 1, a goal keeps its full `weekly_target`; goals with no `weekly_target` are left out
+- A goal's `done` is the sum of `block_count` over its completed tasks counted by `period_start`, so it can be fractional
+- Percent: each requirement contributes `min(done / target, 1)`; the area averages its requirements and the week averages its areas
+- Day squares: a day is done when every `DAILY` habit active that day was checked
+- API tests cover mid-week additions, archive and restore inside a week, fractional blocks, the 100% cap, goals without a target, the squares and custom week starts
+
+### Block 2 — Frozen weeks and the Growth read
+
+- `period_results` migration; `area_id` is nullable with `ON DELETE SET NULL`, so rows outlive their area
+- The hourly job snapshots each user's closed week at the week turn in their timezone and writes any closed week it missed; repeated runs write nothing new
+- `GET /growth?weeks=` reads closed weeks from `period_results`, newest first; day squares come from habit entries
+- API tests cover timezones, custom week starts, repeated runs, a missed week turn and an area delete that keeps its rows
+
+### Block 3 — Areas screen
+
+- Area rows show the week's seven day dots and percent bar from `/progress`
+- The area panel shows seven day bars, the percent, met/total, and the weekly done state on its goals and habits
+- Progress refreshes after goals, habits and areas change
+
+### Block 4 — Today week panel
+
+- The right panel shows this week's met/total per area from `/progress`, as tiles (Today v2 design, variant B)
+- It refreshes after tasks and habits are checked
+
+### Block 5 — Growth screen
+
+- The History tab becomes a Growth button at the top right of the Areas header; the tabs are Active and Archived
+- Week cards from `/growth`, newest first, with the week label, the area count and the week's percent bar
+- An open card lists each area with its day squares, goals met/total, habits met/total and percent
+- Area filter chips narrow the cards to one area on the client
+
+### Block 6 — Verification
+
+- Web tests cover the area rows and panel, Today's week panel and the Growth cards and filter
+- **Done when:** a closed week's outcome does not move after `weekly_target` is changed, and the same week reads the same percent on the Areas screen before it closes and on Growth after
 
 ## Slice 6 — Notifications
 

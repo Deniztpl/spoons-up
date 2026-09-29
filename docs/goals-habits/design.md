@@ -12,7 +12,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Session ending** — logout revokes that row, a password change revokes all of them. Login inserts a row without touching existing ones, so several devices stay signed in. Refresh tokens live in SecureStore on mobile and an httpOnly cookie on web; the access token is held in memory.
 
-**Areas** — user-defined top-level buckets (SWE, Finance, Social). Habits and goals belong to one; a standalone task may sit outside them. An area's weekly result is derived: every requirement under it must pass.
+**Areas** — user-defined top-level buckets (SWE, Finance, Social). Habits and goals belong to one; a standalone task may sit outside them. An area's weekly progress is derived from the requirements under it; see **Weekly progress**.
 
 **Habits** — behaviours you check off. No scheduling, no duration, no moving. `DAILY` is one checkbox per day, `WEEKLY` one per week on any day. No quota, no fixed weekdays.
 
@@ -60,19 +60,25 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Catch-up on return** — past dormant time is not generated. The first authenticated request after more than 30 days restores only the current 14-day window; older empty dates stay empty.
 
-**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone; reads never write.
+**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; reads never write.
 
-**Weekly target follows active days** — a requirement is judged only on the days it was actually active that week. A `DAILY` habit's target is the number of days between `max(week_start, created_at, area.unarchived_at)` and `min(week_end, area.archived_at)`, so a habit added on Wednesday needs 5 of 5, not 7 of 7. `WEEKLY` habits stay 1 as long as one day was active. A requirement with no active day in a week gets no `period_results` row, the week reads empty for it, and the client draws those days as neither done nor missed. The area's two timestamps cannot express more than one archive cycle inside a week; the last one wins.
+**Weekly target follows active days** — a requirement is judged only on the days it was actually active that week. A `DAILY` habit's target is the number of days between `max(week_start, created_at, area.unarchived_at)` and `min(week_end, area.archived_at)`, so a habit added on Wednesday needs 5 of 5, not 7 of 7. `WEEKLY` habits stay 1 as long as one day was active. Goals keep their full `weekly_target` even when active for only part of a week, and goals with no `weekly_target` are not requirements. A requirement with no active day in a week gets no `period_results` row and the week reads empty for it. The area's two timestamps cannot express more than one archive cycle inside a week; the last one wins.
 
 **Live current week** — the open week is computed from raw rows, so changing a quota mid-week takes effect immediately.
+
+**Weekly progress** — every requirement in an area counts equally toward the area's percent. A goal contributes its done blocks over `weekly_target`, a `DAILY` habit its checked days over its active days, and a `WEEKLY` habit 1 or 0; each is capped at 100%. The area's percent is the average of its requirements, and a week's percent is the average of its areas. There is no pass or fail: requirements that reach their target are shown as met counts, such as goals 2/3.
+
+**Day squares** — each area shows its week as seven squares. A day is done when the area had at least one `DAILY` habit active that day and every one of them was checked. Goals and `WEEKLY` habits do not affect the squares. Squares are read from habit entries, for closed weeks too, so a deleted habit's squares go with it.
+
+**Progress and Growth** — the Areas screen and Today's week panel show the open week, computed live. Growth shows closed weeks from `period_results`. Both use the same per-area shape and calculation; they differ only in the week they read and where it comes from.
 
 **Only areas archive** — an area is a long-running commitment worth putting down and picking up, so it has `archived_at` and `unarchived_at`. Habits and goals don't: a habit is either tracked or dropped, and dropping one usually means replacing it. They have delete and nothing else.
 
 **Archiving an area touches only the area row** — its habits, goals and rules are untouched; they simply stop being reachable while the area is archived, so restoring brings them all back as they were. Archiving removes the area's future pending tasks and their reminders; restoring does not bring them back, and generation resumes from today forward.
 
-**Delete is hard everywhere** — deleting a habit removes its entries, deleting a goal removes its rules, tasks and reminders, deleting an area removes everything under it. `period_results` rows are never deleted: they carry a snapshotted `title` and a `ref_id` that is not a foreign key, so past weeks keep reading after the thing they describe is gone. What is lost is the detail below the week — a deleted habit's day squares, a deleted goal's blocks on old calendars.
+**Delete is hard everywhere** — deleting a habit removes its entries, deleting a goal removes its rules, tasks and reminders, deleting an area removes everything under it. `period_results` rows are never deleted, not even with their area, whose deletion only clears the row's `area_id`: they carry a snapshotted `title` and a `ref_id` that is not a foreign key, so past weeks keep reading after the thing they describe is gone. What is lost is the detail below the week — a deleted habit's day squares, a deleted goal's blocks on old calendars.
 
-**Areas delete from either state** — an active area can be deleted without archiving it first. The client confirms with a strong warning that the area's habits, goals and all of their history go with it, and points to archive as the reversible way to put an area down.
+**Areas delete from either state** — an active area can be deleted without archiving it first. The client confirms with a strong warning that the area's habits and goals go with it, along with their tasks and check-off history, and points to archive as the reversible way to put an area down.
 
 **Push notifications** — a reminder five minutes before a timed task starts. A `reminders` row is written only when a task has `start_time`, with `scheduled_at` in UTC; it is created, updated or cancelled as timing changes. A scheduler scans due reminders every minute and pushes to registered tokens through FCM/APNs.
 
@@ -85,8 +91,6 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 ---
 
 ## Open questions
-
-**Goals active for part of a week** — a `DAILY` habit's target can be derived from active days, but a goal's `weekly_target` is a number the user chose, so scaling it is arbitrary. Options: keep the full target, or let the user set a target for the open week only ("2 this week", or 0 to skip it). Decide in slice 5.
 
 **week\_start\_day changed mid-week** — tasks already generated carry a `period_start` computed from the old boundary. After the change the open week's quota looks at a different range and stops matching them. Options: apply the change from the next week, recompute `period_start` for the open week's tasks, or only allow the change at a week boundary. Decide in slice 3.
 
@@ -356,7 +360,7 @@ CHECK (block_count > 0 AND block_count * 2 = trunc(block_count * 2))
 |---|---|---|
 | id | bigint | PK |
 | user_id | bigint | FK -> users |
-| area_id | bigint | FK -> areas |
+| area_id | bigint | nullable, FK -> areas `ON DELETE SET NULL` |
 | period_start | date | |
 | ref_type | text | HABIT \| GOAL |
 | ref_id | bigint | habits.id or goals.id — not a foreign key |

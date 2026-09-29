@@ -654,58 +654,81 @@ Habits are not in this response — the calendar shows scheduled work only.
 
 ### Results
 
-#### GET /areas/{id}/results
+Weekly progress per area. Two reads share one per-area shape and one calculation: `/progress` is the open week, computed live; `/growth` is closed weeks, read from `period_results`. Neither writes.
 
-Weekly history for one area — the pass/fail strip on the area screen.
+An area object:
 
-| Query | Default |
-|---|---|
-| `weeks` | 8 |
+```json
+{
+  "area_id": "3",
+  "name": "Coding",
+  "percent": 63,
+  "days": [
+    { "date": "2026-09-28", "done": true },
+    { "date": "2026-09-29", "done": false }
+  ],
+  "requirements": [
+    { "ref_type": "GOAL", "ref_id": "7", "title": "Finish auth flow", "target": 2, "done": 1 },
+    { "ref_type": "HABIT", "ref_id": "12", "title": "Read", "target": 7, "done": 6 }
+  ]
+}
+```
 
-Counts back from the current week.
+- `requirements` — the area's goals and habits that were active on at least one day of the week. Active days run from `max(period_start, created_at, area.unarchived_at)` to `min(week_end, area.archived_at)`. A `DAILY` habit's `target` is that day count and its `done` the checked days; a `WEEKLY` habit's `target` is 1. A goal's `target` is its full `weekly_target`, even when it was active for only part of the week, and its `done` is `COALESCE(SUM(block_count), 0)` across its completed tasks whose `period_start` is the week, so `done` can be fractional. Goals with no `weekly_target` are left out. A requirement counts as met when `done >= target`.
+- `percent` — every requirement counts equally: each contributes `min(done / target, 1)`, and the area's percent is their average, from 0 to 100, rounded to a whole number.
+- `days` — always seven entries in week order, with dates resolved on the server. A day is `done` when the area had at least one `DAILY` habit active that day and every one of them was checked. Goals and `WEEKLY` habits do not affect it, and later days of the open week are not done yet.
+
+Only active areas with at least one requirement that week appear. Archived and deleted areas are left out.
+
+#### GET /progress
+
+The open week — the Areas screen's rows and panel, and Today's week panel.
 
 **200**
 
 ```json
 {
-  "area_id": "3",
+  "period_start": "2026-09-28",
+  "period_end": "2026-10-04",
+  "percent": 41,
+  "areas": [ ... ]
+}
+```
+
+Computed live from raw rows, so it moves as tasks and habits are checked. The week's `percent` is the average of its areas' percents; it is null when no area has a requirement.
+
+#### GET /growth
+
+Closed weeks — the Growth screen.
+
+| Query | Default |
+|---|---|
+| `weeks` | 8 |
+
+Counts back from the last closed week, newest first. `weeks` is between 1 and 52.
+
+**200**
+
+```json
+{
   "weeks": [
     {
-      "period_start": "2026-09-14",
-      "open": true,
-      "passed": false,
-      "requirements": [
-        { "ref_type": "GOAL", "ref_id": "7", "title": "CS Block", "target": 3, "done": 1 },
-        { "ref_type": "HABIT", "ref_id": "12", "title": "Read", "target": 7, "done": 5 }
-      ]
-    },
-    {
-      "period_start": "2026-09-07",
-      "open": false,
-      "passed": true,
-      "requirements": [ ... ]
+      "period_start": "2026-09-21",
+      "period_end": "2026-09-27",
+      "percent": 55,
+      "areas": [ ... ]
     }
   ]
 }
 ```
 
-Newest week first.
+`requirements` come from `period_results` and never change: `title`, `target` and `done` were snapshotted when the week closed, so a week still reads correctly after a habit or goal is renamed, retargeted or deleted. `days` are read from habit entries, so a deleted habit's squares go with it. A week with no results carries an empty `areas` list and a null `percent`.
 
-`open` marks the current week — computed live from raw rows, so it moves as the week goes. Closed weeks come from `period_results` and never change.
+Closed weeks are snapshotted by the scheduled job at the week turn in the user's timezone; a closed week it missed is written on its next run.
 
-`passed` is derived: every requirement satisfies `done >= target`. On an open week it reflects where things stand right now.
-
-For goals, `target` is `weekly_target` in blocks and `done` is `COALESCE(SUM(block_count), 0)` across completed tasks in the period, not `COUNT(*)` — so null blocks contribute zero and `done` can be fractional, such as 2.5.
-
-`title` is snapshotted alongside `target` and `done`, so a week still reads correctly after the habit or goal is renamed or deleted. `ref_id` is not a foreign key — it identifies the row for the unique constraint, nothing more.
-
-A requirement appears for a week only if it was active for at least one day of it. Active days run from `max(period_start, created_at, area.unarchived_at)` to `min(week_end, area.archived_at)`. A `DAILY` habit's `target` is that day count, so one added mid-week is judged on the remaining days; `WEEKLY` habits stay 1. Goals with no `weekly_target` are left out; they have no quota to fail.
-
-A habit or goal deleted mid-week leaves that week with no row for it — it is neither passed nor failed, it is simply not a requirement any more.
-
-A week with no active day for a requirement carries no row for it, and the client draws those days as neither done nor missed.
-
-Closed weeks are snapshotted by the scheduled rollup at the week turn in the user's timezone. Reads never write.
+| Error | When |
+|---|---|
+| 422 `validation_error` | `weeks` is below 1 or above 52 |
 
 ---
 
