@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Select, and_, delete, func, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -193,6 +193,12 @@ class TaskRepository:
         task.status = TaskStatus.PENDING.value
         task.completed_at = None
         self.session.flush()
+
+    def rename_goal_tasks(self, *, goal_id: int, user_id: int, title: str) -> None:
+        query = (
+            update(Task).where(Task.goal_id == goal_id, Task.user_id == user_id).values(title=title)
+        )
+        self.session.execute(query)
 
     def add_generated_tasks(self, *, task_values: list[dict[str, object]]) -> None:
         if not task_values:

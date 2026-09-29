@@ -83,6 +83,8 @@ class GoalService:
                 weekly_target=payload.weekly_target,
                 update_weekly_target="weekly_target" in payload.model_fields_set,
             )
+            if payload.title is not None:
+                self.task_service.rename_goal_tasks(goal=goal)
             response = GoalResponse.model_validate(goal)
         return response
 

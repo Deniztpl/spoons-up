@@ -384,6 +384,8 @@ All fields optional. Send `weekly_target: null` to drop the quota.
 
 Lowering `weekly_target` takes effect on the open week immediately. Closed weeks in `period_results` keep the target they were judged against.
 
+A new `title` also renames every task of the goal, done ones included, since a goal-linked task always shows its goal's title. Closed weeks in `period_results` keep the title they closed with.
+
 #### DELETE /goals/{id}
 
 **204** — the goal, its rules, all its tasks and their reminders. Its `period_results` rows stay, so past weeks keep reading correctly. Old calendars lose the goal's blocks.

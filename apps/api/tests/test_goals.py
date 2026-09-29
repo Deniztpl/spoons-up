@@ -74,6 +74,16 @@ def create_rule(
     return response.json()
 
 
+def create_task(
+    client: TestClient,
+    headers: dict[str, str],
+    payload: dict[str, object],
+) -> dict[str, object]:
+    response = client.post("/api/v1/tasks", json=payload, headers=headers)
+    assert response.status_code == 201
+    return response.json()
+
+
 def test_goal_crud_and_area_filter(client: TestClient) -> None:
     headers = bearer(register(client, "goals@example.com"))
     first_area = create_area(client, headers, "Work")
@@ -134,6 +144,40 @@ def test_goal_crud_and_area_filter(client: TestClient) -> None:
     assert deleted.status_code == 204
     assert missing.status_code == 404
     assert missing.json()["code"] == "not_found"
+
+
+def test_renaming_a_goal_renames_its_tasks(client: TestClient) -> None:
+    headers = bearer(register(client, "goal-rename@example.com"))
+    area_id = str(create_area(client, headers, "Work")["id"])
+    goal = create_goal(client, headers, area_id=area_id, title="Deep work", weekly_target=3)
+    other = create_goal(client, headers, area_id=area_id, title="Reading", weekly_target=None)
+    everyday = client.post(
+        f"/api/v1/goals/{goal['id']}/rules",
+        json={"byweekday": [1, 2, 3, 4, 5, 6, 7]},
+        headers=headers,
+    )
+    placed = create_task(client, headers, {"goal_id": goal["id"], "scheduled_date": "2030-01-07"})
+    create_task(client, headers, {"goal_id": other["id"], "scheduled_date": "2030-01-07"})
+    create_task(client, headers, {"title": "Dentist", "scheduled_date": "2030-01-07"})
+    completed = client.post(f"/api/v1/tasks/{placed['id']}/check", headers=headers)
+
+    renamed = client.patch(
+        f"/api/v1/goals/{goal['id']}",
+        json={"title": "  Focus  "},
+        headers=headers,
+    )
+
+    assert everyday.status_code == 201
+    assert completed.status_code == 200
+    assert renamed.status_code == 200
+    today = client.get("/api/v1/today", headers=headers).json()
+    assert [task["title"] for task in today["tasks"]] == ["Focus"]
+    later = client.get("/api/v1/week", headers=headers).json()["later_tasks"]
+    assert [(item["title"], item["status"]) for item in later["items"]] == [
+        ("Focus", "DONE"),
+        ("Reading", "PENDING"),
+        ("Dentist", "PENDING"),
+    ]
 
 
 def test_goal_rule_crud_and_nested_response(client: TestClient) -> None:

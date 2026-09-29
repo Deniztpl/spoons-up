@@ -183,6 +183,14 @@ class TaskService:
         """Turn a rule occurrence back into an ad-hoc task."""
         self.task_repository.set_rule(task=task, rule_id=None, occurrence_date=None)
 
+    def rename_goal_tasks(self, *, goal: Goal) -> None:
+        """A goal-linked task shows its goal's title, so a rename reaches every one of them."""
+        self.task_repository.rename_goal_tasks(
+            goal_id=goal.id,
+            user_id=goal.user_id,
+            title=goal.title,
+        )
+
     def delete_untouched_pending_tasks_for_rule(
         self,
         *,
