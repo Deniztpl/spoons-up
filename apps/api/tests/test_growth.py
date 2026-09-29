@@ -20,12 +20,7 @@ CLOSED_WEEK_START = datetime(2026, 9, 14, 0, tzinfo=UTC)
 
 @pytest.fixture(autouse=True)
 def fixed_results_service_time(monkeypatch: pytest.MonkeyPatch) -> None:
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):  # type: ignore[no-untyped-def]
-            return FIXED_NOW if tz is None else FIXED_NOW.astimezone(tz)
-
-    monkeypatch.setattr(results_service_module, "datetime", FixedDateTime)
+    set_results_service_time(monkeypatch, FIXED_NOW)
 
 
 def test_freeze_writes_each_closed_week_once_and_growth_reads_it(
@@ -135,6 +130,40 @@ def test_freeze_waits_for_the_local_week_turn_and_catches_up_missed_weeks(
     assert new_york.last_frozen_week == date(2026, 9, 7)
 
 
+def test_a_week_reads_the_same_on_progress_while_open_and_on_growth_once_closed(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = bearer(register(client, "growth-same@example.com"))
+    area_id = str(create_area(client, headers, "Coding")["id"])
+    goal = create_goal(client, headers, area_id=area_id, title="Deep work", weekly_target=2)
+    practice = create_habit(client, headers, area_id=area_id, title="Practice", mode="DAILY")
+    review = create_habit(client, headers, area_id=area_id, title="Review", mode="WEEKLY")
+    # The week open at FIXED_NOW runs Monday 2026-09-21 to Sunday 2026-09-27.
+    for day in ("2026-09-21", "2026-09-22"):
+        check_habit(client, headers, habit_id=str(practice["id"]), target_date=day)
+    check_habit(client, headers, habit_id=str(review["id"]), target_date="2026-09-23")
+
+    with db_session.begin():
+        user = get_user(db_session, "growth-same@example.com")
+        start_in_closed_week(db_session, user=user)
+        db_session.add(build_task(user_id=user.id, goal=goal, day=date(2026, 9, 22), blocks="1.5"))
+
+    open_week = client.get("/api/v1/progress", headers=headers).json()
+
+    # Monday noon in Istanbul, once the week has turned.
+    week_turn = datetime(2026, 9, 28, 9, tzinfo=UTC)
+    run_results_freeze(db_session, now=week_turn)
+    set_results_service_time(monkeypatch, week_turn)
+    closed_week = client.get("/api/v1/growth?weeks=1", headers=headers).json()["weeks"][0]
+
+    # (1.5/2 + 2/7 + 1/1) / 3 = 67.9%
+    assert open_week["period_start"] == "2026-09-21"
+    assert open_week["percent"] == 68
+    assert closed_week == open_week
+
+
 def test_freeze_first_run_reaches_back_to_signup_beyond_a_year(
     client: TestClient,
     db_session: Session,
@@ -242,6 +271,15 @@ def test_growth_validates_its_query_and_requires_authentication(client: TestClie
     assert client.get("/api/v1/growth?weeks=53", headers=headers).status_code == 422
     assert client.get("/api/v1/growth?before=soon", headers=headers).status_code == 422
     assert client.get("/api/v1/growth").status_code == 401
+
+
+def set_results_service_time(monkeypatch: pytest.MonkeyPatch, fixed_now: datetime) -> None:
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[no-untyped-def]
+            return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(results_service_module, "datetime", FixedDateTime)
 
 
 def register(

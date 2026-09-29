@@ -116,7 +116,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Web tests cover both form entry points, Today's disabled date, Week's minimum date, limited navigation, moving/deleting tasks and the later-task info list
 - **Done when:** a task moved across a week boundary still counts toward its original week; past and third-week navigation are unavailable; a manually placed task after next week appears in the info count and list while an untouched generated occurrence does not
 
-## Slice 5 — Weekly progress and Growth
+## Slice 5 — Weekly progress and Growth — DONE
 
 The Areas screen and Today show the open week live; Growth shows closed weeks frozen in `period_results`. Both read the same per-area shape: requirements with `target` and `done`, a percent where every requirement counts equally, and seven day squares from `DAILY` habits.
 
@@ -155,7 +155,7 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - Area filter chips narrow the cards to one area on the client
 - A Show older weeks button loads the next 12 weeks until the signup week
 
-### Block 6 — Verification
+### Block 6 — Verification — DONE
 
 - Web tests cover the area rows and panel, Today's week panel and the Growth cards and filter
 - **Done when:** a closed week's outcome does not move after `weekly_target` is changed, and the same week reads the same percent on the Areas screen before it closes and on Growth after
