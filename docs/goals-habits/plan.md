@@ -32,7 +32,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 
 13. **Done when:** areas created in the browser appear after a reload; another user's area returns 404
 
-## Slice 2 — Habits
+## Slice 2 — Habits — DONE
 
 14. `habits` and `habit_entries` migration, CRUD — DONE
 15. Check off and undo — a row on check, hard delete on undo — DONE
@@ -41,7 +41,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
    - Today is the landing page after sign-in — DONE
    - Habits are added, edited and deleted from the area panel in a modal — DONE
    - An active area can be deleted from its menu after a strong warning; archive stays the reversible option — DONE
-18. **Done when:** a habit is checked off in the browser and survives a reload; checking twice in one period is rejected
+18. **Done when:** a habit is checked off in the browser and survives a reload; checking twice in one period is rejected — DONE
 
 ## Slice 3 — Goals and task generation — DONE
 
@@ -67,7 +67,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - Add, edit and delete tasks from Today. A task edit changes only that task; its linked schedule days are edited separately and keep the existing regeneration rules — DONE
 - **Done when:** goal-linked, standalone, timed and untimed tasks can be created from Today and survive a reload — DONE
 
-## Slice 4 — Calendar
+## Slice 4 — Calendar — DONE
 
 ### Block 1 — Task date rules — DONE
 
@@ -108,7 +108,7 @@ One slice at a time. Finish it, use it by hand, commit, move on.
 - `DELETE /tasks/{id}/repeat` ends a task's schedule: the task stays as an ad-hoc task and the rule goes, as `DELETE /rules/{id}` does
 - The shared form shows Repeat when editing any goal task; weekday edits on an existing schedule still use `PATCH /rules/{id}`
 
-### Block 5 — Verification
+### Block 5 — Verification — DONE
 
 - API tests cover both allowed weeks, rejected week navigation, custom week starts and user timezones
 - API tests cover past-date rejection and confirm that a patch without `scheduled_date` can still update another field

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.periods import get_week_start
 from app.models import Area, Goal, Habit, Task, TaskStatus, User
 from app.services import results as results_service_module
+from app.services import tasks as tasks_service_module
 
 pytestmark = pytest.mark.integration
 
@@ -160,6 +161,49 @@ def test_progress_counts_requirements_only_on_their_active_days(
     assert [day["done"] for day in sleep["days"]] == [False] * 7
     assert sleep["percent"] == 0
     assert body["percent"] == 7
+
+
+def test_progress_counts_a_task_moved_to_next_week_toward_its_original_week(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Task date checks run at the same observed time as progress.
+    monkeypatch.setattr(tasks_service_module, "datetime", results_service_module.datetime)
+    headers = bearer(register(client, "progress-moved@example.com"))
+    area_id = str(create_area(client, headers, "Coding")["id"])
+    goal = create_goal(client, headers, area_id=area_id, title="Deep work", weekly_target=2)
+    task = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-24", "block_count": 1},
+        headers=headers,
+    ).json()
+    with db_session.begin():
+        set_created_at(
+            db_session,
+            user_id=get_user(db_session, "progress-moved@example.com").id,
+            value=LONG_AGO,
+        )
+
+    moved = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"scheduled_date": "2026-09-29"},
+        headers=headers,
+    )
+    completed = client.post(f"/api/v1/tasks/{task['id']}/check", headers=headers)
+    response = client.get("/api/v1/progress", headers=headers)
+
+    assert moved.status_code == 200
+    assert moved.json()["scheduled_date"] == "2026-09-29"
+    assert moved.json()["period_start"] == "2026-09-21"
+    assert completed.status_code == 200
+    body = response.json()
+    assert body["period_start"] == "2026-09-21"
+    [coding] = body["areas"]
+    assert [(item["title"], item["target"], item["done"]) for item in coding["requirements"]] == [
+        ("Deep work", 2, 1),
+    ]
+    assert body["percent"] == 50
 
 
 def test_progress_uses_the_users_week_start_and_local_date(
