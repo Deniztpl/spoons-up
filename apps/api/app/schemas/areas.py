@@ -3,6 +3,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
+from app.models import AreaColor
+
 
 def _strip_name(value: str) -> str:
     return value.strip()
@@ -35,6 +37,7 @@ class AreaResponse(BaseModel):
 
     id: str
     name: str
+    color: AreaColor
     archived_at: datetime | None
     unarchived_at: datetime | None
     created_at: datetime

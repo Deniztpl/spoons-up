@@ -1,4 +1,4 @@
-from app.models.area import Area
+from app.models.area import Area, AreaColor
 from app.models.base import Base
 from app.models.goal import Goal, GoalRule
 from app.models.habit import Habit, HabitEntry, HabitMode, HabitPeriodType
@@ -9,6 +9,7 @@ from app.models.user import User
 
 __all__ = [
     "Area",
+    "AreaColor",
     "Base",
     "Goal",
     "GoalRule",

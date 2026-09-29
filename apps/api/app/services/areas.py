@@ -1,3 +1,5 @@
+import random
+from collections import Counter
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -5,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AreaNameTakenError, NotFoundError
-from app.models import Area, User
+from app.models import Area, AreaColor, User
 from app.repositories.areas import AreaRepository
 from app.repositories.users import UserRepository
 from app.schemas.areas import (
@@ -51,7 +53,11 @@ class AreaService:
     def create(self, payload: CreateAreaRequest, *, user_id: int) -> AreaResponse:
         try:
             with self.session.begin():
-                area = self.area_repository.create(user_id=user_id, name=payload.name)
+                area = self.area_repository.create(
+                    user_id=user_id,
+                    name=payload.name,
+                    color=self._pick_color(user_id=user_id),
+                )
                 response = AreaResponse.model_validate(area)
         except IntegrityError as exc:
             raise AreaNameTakenError from exc
@@ -110,6 +116,15 @@ class AreaService:
         with self.session.begin():
             area = self._get_owned_area(area_id=area_id, user_id=user_id)
             self.area_repository.delete(area=area)
+
+    def _pick_color(self, *, user_id: int) -> AreaColor:
+        """A random colour among those the user's areas use least, so areas stay apart."""
+        used = Counter(
+            area.color
+            for area in self.area_repository.list_for_user(user_id=user_id, include_archived=True)
+        )
+        fewest = min(used[color] for color in AreaColor)
+        return random.choice([color for color in AreaColor if used[color] == fewest])
 
     def _get_owned_area(self, *, area_id: int, user_id: int) -> Area:
         area = self.area_repository.get_for_user(area_id=area_id, user_id=user_id)

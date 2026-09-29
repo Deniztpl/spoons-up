@@ -14,6 +14,20 @@
         "title": "ArchiveAreaRequest",
         "type": "object"
       },
+      "AreaColor": {
+        "enum": [
+          "SLATE",
+          "GREEN",
+          "BROWN",
+          "STEEL",
+          "CLAY",
+          "PLUM",
+          "TEAL",
+          "ROSE"
+        ],
+        "title": "AreaColor",
+        "type": "string"
+      },
       "AreaListResponse": {
         "properties": {
           "areas": {
@@ -44,6 +58,9 @@
             ],
             "title": "Archived At"
           },
+          "color": {
+            "$ref": "#/components/schemas/AreaColor"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -73,6 +90,7 @@
         "required": [
           "id",
           "name",
+          "color",
           "archived_at",
           "unarchived_at",
           "created_at"

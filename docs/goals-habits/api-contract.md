@@ -159,11 +159,14 @@ An area object:
 {
   "id": "3",
   "name": "SWE",
+  "color": "SLATE",
   "archived_at": null,
   "unarchived_at": null,
   "created_at": "2026-09-01T09:00:00Z"
 }
 ```
+
+`color` is one of `SLATE`, `GREEN`, `BROWN`, `STEEL`, `CLAY`, `PLUM`, `TEAL` and `ROSE`. The server picks it when the area is created — at random among the colours the user's areas use least, archived ones included — and it does not change. The client maps each name to its own shades.
 
 #### GET /areas
 
@@ -174,7 +177,7 @@ An area object:
 **200**
 
 ```json
-{ "areas": [ { "id": "3", "name": "SWE", "archived_at": null, "unarchived_at": null, "created_at": "..." } ] }
+{ "areas": [ { "id": "3", "name": "SWE", "color": "SLATE", "archived_at": null, "unarchived_at": null, "created_at": "..." } ] }
 ```
 
 Ordered by `created_at`.

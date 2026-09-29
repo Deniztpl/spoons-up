@@ -28,10 +28,11 @@ class AreaRepository:
             )
         )
 
-    def create(self, *, user_id: int, name: str) -> Area:
+    def create(self, *, user_id: int, name: str, color: str) -> Area:
         area = Area(
             user_id=user_id,
             name=name,
+            color=color,
             archived_at=None,
             unarchived_at=None,
         )

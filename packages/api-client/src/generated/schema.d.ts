@@ -400,6 +400,11 @@ export interface components {
             /** Archived */
             archived: boolean;
         };
+        /**
+         * AreaColor
+         * @enum {string}
+         */
+        AreaColor: "SLATE" | "GREEN" | "BROWN" | "STEEL" | "CLAY" | "PLUM" | "TEAL" | "ROSE";
         /** AreaListResponse */
         AreaListResponse: {
             /** Areas */
@@ -409,6 +414,7 @@ export interface components {
         AreaResponse: {
             /** Archived At */
             archived_at: string | null;
+            color: components["schemas"]["AreaColor"];
             /**
              * Created At
              * Format: date-time

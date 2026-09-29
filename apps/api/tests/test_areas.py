@@ -121,6 +121,27 @@ def test_area_crud_and_archive_filter(client: TestClient) -> None:
     assert missing.json()["code"] == "not_found"
 
 
+def test_new_areas_spread_over_the_palette_before_a_colour_repeats(
+    client: TestClient,
+) -> None:
+    headers = bearer(register(client, "area-colors@example.com"))
+    palette = {"SLATE", "GREEN", "BROWN", "STEEL", "CLAY", "PLUM", "TEAL", "ROSE"}
+
+    first_eight = [
+        client.post("/api/v1/areas", json={"name": f"Area {index}"}, headers=headers).json()
+        for index in range(8)
+    ]
+    ninth = client.post("/api/v1/areas", json={"name": "Area 8"}, headers=headers).json()
+    listed = client.get("/api/v1/areas", headers=headers).json()["areas"]
+
+    assert {area["color"] for area in first_eight} == palette
+    assert ninth["color"] in palette
+    assert [area["color"] for area in listed] == [
+        *(area["color"] for area in first_eight),
+        ninth["color"],
+    ]
+
+
 def test_area_names_are_validated_and_unique_per_user(client: TestClient) -> None:
     first_user = register(client, "first-area-owner@example.com")
     second_user = register(client, "second-area-owner@example.com")

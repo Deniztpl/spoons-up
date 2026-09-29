@@ -14,6 +14,8 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Areas** — user-defined top-level buckets (SWE, Finance, Social). Habits and goals belong to one; a standalone task may sit outside them. An area's weekly progress is derived from the requirements under it; see **Weekly progress**.
 
+**Area colours** — each area gets a colour from an eight-colour palette when it is created, at random among the colours the user's areas use least, so areas stay apart until the palette runs out. Its goals, habits and tasks are drawn in that colour; standalone tasks keep the accent. Goals and habits tell apart by shape and weight instead: a goal is a square with a solid fill, a habit a circle with a light fill and an outline. Progress bars and day squares keep the accent.
+
 **Habits** — behaviours you check off. No scheduling, no duration, no moving. `DAILY` is one checkbox per day, `WEEKLY` one per week on any day. No quota, no fixed weekdays.
 
 **Habit entries are sparse** — a row exists only when the user checks off. No row means not done; there is no MISSED or SKIPPED status. Undo is a hard delete.
@@ -145,6 +147,7 @@ erDiagram
         bigint id PK
         bigint user_id FK
         text name
+        text color
         timestamptz archived_at
         timestamptz unarchived_at
         timestamptz created_at
@@ -272,6 +275,7 @@ CREATE INDEX ON refresh_tokens (user_id) WHERE revoked_at IS NULL;
 | id | bigint | PK |
 | user_id | bigint | FK -> users |
 | name | text | |
+| color | text | one of the eight palette names, picked at creation |
 | archived_at | timestamptz | nullable |
 | unarchived_at | timestamptz | nullable, when the area last came back from the archive |
 | created_at | timestamptz | |
