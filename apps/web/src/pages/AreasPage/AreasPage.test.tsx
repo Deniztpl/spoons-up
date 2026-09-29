@@ -8,10 +8,11 @@ import { AreasPage } from "./AreasPage";
 const onLogout = vi.fn(async () => ({ ok: true as const }));
 const createdAt = "2026-09-22T09:00:00Z";
 
-function area(id: string, name: string) {
+function area(id: string, name: string, color = "SLATE") {
   return {
     id,
     name,
+    color,
     archived_at: null,
     unarchived_at: null,
     created_at: createdAt,
@@ -367,7 +368,7 @@ describe("Areas page", () => {
     const fetchMock = vi.fn(async (request: Request) => {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/api/v1/areas") {
-        return Response.json({ areas: [area("1", "SWE"), area("2", "Finance")] });
+        return Response.json({ areas: [area("1", "SWE"), area("2", "Finance", "GREEN")] });
       }
       if (request.method === "GET" && url.pathname === "/api/v1/goals") {
         return Response.json({ goals: [goal("7", "CS Block", 2), goal("8", "Ship", 2)] });
@@ -413,6 +414,10 @@ describe("Areas page", () => {
     expect(screen.getByRole("button", { name: "SWE" })).toHaveAccessibleDescription(
       "64% this week",
     );
+    expect(screen.getByRole("button", { name: "SWE" })).toHaveClass("area-slate");
+    expect(screen.getByRole("button", { name: "Finance" })).toHaveClass("area-green");
+    // The panel draws SWE's goals and habits in SWE's colour.
+    expect(csBlock.closest(".area-slate")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Finance" })).toHaveAccessibleDescription(
       "Nothing to measure this week",
     );

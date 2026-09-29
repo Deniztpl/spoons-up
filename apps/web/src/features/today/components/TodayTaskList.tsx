@@ -1,10 +1,13 @@
 import type { CSSProperties } from "react";
 
 import { CheckIcon } from "../../../components/ui/CheckIcon";
+import type { Area } from "../../areas/api/areasApi";
+import { areaColorClass } from "../../areas/areaColor";
 import type { TodayTask } from "../api/todayApi";
 
 type TodayTaskListProps = {
   tasks: TodayTask[];
+  areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: string[];
   onToggle: (task: TodayTask) => void;
   onEdit: (task: TodayTask) => void;
@@ -16,6 +19,7 @@ const blockGap = 8;
 
 export function TodayTaskList({
   tasks,
+  areaByGoalId,
   pendingTaskIds,
   onToggle,
   onEdit,
@@ -58,10 +62,15 @@ export function TodayTaskList({
           const checkId = `task-${task.id}-check`;
           const titleId = `task-${task.id}-title`;
           const detailsId = `task-${task.id}-details`;
+          const area = task.goal_id ? areaByGoalId.get(task.goal_id) : undefined;
           return (
             <li
               key={task.id}
-              className="overflow-hidden rounded-[10px] bg-card shadow-[0_1px_0_rgb(28_43_33/0.06),0_0_0_1px_rgb(28_43_33/0.07)]"
+              className={`overflow-hidden rounded-[10px] ${
+                area
+                  ? `border border-area/38 bg-[color-mix(in_oklch,var(--area)_9%,var(--color-card))] ${areaColorClass(area)}`
+                  : "bg-card shadow-[0_1px_0_rgb(28_43_33/0.06),0_0_0_1px_rgb(28_43_33/0.07)]"
+              }`}
               style={{ height }}
             >
               <div
@@ -85,7 +94,7 @@ export function TodayTaskList({
                   />
                   <span
                     aria-hidden="true"
-                    className="grid size-4 shrink-0 place-items-center rounded-[5px] border-[1.5px] border-ink-soft text-white peer-checked:border-accent peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                    className="grid size-4 shrink-0 place-items-center rounded-[5px] border-[1.5px] border-ink-soft text-white peer-checked:border-area peer-checked:bg-area peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
                   >
                     {isDone ? <CheckIcon /> : null}
                   </span>

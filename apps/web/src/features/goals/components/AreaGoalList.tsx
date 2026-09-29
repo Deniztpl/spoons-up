@@ -29,7 +29,7 @@ export function AreaGoalList({ goals, weekResults, onEdit }: AreaGoalListProps) 
               <span
                 aria-hidden="true"
                 className={`grid size-4 shrink-0 place-items-center rounded-[5px] border-[1.5px] ${
-                  isDone ? "border-accent bg-accent text-white" : "border-muted"
+                  isDone ? "border-area bg-area text-white" : "border-muted"
                 }`}
               >
                 {isDone ? <CheckIcon /> : null}
@@ -42,7 +42,7 @@ export function AreaGoalList({ goals, weekResults, onEdit }: AreaGoalListProps) 
               </span>
               <span
                 aria-hidden={result ? "true" : undefined}
-                className={`shrink-0 rounded-[5px] bg-accent/12 px-[7px] py-[3px] text-accent ${
+                className={`shrink-0 rounded-[5px] bg-area/12 px-[7px] py-[3px] text-area-strong ${
                   result
                     ? "text-[11px] font-semibold tabular-nums"
                     : "text-[10px] font-medium uppercase tracking-[0.06em]"

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
+import { areaColorClass } from "../../features/areas/areaColor";
 import { AreaDetails } from "../../features/areas/components/AreaDetails/AreaDetails";
 import { AreaIcon } from "../../features/areas/components/AreaIcon";
 import { AreaList } from "../../features/areas/components/AreaList/AreaList";
@@ -198,7 +199,7 @@ export function AreasPage({
             onCancelDeleting={areaState.cancelDeleting}
             onDelete={() => void areaState.deleteArea()}
           >
-            <div className="flex flex-col gap-4">
+            <div className={`flex flex-col gap-4 ${areaColorClass(selectedArea)}`}>
               {selectedResult ? <AreaWeekProgress result={selectedResult} /> : null}
 
               {isLoadingItems ? (
@@ -248,12 +249,12 @@ export function AreasPage({
                 <button type="button" className={addButtonClassName} onClick={areaGoals.openCreate}>
                   <span
                     aria-hidden="true"
-                    className="size-2.5 rounded-[3px] border-[1.5px] border-accent"
+                    className="size-2.5 rounded-[3px] border-[1.5px] border-area"
                   />
                   Add goal
                 </button>
                 <button type="button" className={addButtonClassName} onClick={areaHabits.openCreate}>
-                  <span aria-hidden="true" className="size-2.5 rounded-full border-[1.5px] border-habit" />
+                  <span aria-hidden="true" className="size-2.5 rounded-full border-[1.5px] border-area" />
                   Add habit
                 </button>
               </div>

@@ -9,6 +9,8 @@ import {
 } from "react";
 
 import { CheckIcon } from "../../../components/ui/CheckIcon";
+import type { Area } from "../../areas/api/areasApi";
+import { areaColorClass } from "../../areas/areaColor";
 import type { WeekResponse, WeekTask } from "../api/weekApi";
 
 const HOUR_HEIGHT = 64;
@@ -17,6 +19,8 @@ const DAY_HEIGHT = 24 * HOUR_HEIGHT;
 const MIN_BLOCK_HEIGHT = 18;
 // Blocks at least this tall show a time row above the title.
 const TALL_BLOCK_HEIGHT = 40;
+// Blocks of 90 minutes or more also name their area under the title.
+const AREA_LABEL_BLOCK_HEIGHT = 94;
 const LAST_START_MINUTES = 23 * 60 + 45;
 const TASK_DRAG_TYPE = "application/x-spoons-up-task";
 const calendarColumns = "grid grid-cols-[52px_repeat(7,minmax(0,1fr))]";
@@ -38,6 +42,7 @@ const fullDateFormat = new Intl.DateTimeFormat("en", {
 type WeekCalendarProps = {
   week: WeekResponse;
   todayDate: string;
+  areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
   onCreate: (defaults: { scheduledDate: string; startTime?: string }) => void;
   onEdit: (task: WeekTask) => void;
@@ -55,6 +60,7 @@ type BlockPlacement = {
 export function WeekCalendar({
   week,
   todayDate,
+  areaByGoalId,
   pendingTaskIds,
   onCreate,
   onEdit,
@@ -142,6 +148,7 @@ export function WeekCalendar({
                   isToday={day.date === todayDate}
                   isPast={day.date < todayDate}
                   tasks={day.tasks.filter((task) => task.start_time === null)}
+                  areaByGoalId={areaByGoalId}
                   pendingTaskIds={pendingTaskIds}
                   onEdit={onEdit}
                   onToggle={onToggle}
@@ -170,6 +177,7 @@ export function WeekCalendar({
                 isToday={day.date === todayDate}
                 isPast={day.date < todayDate}
                 tasks={day.tasks.filter((task) => task.start_time !== null)}
+                areaByGoalId={areaByGoalId}
                 pendingTaskIds={pendingTaskIds}
                 onCreate={onCreate}
                 onEdit={onEdit}
@@ -239,6 +247,7 @@ export function WeekCalendar({
                       <li key={task.id}>
                         <MobileTaskCard
                           task={task}
+                          area={taskArea(task, areaByGoalId)}
                           isPending={pendingTaskIds.has(task.id)}
                           onEdit={onEdit}
                           onToggle={onToggle}
@@ -275,6 +284,7 @@ function UntimedDropZone({
   isToday,
   isPast,
   tasks,
+  areaByGoalId,
   pendingTaskIds,
   onEdit,
   onToggle,
@@ -284,6 +294,7 @@ function UntimedDropZone({
   isToday: boolean;
   isPast: boolean;
   tasks: WeekTask[];
+  areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
   onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
@@ -306,6 +317,7 @@ function UntimedDropZone({
         <TaskBlock
           key={task.id}
           task={task}
+          area={taskArea(task, areaByGoalId)}
           isPending={pendingTaskIds.has(task.id)}
           onEdit={onEdit}
           onToggle={onToggle}
@@ -320,6 +332,7 @@ function DayTimeline({
   isToday,
   isPast,
   tasks,
+  areaByGoalId,
   pendingTaskIds,
   onCreate,
   onEdit,
@@ -330,6 +343,7 @@ function DayTimeline({
   isToday: boolean;
   isPast: boolean;
   tasks: WeekTask[];
+  areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
   onCreate: WeekCalendarProps["onCreate"];
   onEdit: (task: WeekTask) => void;
@@ -374,6 +388,7 @@ function DayTimeline({
         <TaskBlock
           key={task.id}
           task={task}
+          area={taskArea(task, areaByGoalId)}
           placement={blockPlacement(task, column, columns)}
           isPending={pendingTaskIds.has(task.id)}
           onEdit={onEdit}
@@ -407,12 +422,14 @@ function NowLine() {
 // Timed tasks are placed on the timeline; untimed tasks flow in their row.
 function TaskBlock({
   task,
+  area,
   placement,
   isPending,
   onEdit,
   onToggle,
 }: {
   task: WeekTask;
+  area: Area | undefined;
   placement?: BlockPlacement;
   isPending: boolean;
   onEdit: (task: WeekTask) => void;
@@ -420,13 +437,14 @@ function TaskBlock({
 }) {
   const isDone = task.status === "DONE";
   const isTall = placement !== undefined && placement.height >= TALL_BLOCK_HEIGHT;
+  const showsArea = area !== undefined && isTall && placement.height >= AREA_LABEL_BLOCK_HEIGHT;
   const titleClassName = `min-w-0 text-[12px] font-medium leading-[1.25] text-ink ${isDone ? "line-through" : ""}`;
   const badge =
     task.block_count !== null || task.rule_id !== null ? (
       <span
         aria-hidden="true"
         className={`ml-auto flex h-[15px] shrink-0 items-center gap-[3px] rounded-[5px] px-1 text-[9.5px] font-semibold text-white tabular-nums ${
-          task.goal_id ? "bg-accent" : "bg-ink-soft"
+          task.goal_id ? "bg-area-strong" : "bg-ink-soft"
         }`}
       >
         {task.rule_id !== null ? <RepeatIcon className="size-[9px]" /> : null}
@@ -442,15 +460,15 @@ function TaskBlock({
         placement ? "absolute z-[2] hover:z-[3]" : "relative h-[22px] shrink-0"
       } overflow-hidden rounded-[7px] border shadow-[0_1px_2px_rgb(28_43_33/0.06)] transition-shadow hover:shadow-[0_4px_12px_rgb(28_43_33/0.14)] ${
         task.goal_id
-          ? "border-accent/38 bg-[color-mix(in_oklch,var(--color-accent)_9%,var(--color-card))]"
+          ? "border-area/38 bg-[color-mix(in_oklch,var(--area)_9%,var(--color-card))]"
           : "border-ink/16 bg-card"
-      } ${isPending ? "cursor-wait opacity-60" : isDone ? "opacity-50" : ""}`}
+      } ${areaColorClass(area)} ${isPending ? "cursor-wait opacity-60" : isDone ? "opacity-50" : ""}`}
       style={placement}
       onDragStart={(event) => startDragging(event, task, task.duration_minutes ?? 30)}
     >
       <button
         type="button"
-        aria-label={taskSummary(task)}
+        aria-label={taskSummary(task, area)}
         className={`absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
           isPending ? "cursor-wait" : "cursor-grab active:cursor-grabbing"
         }`}
@@ -470,9 +488,18 @@ function TaskBlock({
               </span>
               {badge}
             </div>
-            <span className={titleClassName} style={titleClamp(placement.height)}>
+            <span
+              className={titleClassName}
+              style={titleClamp(placement.height - (showsArea ? 15 : 0))}
+            >
               {task.title}
             </span>
+            {showsArea ? (
+              <span className="mt-auto flex min-w-0 items-center gap-[5px] text-[10.5px] font-medium text-area-strong">
+                <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-area" />
+                <span className="truncate">{area.name}</span>
+              </span>
+            ) : null}
           </>
         ) : (
           <>
@@ -488,11 +515,13 @@ function TaskBlock({
 
 function MobileTaskCard({
   task,
+  area,
   isPending,
   onEdit,
   onToggle,
 }: {
   task: WeekTask;
+  area: Area | undefined;
   isPending: boolean;
   onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
@@ -500,9 +529,11 @@ function MobileTaskCard({
   const isDone = task.status === "DONE";
   return (
     <div
-      className={`flex min-h-[52px] items-center gap-2.5 rounded-[10px] bg-card pl-3 shadow-[0_1px_0_rgb(28_43_33/0.06),0_0_0_1px_rgb(28_43_33/0.07)] ${
-        isDone ? "opacity-50" : ""
-      }`}
+      className={`flex min-h-[52px] items-center gap-2.5 rounded-[10px] pl-3 ${
+        area
+          ? `border border-area/38 bg-[color-mix(in_oklch,var(--area)_9%,var(--color-card))] ${areaColorClass(area)}`
+          : "bg-card shadow-[0_1px_0_rgb(28_43_33/0.06),0_0_0_1px_rgb(28_43_33/0.07)]"
+      } ${isDone ? "opacity-50" : ""}`}
     >
       <TaskCheck task={task} isPending={isPending} onToggle={onToggle} size="large" />
       <button
@@ -553,7 +584,7 @@ function TaskCheck({
       />
       <span
         aria-hidden="true"
-        className={`grid place-items-center border-[1.5px] border-muted text-white transition peer-checked:border-accent peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-accent ${
+        className={`grid place-items-center border-[1.5px] border-muted text-white transition peer-checked:border-area peer-checked:bg-area peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-accent ${
           size === "large" ? "size-[18px] rounded-[5px]" : "size-[11px] rounded-[3px]"
         }`}
       >
@@ -636,8 +667,13 @@ function titleClamp(height: number): CSSProperties {
   };
 }
 
-function taskSummary(task: WeekTask) {
+function taskArea(task: WeekTask, areaByGoalId: ReadonlyMap<string, Area>) {
+  return task.goal_id ? areaByGoalId.get(task.goal_id) : undefined;
+}
+
+function taskSummary(task: WeekTask, area: Area | undefined) {
   const details = [task.title];
+  if (area) details.push(area.name);
   if (task.start_time) {
     details.push(task.end_time ? `${task.start_time} to ${task.end_time}` : task.start_time);
   }

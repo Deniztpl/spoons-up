@@ -260,6 +260,71 @@ describe("Week page", () => {
     });
   });
 
+  it("draws goal tasks in their area's colour and names the area on long blocks", async () => {
+    const longGoalTask = {
+      ...task("43", "Deep work", "2026-09-24", "13:00"),
+      goal_id: "7",
+      duration_minutes: 120,
+      end_time: "15:00",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname === "/api/v1/today") {
+          return Response.json(todayResponse());
+        }
+        if (url.pathname === "/api/v1/week") {
+          const response = weekResponse();
+          return Response.json({
+            ...response,
+            days: response.days.map((day) =>
+              day.date === "2026-09-24" ? { ...day, tasks: [...day.tasks, longGoalTask] } : day,
+            ),
+          });
+        }
+        if (url.pathname === "/api/v1/areas") {
+          return Response.json({
+            areas: [
+              {
+                id: "3",
+                name: "Coding",
+                color: "GREEN",
+                archived_at: null,
+                unarchived_at: null,
+                created_at: "2026-09-22T09:00:00Z",
+              },
+            ],
+          });
+        }
+        if (url.pathname === "/api/v1/goals") {
+          return Response.json({
+            goals: [
+              {
+                id: "7",
+                area_id: "3",
+                title: "Deep work",
+                weekly_target: 2,
+                created_at: "2026-09-22T09:00:00Z",
+                rules: [],
+              },
+            ],
+          });
+        }
+        throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+      }),
+    );
+    renderPage();
+
+    const block = await screen.findByRole("button", { name: "Deep work, Coding, 13:00 to 15:00" });
+    const card = block.closest("article")!;
+    expect(card).toHaveClass("area-green");
+    expect(within(card).getByText("Coding")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Plan sprint, 09:00 to 10:00" }).closest("article"),
+    ).not.toHaveClass("area-green");
+  });
+
   it("edits and deletes a task through the shared form", async () => {
     let hasTask = true;
     const fetchMock = vi.fn(async (request: Request) => {

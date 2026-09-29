@@ -307,6 +307,49 @@ describe("Today page", () => {
     expect(screen.queryByRole("list", { name: "Tasks" })).not.toBeInTheDocument();
   });
 
+  it("draws goal tasks and habits in their area's colour", async () => {
+    stubFetch(
+      vi.fn(async (request: Request) => {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === "/api/v1/areas") {
+          return Response.json({ areas: [{ ...area("3", "Coding"), color: "GREEN" }] });
+        }
+        if (pathname === "/api/v1/goals") {
+          return Response.json({
+            goals: [
+              {
+                id: "7",
+                area_id: "3",
+                title: "CS Block",
+                weekly_target: 2,
+                created_at: "2026-09-22T09:00:00Z",
+                rules: [],
+              },
+            ],
+          });
+        }
+        return todayResponse({
+          tasks: [
+            todayTask("483", "CS Block", ["19:00", "21:00"], 2),
+            { ...todayTask("484", "Dentist", ["08:00", "09:00"], null), goal_id: null, rule_id: null },
+          ],
+        });
+      }),
+    );
+    renderPage();
+
+    const tasks = await screen.findByRole("list", { name: "Tasks" });
+    await waitFor(() => {
+      expect(within(tasks).getByRole("checkbox", { name: "CS Block" }).closest("li")).toHaveClass(
+        "area-green",
+      );
+    });
+    expect(
+      within(tasks).getByRole("checkbox", { name: "Dentist" }).closest("li"),
+    ).not.toHaveClass("area-green");
+    expect(screen.getByRole("checkbox", { name: "Read" }).closest("li")).toHaveClass("area-green");
+  });
+
   it("completes and undoes a task", async () => {
     const pending = todayTask("483", "CS Block", ["19:00", "21:00"], 2);
     const done = todayTask("481", "Review PR", ["09:30", "10:30"], 1, "DONE");

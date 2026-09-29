@@ -34,7 +34,7 @@ export function AreaHabitList({ habits, weekResults, onEdit }: AreaHabitListProp
               <span
                 aria-hidden="true"
                 className={`grid size-4 shrink-0 place-items-center rounded-full border-[1.5px] ${
-                  isDone ? "border-habit bg-habit text-white" : "border-muted"
+                  isDone ? "border-area bg-area/20 text-area-strong" : "border-muted"
                 }`}
               >
                 {isDone ? <CheckIcon /> : null}
@@ -47,7 +47,7 @@ export function AreaHabitList({ habits, weekResults, onEdit }: AreaHabitListProp
               </span>
               <span
                 aria-hidden={result ? "true" : undefined}
-                className={`shrink-0 rounded-[5px] bg-habit/12 px-[7px] py-[3px] text-habit-strong ${
+                className={`shrink-0 rounded-[5px] border border-area/40 px-[6px] py-[2px] text-area-strong ${
                   result
                     ? "text-[11px] font-semibold tabular-nums"
                     : "text-[10px] font-medium uppercase tracking-[0.06em]"

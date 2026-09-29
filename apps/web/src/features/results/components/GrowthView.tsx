@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { CheckIcon } from "../../../components/ui/CheckIcon";
 import type { Area } from "../../areas/api/areasApi";
+import { areaColorClass } from "../../areas/areaColor";
 import type { AreaResult, GrowthWeek } from "../api/resultsApi";
 import { useGrowth } from "../hooks/useGrowth";
 import { weekAmount } from "../weekAmount";
@@ -18,6 +19,7 @@ export function GrowthView({ areas }: { areas: Area[] }) {
   const openWeekStart = openWeek === undefined ? (weeks?.[0]?.period_start ?? null) : openWeek;
   const hasResults = weeks?.some((week) => week.areas.length > 0) ?? false;
   const filters = [{ id: null, name: "All areas" }, ...areas];
+  const areaById = new Map(areas.map((area) => [area.id, area]));
 
   return (
     <section aria-label="Growth">
@@ -70,6 +72,7 @@ export function GrowthView({ areas }: { areas: Area[] }) {
               key={week.period_start}
               week={week}
               shownAreaId={shownAreaId}
+              areaById={areaById}
               isOpen={week.period_start === openWeekStart}
               onToggle={() =>
                 setOpenWeek(week.period_start === openWeekStart ? null : week.period_start)
@@ -105,11 +108,13 @@ export function GrowthView({ areas }: { areas: Area[] }) {
 function GrowthWeekCard({
   week,
   shownAreaId,
+  areaById,
   isOpen,
   onToggle,
 }: {
   week: GrowthWeek;
   shownAreaId: string | null;
+  areaById: ReadonlyMap<string, Area>;
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -158,7 +163,7 @@ function GrowthWeekCard({
           {areas.length === 0 ? (
             <p className="py-2 text-[13px] text-ink-soft">Nothing was measured this week.</p>
           ) : (
-            <GrowthAreaTable areas={areas} />
+            <GrowthAreaTable areas={areas} areaById={areaById} />
           )}
         </div>
       ) : null}
@@ -166,7 +171,13 @@ function GrowthWeekCard({
   );
 }
 
-function GrowthAreaTable({ areas }: { areas: AreaResult[] }) {
+function GrowthAreaTable({
+  areas,
+  areaById,
+}: {
+  areas: AreaResult[];
+  areaById: ReadonlyMap<string, Area>;
+}) {
   const days = areas[0]?.days ?? [];
   // One area's goals and habits are shown at a time.
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
@@ -207,6 +218,7 @@ function GrowthAreaTable({ areas }: { areas: AreaResult[] }) {
           <GrowthAreaRow
             key={area.area_id}
             area={area}
+            colorArea={areaById.get(area.area_id)}
             isOpen={area.area_id === openAreaId}
             onToggle={() =>
               setOpenAreaId((current) => (current === area.area_id ? null : area.area_id))
@@ -221,11 +233,14 @@ function GrowthAreaTable({ areas }: { areas: AreaResult[] }) {
 
 function GrowthAreaRow({
   area,
+  colorArea,
   isOpen,
   onToggle,
   onClose,
 }: {
   area: AreaResult;
+  // The live area, for its colour; results carry only the id and name.
+  colorArea: Area | undefined;
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -265,7 +280,11 @@ function GrowthAreaRow({
   return (
     <>
       {/* The whole row toggles; its button carries the keyboard and screen reader access. */}
-      <tr ref={rowRef} className="cursor-pointer border-b border-line" onClick={onToggle}>
+      <tr
+        ref={rowRef}
+        className={`cursor-pointer border-b border-line ${areaColorClass(colorArea)}`}
+        onClick={onToggle}
+      >
         <th scope="row" className="py-[9px] pr-2.5 text-left text-[13.5px] font-normal sm:pr-3.5">
           <button
             ref={buttonRef}
@@ -274,6 +293,7 @@ function GrowthAreaRow({
             aria-controls={cardId}
             className="flex max-w-full items-center gap-1.5 rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-area" />
             <span className="truncate">{area.name}</span>
             <span aria-hidden="true" className="shrink-0 text-xs text-muted">
               {isOpen ? "▴" : "▾"}
@@ -296,10 +316,13 @@ function GrowthAreaRow({
         </td>
         <td className="py-[9px] pr-2.5 sm:pr-3.5">
           <span className="flex items-center gap-[5px] text-xs text-ink-soft tabular-nums sm:gap-[7px]">
-            <span aria-hidden="true" className="size-[9px] shrink-0 rounded-[3px] bg-accent" />
+            <span aria-hidden="true" className="size-[9px] shrink-0 rounded-[3px] bg-area" />
             <span className="sr-only">Goals </span>
             {metFraction(area, "GOAL")}
-            <span aria-hidden="true" className="ml-1 size-[9px] shrink-0 rounded-full bg-habit" />
+            <span
+              aria-hidden="true"
+              className="ml-1 size-[9px] shrink-0 rounded-full border-[1.5px] border-area"
+            />
             <span className="sr-only">Habits </span>
             {metFraction(area, "HABIT")}
           </span>
@@ -315,7 +338,7 @@ function GrowthAreaRow({
             <div
               ref={cardRef}
               id={cardId}
-              className="absolute left-3 top-1 z-20 w-[340px] max-w-[calc(100vw-4rem)] rounded-[11px] border border-ink/12 bg-card p-1.5 shadow-[0_10px_26px_rgb(28_43_33/0.14)]"
+              className={`absolute left-3 top-1 z-20 w-[340px] max-w-[calc(100vw-4rem)] rounded-[11px] border border-ink/12 bg-card p-1.5 shadow-[0_10px_26px_rgb(28_43_33/0.14)] ${areaColorClass(colorArea)}`}
             >
               <ul aria-label={`${area.name} goals and habits`} className="flex flex-col">
                 {area.requirements.map((item) => {
@@ -333,8 +356,8 @@ function GrowthAreaRow({
                         } ${
                           isMet
                             ? isGoal
-                              ? "border-accent bg-accent text-white"
-                              : "border-habit bg-habit text-white"
+                              ? "border-area bg-area text-white"
+                              : "border-area bg-area/20 text-area-strong"
                             : "border-muted"
                         }`}
                       >
@@ -350,8 +373,10 @@ function GrowthAreaRow({
                       </span>
                       <span
                         aria-hidden="true"
-                        className={`shrink-0 rounded-[5px] px-[7px] py-[3px] text-[11px] font-semibold tabular-nums ${
-                          isGoal ? "bg-accent/12 text-accent" : "bg-habit/12 text-habit-strong"
+                        className={`shrink-0 rounded-[5px] text-[11px] font-semibold text-area-strong tabular-nums ${
+                          isGoal
+                            ? "bg-area/12 px-[7px] py-[3px]"
+                            : "border border-area/40 px-[6px] py-[2px]"
                         }`}
                       >
                         {weekAmount(item)}

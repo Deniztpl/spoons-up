@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import { AppLayout } from "../../components/layout/AppLayout";
+import { useAreaLookup } from "../../features/areas/hooks/useAreaLookup";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
 import { useProgress } from "../../features/results/hooks/useProgress";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
@@ -30,6 +31,7 @@ export function TodayPage({
 }) {
   const todayState = useToday();
   const progressState = useProgress();
+  const areaLookup = useAreaLookup();
   // Checking work off or changing a task moves this week's progress.
   const reloadAll = () => {
     todayState.reload();
@@ -90,6 +92,7 @@ export function TodayPage({
               {tasks.length > 0 ? (
                 <TodayTaskList
                   tasks={tasks}
+                  areaByGoalId={areaLookup.areaByGoalId}
                   pendingTaskIds={todayState.pendingTaskIds}
                   onToggle={(task) => void refreshProgressAfter(todayState.toggleTask(task))}
                   onEdit={taskForm.openEdit}
@@ -112,6 +115,7 @@ export function TodayPage({
               {today && habits.length > 0 ? (
                 <TodayHabitList
                   habits={habits}
+                  areaById={areaLookup.areaById}
                   pendingHabitIds={todayState.pendingHabitIds}
                   onToggle={(habit) => void refreshProgressAfter(todayState.toggleHabit(habit))}
                 />

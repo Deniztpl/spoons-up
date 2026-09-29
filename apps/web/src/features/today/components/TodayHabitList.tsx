@@ -1,21 +1,30 @@
 import { CheckIcon } from "../../../components/ui/CheckIcon";
+import type { Area } from "../../areas/api/areasApi";
+import { areaColorClass } from "../../areas/areaColor";
 import type { TodayHabit } from "../api/todayApi";
 
 type TodayHabitListProps = {
   habits: TodayHabit[];
+  areaById: ReadonlyMap<string, Area>;
   pendingHabitIds: string[];
   onToggle: (habit: TodayHabit) => void;
 };
 
-export function TodayHabitList({ habits, pendingHabitIds, onToggle }: TodayHabitListProps) {
+export function TodayHabitList({
+  habits,
+  areaById,
+  pendingHabitIds,
+  onToggle,
+}: TodayHabitListProps) {
   return (
     <ul className="flex flex-col gap-2">
       {habits.map((habit) => {
         const isPending = pendingHabitIds.includes(habit.id);
         return (
-          <li key={habit.id}>
+          <li key={habit.id} className={areaColorClass(areaById.get(habit.area_id))}>
+            {/* Habits are outlined and lightly filled, so they read apart from goal tasks. */}
             <label
-              className={`flex h-8 items-center gap-2.5 rounded-[10px] bg-habit/9 pl-[13px] pr-2 transition hover:brightness-[.985] ${
+              className={`flex h-8 items-center gap-2.5 rounded-[10px] border border-area/35 bg-card pl-[13px] pr-2 transition hover:brightness-[.985] ${
                 isPending ? "cursor-wait" : "cursor-pointer"
               }`}
             >
@@ -28,7 +37,7 @@ export function TodayHabitList({ habits, pendingHabitIds, onToggle }: TodayHabit
               />
               <span
                 aria-hidden="true"
-                className="grid size-4 shrink-0 place-items-center rounded-full border-[1.5px] border-ink-soft text-white peer-checked:border-habit peer-checked:bg-habit peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                className="grid size-4 shrink-0 place-items-center rounded-full border-[1.5px] border-ink-soft text-area-strong peer-checked:border-area peer-checked:bg-area/20 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
               >
                 {habit.done ? <CheckIcon /> : null}
               </span>

@@ -26,6 +26,12 @@
   --font-sans: Outfit, system-ui, sans-serif;
 }
 
+@theme inline {
+  /* The colour of the area an item belongs to, set by the area-* classes below. */
+  --color-area: var(--area);
+  --color-area-strong: var(--area-strong);
+}
+
 :root {
   color: #1c2b21;
   background: #f4f2ec;
@@ -34,6 +40,51 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Items without an area keep the accent. */
+  --area: var(--color-accent);
+  --area-strong: var(--color-accent-strong);
+}
+
+/* The API's area palette: a base for fills and marks, and a darker shade that meets WCAG AA
+   as text. */
+.area-slate {
+  --area: #37596b;
+  --area-strong: #2c4856;
+}
+
+.area-green {
+  --area: #5f8a5c;
+  --area-strong: #466b44;
+}
+
+.area-brown {
+  --area: #9b7a4f;
+  --area-strong: #7a5c35;
+}
+
+.area-steel {
+  --area: #6f7f96;
+  --area-strong: #56657c;
+}
+
+.area-clay {
+  --area: #a8746f;
+  --area-strong: #8e5b56;
+}
+
+.area-plum {
+  --area: #7a6a95;
+  --area-strong: #62557c;
+}
+
+.area-teal {
+  --area: #3f8078;
+  --area-strong: #2f6660;
+}
+
+.area-rose {
+  --area: #a3637f;
+  --area-strong: #84495f;
 }
 
 * {

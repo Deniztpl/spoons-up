@@ -1,5 +1,6 @@
 import type { AreaResult } from "../../../results/api/resultsApi";
 import type { Area } from "../../api/areasApi";
+import { areaColorClass } from "../../areaColor";
 import { AreaCreateForm } from "./AreaCreateForm";
 
 const emptyWeek = Array.from({ length: 7 }, () => ({ done: false }));
@@ -57,15 +58,16 @@ export function AreaList({
         aria-current={isSelected ? "page" : undefined}
         className={`flex w-full items-center gap-[18px] rounded-lg border px-[18px] py-[17px] text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
           isArchivedView ? "border-dashed" : ""
-        } ${tone}`}
+        } ${tone} ${areaColorClass(area)}`}
         onClick={() => onSelect(area.id)}
       >
-        <span
-          className={`min-w-0 flex-1 truncate text-[15.5px] font-medium ${
-            isArchivedView ? "text-ink-soft" : ""
-          }`}
-        >
-          {area.name}
+        <span className="flex min-w-0 flex-1 items-center gap-2.5">
+          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-area" />
+          <span
+            className={`truncate text-[15.5px] font-medium ${isArchivedView ? "text-ink-soft" : ""}`}
+          >
+            {area.name}
+          </span>
         </span>
         {area.archived_at !== null ? (
           <span className="shrink-0 whitespace-nowrap text-xs text-ink-soft">

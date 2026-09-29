@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { AppLayout } from "../../components/layout/AppLayout";
+import { useAreaLookup } from "../../features/areas/hooks/useAreaLookup";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
 import { useTaskForm } from "../../features/tasks/hooks/useTaskForm";
@@ -16,6 +17,7 @@ export function WeekPage({
   onLogout: () => Promise<AuthActionResult>;
 }) {
   const weekState = useWeek();
+  const areaLookup = useAreaLookup();
   const taskForm = useTaskForm({
     onSaved: weekState.reload,
     onDeleted: weekState.reload,
@@ -112,6 +114,7 @@ export function WeekPage({
           <WeekCalendar
             week={week}
             todayDate={todayDate}
+            areaByGoalId={areaLookup.areaByGoalId}
             pendingTaskIds={weekState.pendingTaskIds}
             onCreate={taskForm.openCreate}
             onEdit={taskForm.openEdit}
