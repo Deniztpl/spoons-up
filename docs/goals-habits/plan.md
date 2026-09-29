@@ -147,12 +147,13 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - The right panel shows this week's met/total per area from `/progress`, as tiles (Today v2 design, variant B)
 - It refreshes after tasks and habits are checked
 
-### Block 5 — Growth screen
+### Block 5 — Growth screen — DONE
 
 - The History tab becomes a Growth button at the top right of the Areas header; the tabs are Active and Archived
 - Week cards from `/growth`, newest first, with the week label, the area count and the week's percent bar
-- An open card lists each area with its day squares, goals met/total, habits met/total and percent
+- An open card lists each area with its day squares, goals met/total, habits met/total and percent; an area row opens a card listing each goal and habit with its done/target and its own percent
 - Area filter chips narrow the cards to one area on the client
+- A Show older weeks button loads the next 12 weeks until the signup week
 
 ### Block 6 — Verification
 

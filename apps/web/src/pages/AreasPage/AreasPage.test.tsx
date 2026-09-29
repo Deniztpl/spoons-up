@@ -59,6 +59,25 @@ function weekDays(doneCount: number) {
   }));
 }
 
+function growthArea(
+  id: string,
+  name: string,
+  percent: number,
+  doneDays: number,
+  requirements: unknown[],
+) {
+  return {
+    area_id: id,
+    name,
+    percent,
+    days: ["14", "15", "16", "17", "18", "19", "20"].map((day, index) => ({
+      date: `2026-09-${day}`,
+      done: index < doneDays,
+    })),
+    requirements,
+  };
+}
+
 function requestsTo(fetchMock: ReturnType<typeof vi.fn>, method: string, pathname: string) {
   return fetchMock.mock.calls
     .map(([request]) => request as Request)
@@ -270,7 +289,11 @@ describe("Areas page", () => {
       "aria-pressed",
       "true",
     );
-    expect(within(views).getByRole("button", { name: /History/ })).toBeDisabled();
+    expect(within(views).queryByRole("button", { name: /History/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Growth" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(
       screen.queryByRole("button", { name: "Old project (archived)" }),
     ).not.toBeInTheDocument();
@@ -412,6 +435,218 @@ describe("Areas page", () => {
     await waitFor(() => {
       expect(requestsTo(fetchMock, "GET", "/api/v1/progress")).toHaveLength(2);
     });
+  });
+
+  it("shows closed weeks and their areas on the Growth view", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/v1/areas") {
+        return Response.json({ areas: [area("1", "SWE"), area("2", "Finance")] });
+      }
+      if (url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
+      }
+      if (url.pathname === "/api/v1/habits") {
+        return Response.json({ habits: [] });
+      }
+      if (url.pathname === "/api/v1/progress") {
+        return Response.json(progress());
+      }
+      if (url.pathname === "/api/v1/growth" && url.searchParams.get("before") === "2026-09-07") {
+        return Response.json({
+          weeks: [
+            {
+              period_start: "2026-08-31",
+              period_end: "2026-09-06",
+              percent: 40,
+              areas: [
+                growthArea("1", "SWE", 40, 0, [
+                  { ref_type: "GOAL", ref_id: "7", title: "CS Block", target: 5, done: 2 },
+                ]),
+              ],
+            },
+          ],
+          has_more: false,
+        });
+      }
+      if (url.pathname === "/api/v1/growth") {
+        return Response.json({
+          weeks: [
+            {
+              period_start: "2026-09-14",
+              period_end: "2026-09-20",
+              percent: 70,
+              areas: [
+                growthArea("1", "SWE", 74, 5, [
+                  { ref_type: "GOAL", ref_id: "7", title: "CS Block", target: 2, done: 2 },
+                  { ref_type: "GOAL", ref_id: "8", title: "Ship", target: 2, done: 1.5 },
+                  { ref_type: "HABIT", ref_id: "10", title: "Read", target: 7, done: 5 },
+                ]),
+                growthArea("2", "Finance", 67, 0, [
+                  { ref_type: "GOAL", ref_id: "9", title: "Budget", target: 3, done: 1 },
+                  { ref_type: "HABIT", ref_id: "12", title: "Review", target: 1, done: 1 },
+                ]),
+              ],
+            },
+            {
+              period_start: "2026-09-07",
+              period_end: "2026-09-13",
+              percent: 50,
+              areas: [
+                growthArea("1", "SWE", 50, 0, [
+                  { ref_type: "GOAL", ref_id: "7", title: "CS Block", target: 2, done: 1 },
+                ]),
+              ],
+            },
+          ],
+          has_more: true,
+        });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByRole("heading", { name: "SWE" });
+    expect(requestsTo(fetchMock, "GET", "/api/v1/growth")).toHaveLength(0);
+
+    const growth = screen.getByRole("button", { name: "Growth" });
+    await user.click(growth);
+
+    expect(growth).toHaveAttribute("aria-pressed", "true");
+    const views = screen.getByRole("group", { name: "Area views" });
+    expect(within(views).getByRole("button", { name: "Active" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.queryByRole("button", { name: "Add goal" })).not.toBeInTheDocument();
+
+    const newest = await screen.findByRole("button", { name: /^Sep 14\s–\s20$/ });
+    const older = screen.getByRole("button", { name: /^Sep 7\s–\s13$/ });
+    expect(newest).toHaveAttribute("aria-expanded", "true");
+    expect(newest).toHaveAccessibleDescription("2 areas, 70% done");
+    expect(older).toHaveAttribute("aria-expanded", "false");
+    expect(older).toHaveAccessibleDescription("1 area, 50% done");
+
+    const weekRow = (name: string) =>
+      screen.getByRole("rowheader", { name }).closest("tr") as HTMLElement;
+    expect(weekRow("SWE")).toHaveTextContent("5 of 7 days with every daily habit done");
+    expect(weekRow("SWE")).toHaveTextContent("Goals 1/2");
+    expect(weekRow("SWE")).toHaveTextContent("Habits 0/1");
+    expect(weekRow("SWE")).toHaveTextContent("74%");
+    expect(weekRow("Finance")).toHaveTextContent("0 of 7 days with every daily habit done");
+    expect(weekRow("Finance")).toHaveTextContent("Goals 0/1");
+    expect(weekRow("Finance")).toHaveTextContent("Habits 1/1");
+    expect(weekRow("Finance")).toHaveTextContent("67%");
+
+    const sweToggle = within(weekRow("SWE")).getByRole("button", { name: "SWE" });
+    expect(sweToggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(sweToggle);
+
+    expect(sweToggle).toHaveAttribute("aria-expanded", "true");
+    const sweItems = within(
+      screen.getByRole("list", { name: "SWE goals and habits" }),
+    ).getAllByRole("listitem");
+    expect(sweItems).toHaveLength(3);
+    expect(sweItems[0]).toHaveTextContent("CS Block, goal, 2 of 2");
+    expect(sweItems[0]).toHaveTextContent("100%");
+    expect(within(sweItems[1]!).getByText("1½/2")).toBeInTheDocument();
+    expect(sweItems[1]).toHaveTextContent("Ship, goal, 1.5 of 2");
+    expect(sweItems[1]).toHaveTextContent("75%");
+    expect(sweItems[2]).toHaveTextContent("Read, habit, 5 of 7");
+    expect(sweItems[2]).toHaveTextContent("71%");
+
+    await user.keyboard("{Escape}");
+    expect(sweToggle).toHaveAttribute("aria-expanded", "false");
+    expect(sweToggle).toHaveFocus();
+
+    await user.click(within(weekRow("Finance")).getByText("67%"));
+    expect(screen.getByRole("list", { name: "Finance goals and habits" })).toBeInTheDocument();
+    await user.click(within(weekRow("SWE")).getByText("74%"));
+    expect(sweToggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.queryByRole("list", { name: "Finance goals and habits" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("heading", { name: "Areas" }));
+    expect(sweToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list", { name: "SWE goals and habits" })).not.toBeInTheDocument();
+
+    const filters = screen.getByRole("group", { name: "Areas shown" });
+    expect(within(filters).getByRole("button", { name: "All areas" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(within(filters).getByRole("button", { name: "Finance" }));
+
+    expect(within(filters).getByRole("button", { name: "Finance" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(newest).toHaveAccessibleDescription("1 area, 67% done");
+    expect(older).toHaveAccessibleDescription("0 areas, nothing measured");
+    expect(screen.queryByRole("rowheader", { name: "SWE" })).not.toBeInTheDocument();
+    expect(weekRow("Finance")).toHaveTextContent("67%");
+
+    await user.click(older);
+    expect(older).toHaveAttribute("aria-expanded", "true");
+    expect(newest).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Nothing was measured this week.")).toBeInTheDocument();
+
+    await user.click(within(filters).getByRole("button", { name: "All areas" }));
+    expect(weekRow("SWE")).toHaveTextContent("Goals 0/1");
+    expect(weekRow("SWE")).toHaveTextContent("Habits –");
+    expect(weekRow("SWE")).toHaveTextContent("50%");
+
+    await user.click(older);
+    expect(older).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show older weeks" }));
+
+    const oldest = await screen.findByRole("button", { name: /^Aug 31\s–\sSep 6$/ });
+    expect(oldest).toHaveAccessibleDescription("1 area, 40% done");
+    expect(newest).toBeInTheDocument();
+    expect(older).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show older weeks" })).not.toBeInTheDocument();
+    const growthRequests = requestsTo(fetchMock, "GET", "/api/v1/growth");
+    expect(growthRequests).toHaveLength(2);
+    expect(new URL(growthRequests[0]!.url).searchParams.has("before")).toBe(false);
+    expect(new URL(growthRequests[1]!.url).searchParams.get("before")).toBe("2026-09-07");
+  });
+
+  it("explains an empty Growth view before any week closes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === "/api/v1/growth") {
+          return Response.json({
+            weeks: [{ period_start: "2026-09-14", period_end: "2026-09-20", percent: null, areas: [] }],
+            has_more: false,
+          });
+        }
+        return respondWithAreas([area("1", "SWE")])(request);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByRole("heading", { name: "SWE" });
+    await user.click(screen.getByRole("button", { name: "Growth" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Your growth starts here" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Sep 14/ })).not.toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Area views" })).getByRole("button", {
+        name: "Active",
+      }),
+    );
+    expect(screen.getByRole("heading", { name: "SWE" })).toBeInTheDocument();
   });
 
   it("adds, edits, and deletes habits from the area panel", async () => {
