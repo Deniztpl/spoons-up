@@ -180,6 +180,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Growth */
+        get: operations["get_growth_api_v1_growth_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/habits": {
         parameters: {
             query?: never;
@@ -388,19 +405,6 @@ export interface components {
             /** Areas */
             areas: components["schemas"]["AreaResponse"][];
         };
-        /** AreaProgressResponse */
-        AreaProgressResponse: {
-            /** Area Id */
-            area_id: string;
-            /** Days */
-            days: components["schemas"]["ProgressDayResponse"][];
-            /** Name */
-            name: string;
-            /** Percent */
-            percent: number;
-            /** Requirements */
-            requirements: components["schemas"]["RequirementResponse"][];
-        };
         /** AreaResponse */
         AreaResponse: {
             /** Archived At */
@@ -416,6 +420,19 @@ export interface components {
             name: string;
             /** Unarchived At */
             unarchived_at: string | null;
+        };
+        /** AreaResultResponse */
+        AreaResultResponse: {
+            /** Area Id */
+            area_id: string;
+            /** Days */
+            days: components["schemas"]["ResultDayResponse"][];
+            /** Name */
+            name: string;
+            /** Percent */
+            percent: number;
+            /** Requirements */
+            requirements: components["schemas"]["RequirementResponse"][];
         };
         /** CheckHabitRequest */
         CheckHabitRequest: {
@@ -521,6 +538,28 @@ export interface components {
             /** Start Time */
             start_time: string | null;
         };
+        /** GrowthResponse */
+        GrowthResponse: {
+            /** Weeks */
+            weeks: components["schemas"]["GrowthWeekResponse"][];
+        };
+        /** GrowthWeekResponse */
+        GrowthWeekResponse: {
+            /** Areas */
+            areas: components["schemas"]["AreaResultResponse"][];
+            /** Percent */
+            percent: number | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+        };
         /** HabitEntryResponse */
         HabitEntryResponse: {
             /**
@@ -589,20 +628,10 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
-        /** ProgressDayResponse */
-        ProgressDayResponse: {
-            /**
-             * Date
-             * Format: date
-             */
-            date: string;
-            /** Done */
-            done: boolean;
-        };
         /** ProgressResponse */
         ProgressResponse: {
             /** Areas */
-            areas: components["schemas"]["AreaProgressResponse"][];
+            areas: components["schemas"]["AreaResultResponse"][];
             /** Percent */
             percent: number | null;
             /**
@@ -653,6 +682,16 @@ export interface components {
             target: number;
             /** Title */
             title: string;
+        };
+        /** ResultDayResponse */
+        ResultDayResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Done */
+            done: boolean;
         };
         /** TaskResponse */
         TaskResponse: {
@@ -1623,6 +1662,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoalRuleResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    get_growth_api_v1_growth_get: {
+        parameters: {
+            query?: {
+                weeks?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrowthResponse"];
                 };
             };
             /** @description Unauthorized */

@@ -129,7 +129,7 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - Day squares: a day is done when every `DAILY` habit active that day was checked
 - API tests cover mid-week additions, archive and restore inside a week, fractional blocks, the 100% cap, goals without a target, the squares and custom week starts
 
-### Block 2 — Frozen weeks and the Growth read
+### Block 2 — Frozen weeks and the Growth read — DONE
 
 - `period_results` migration; `area_id` is nullable with `ON DELETE SET NULL`, so rows outlive their area
 - The hourly job snapshots each user's closed week at the week turn in their timezone and writes any closed week it missed; repeated runs write nothing new

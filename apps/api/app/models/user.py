@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     Identity,
     SmallInteger,
@@ -37,6 +38,8 @@ class User(Base):
         DateTime(timezone=True),
         server_default=func.now(),
     )
+    # Start of the latest week whose results are frozen; null until the first freeze.
+    last_frozen_week: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

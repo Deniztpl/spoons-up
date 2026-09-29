@@ -60,7 +60,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Catch-up on return** — past dormant time is not generated. The first authenticated request after more than 30 days restores only the current 14-day window; older empty dates stay empty.
 
-**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; reads never write.
+**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; a user's first run reaches back to their signup week, at most 52 weeks. Each week is frozen once, tracked by `users.last_frozen_week`; reads never write.
 
 **Weekly target follows active days** — a requirement is judged only on the days it was actually active that week. A `DAILY` habit's target is the number of days between `max(week_start, created_at, area.unarchived_at)` and `min(week_end, area.archived_at)`, so a habit added on Wednesday needs 5 of 5, not 7 of 7. `WEEKLY` habits stay 1 as long as one day was active. Goals keep their full `weekly_target` even when active for only part of a week, and goals with no `weekly_target` are not requirements. A requirement with no active day in a week gets no `period_results` row and the week reads empty for it. The area's two timestamps cannot express more than one archive cycle inside a week; the last one wins.
 
@@ -128,6 +128,7 @@ erDiagram
         text timezone
         smallint week_start_day
         timestamptz last_seen_at
+        date last_frozen_week
         timestamptz created_at
     }
 
@@ -246,6 +247,7 @@ erDiagram
 | timezone | text | IANA, e.g. Europe/Istanbul |
 | week_start_day | smallint | 1 = Monday |
 | last_seen_at | timestamptz | refreshed on each authenticated request; the daily job skips users who have been away |
+| last_frozen_week | date | nullable; start of the latest week whose results are frozen |
 | created_at | timestamptz | |
 
 #### refresh_tokens

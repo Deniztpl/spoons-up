@@ -16,6 +16,11 @@ class HabitRepository:
             query = query.where(Habit.area_id == area_id)
         return list(self.session.scalars(query.order_by(Habit.created_at, Habit.id)))
 
+    def list_all_for_user(self, *, user_id: int) -> list[Habit]:
+        """List the user's habits, including those under archived areas."""
+        query = select(Habit).where(Habit.user_id == user_id).order_by(Habit.created_at, Habit.id)
+        return list(self.session.scalars(query))
+
     def get_for_user(self, *, habit_id: int, user_id: int) -> Habit | None:
         return self.session.scalar(
             self._select_active_habits_for_user(user_id=user_id).where(Habit.id == habit_id)

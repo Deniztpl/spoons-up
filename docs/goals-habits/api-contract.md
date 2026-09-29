@@ -724,7 +724,7 @@ Counts back from the last closed week, newest first. `weeks` is between 1 and 52
 
 `requirements` come from `period_results` and never change: `title`, `target` and `done` were snapshotted when the week closed, so a week still reads correctly after a habit or goal is renamed, retargeted or deleted. `days` are read from habit entries, so a deleted habit's squares go with it. A week with no results carries an empty `areas` list and a null `percent`.
 
-Closed weeks are snapshotted by the scheduled job at the week turn in the user's timezone; a closed week it missed is written on its next run.
+Closed weeks are snapshotted by the scheduled job at the week turn in the user's timezone; a closed week it missed is written on its next run, and a user's first run reaches back to their signup week, at most 52 weeks.
 
 | Error | When |
 |---|---|

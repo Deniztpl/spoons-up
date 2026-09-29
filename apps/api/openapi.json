@@ -30,45 +30,6 @@
         "title": "AreaListResponse",
         "type": "object"
       },
-      "AreaProgressResponse": {
-        "properties": {
-          "area_id": {
-            "title": "Area Id",
-            "type": "string"
-          },
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/ProgressDayResponse"
-            },
-            "title": "Days",
-            "type": "array"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "percent": {
-            "title": "Percent",
-            "type": "integer"
-          },
-          "requirements": {
-            "items": {
-              "$ref": "#/components/schemas/RequirementResponse"
-            },
-            "title": "Requirements",
-            "type": "array"
-          }
-        },
-        "required": [
-          "area_id",
-          "name",
-          "percent",
-          "days",
-          "requirements"
-        ],
-        "title": "AreaProgressResponse",
-        "type": "object"
-      },
       "AreaResponse": {
         "properties": {
           "archived_at": {
@@ -117,6 +78,45 @@
           "created_at"
         ],
         "title": "AreaResponse",
+        "type": "object"
+      },
+      "AreaResultResponse": {
+        "properties": {
+          "area_id": {
+            "title": "Area Id",
+            "type": "string"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/ResultDayResponse"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "percent": {
+            "title": "Percent",
+            "type": "integer"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementResponse"
+            },
+            "title": "Requirements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "area_id",
+          "name",
+          "percent",
+          "days",
+          "requirements"
+        ],
+        "title": "AreaResultResponse",
         "type": "object"
       },
       "CheckHabitRequest": {
@@ -483,6 +483,62 @@
         "title": "GoalRuleResponse",
         "type": "object"
       },
+      "GrowthResponse": {
+        "properties": {
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/GrowthWeekResponse"
+            },
+            "title": "Weeks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "weeks"
+        ],
+        "title": "GrowthResponse",
+        "type": "object"
+      },
+      "GrowthWeekResponse": {
+        "properties": {
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaResultResponse"
+            },
+            "title": "Areas",
+            "type": "array"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "period_end": {
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_start",
+          "period_end",
+          "percent",
+          "areas"
+        ],
+        "title": "GrowthWeekResponse",
+        "type": "object"
+      },
       "HabitEntryResponse": {
         "properties": {
           "completed_at": {
@@ -634,30 +690,11 @@
         "title": "LogoutRequest",
         "type": "object"
       },
-      "ProgressDayResponse": {
-        "properties": {
-          "date": {
-            "format": "date",
-            "title": "Date",
-            "type": "string"
-          },
-          "done": {
-            "title": "Done",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "date",
-          "done"
-        ],
-        "title": "ProgressDayResponse",
-        "type": "object"
-      },
       "ProgressResponse": {
         "properties": {
           "areas": {
             "items": {
-              "$ref": "#/components/schemas/AreaProgressResponse"
+              "$ref": "#/components/schemas/AreaResultResponse"
             },
             "title": "Areas",
             "type": "array"
@@ -791,6 +828,25 @@
           "done"
         ],
         "title": "RequirementResponse",
+        "type": "object"
+      },
+      "ResultDayResponse": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "done"
+        ],
+        "title": "ResultDayResponse",
         "type": "object"
       },
       "TaskResponse": {
@@ -2573,6 +2629,76 @@
         "summary": "Create Goal Rule",
         "tags": [
           "goals"
+        ]
+      }
+    },
+    "/api/v1/growth": {
+      "get": {
+        "operationId": "get_growth_api_v1_growth_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "weeks",
+            "required": false,
+            "schema": {
+              "default": 8,
+              "maximum": 52,
+              "minimum": 1,
+              "title": "Weeks",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrowthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get Growth",
+        "tags": [
+          "growth"
         ]
       }
     },

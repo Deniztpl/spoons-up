@@ -12,16 +12,16 @@ class RequirementResponse(BaseModel):
     done: float
 
 
-class ProgressDayResponse(BaseModel):
+class ResultDayResponse(BaseModel):
     date: date
     done: bool
 
 
-class AreaProgressResponse(BaseModel):
+class AreaResultResponse(BaseModel):
     area_id: str
     name: str
     percent: int
-    days: list[ProgressDayResponse]
+    days: list[ResultDayResponse]
     requirements: list[RequirementResponse]
 
 
@@ -29,4 +29,15 @@ class ProgressResponse(BaseModel):
     period_start: date
     period_end: date
     percent: int | None
-    areas: list[AreaProgressResponse]
+    areas: list[AreaResultResponse]
+
+
+class GrowthWeekResponse(BaseModel):
+    period_start: date
+    period_end: date
+    percent: int | None
+    areas: list[AreaResultResponse]
+
+
+class GrowthResponse(BaseModel):
+    weeks: list[GrowthWeekResponse]

@@ -6,6 +6,7 @@ from app.api.deps.db import DatabaseSession
 from app.repositories.areas import AreaRepository
 from app.repositories.goals import GoalRepository
 from app.repositories.habits import HabitRepository
+from app.repositories.period_results import PeriodResultRepository
 from app.repositories.refresh_tokens import RefreshTokenRepository
 from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
@@ -133,6 +134,7 @@ def get_results_service(session: DatabaseSession) -> ResultsService:
         AreaRepository(session),
         GoalRepository(session),
         HabitRepository(session),
+        PeriodResultRepository(session),
         TaskRepository(session),
         UserRepository(session),
     )

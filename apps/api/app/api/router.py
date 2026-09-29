@@ -4,7 +4,7 @@ from app.api.areas import router as areas_router
 from app.api.auth import router as auth_router
 from app.api.goals import goals_router, rules_router
 from app.api.habits import router as habits_router
-from app.api.results import progress_router
+from app.api.results import growth_router, progress_router
 from app.api.tasks import router as tasks_router
 from app.api.today import router as today_router
 from app.api.week import router as week_router
@@ -19,3 +19,4 @@ api_router.include_router(tasks_router)
 api_router.include_router(today_router)
 api_router.include_router(week_router)
 api_router.include_router(progress_router)
+api_router.include_router(growth_router)

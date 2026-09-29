@@ -17,6 +17,11 @@ class GoalRepository:
             query = query.where(Goal.area_id == area_id)
         return list(self.session.scalars(query.order_by(Goal.created_at, Goal.id)))
 
+    def list_all_for_user(self, *, user_id: int) -> list[Goal]:
+        """List the user's goals, including those under archived areas."""
+        query = select(Goal).where(Goal.user_id == user_id).order_by(Goal.created_at, Goal.id)
+        return list(self.session.scalars(query))
+
     def get_for_user(self, *, goal_id: int, user_id: int) -> Goal | None:
         return self.session.scalar(
             self._select_active_goals_for_user(user_id=user_id).where(Goal.id == goal_id)

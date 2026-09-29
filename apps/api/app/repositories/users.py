@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -39,4 +39,8 @@ class UserRepository:
 
     def set_last_seen_at(self, *, user: User, last_seen_at: datetime) -> None:
         user.last_seen_at = last_seen_at
+        self.session.flush()
+
+    def set_last_frozen_week(self, *, user: User, week_start: date) -> None:
+        user.last_frozen_week = week_start
         self.session.flush()
