@@ -103,21 +103,25 @@ class TaskRepository:
         *,
         user_id: int,
         goal_id: int | None,
+        parent_id: int | None,
         title: str,
-        scheduled_date: date,
+        scheduled_date: date | None,
+        due_date: date | None,
         start_time: time | None,
         duration_minutes: int | None,
         end_time: time | None,
         block_count: float | None,
-        period_start: date,
+        period_start: date | None,
     ) -> Task:
         task = Task(
             user_id=user_id,
             goal_id=goal_id,
+            parent_id=parent_id,
             rule_id=None,
             title=title,
             occurrence_date=None,
             scheduled_date=scheduled_date,
+            due_date=due_date,
             start_time=start_time,
             duration_minutes=duration_minutes,
             end_time=end_time,
@@ -133,22 +137,28 @@ class TaskRepository:
         *,
         task: Task,
         title: str,
-        scheduled_date: date,
+        scheduled_date: date | None,
+        due_date: date | None,
         start_time: time | None,
         duration_minutes: int | None,
         end_time: time | None,
         block_count: float | None,
+        period_start: date | None,
         update_title: bool,
         update_scheduled_date: bool,
+        update_due_date: bool,
         update_start_time: bool,
         update_duration_minutes: bool,
         update_end_time: bool,
         update_block_count: bool,
+        update_period_start: bool,
     ) -> Task:
         if update_title:
             task.title = title
         if update_scheduled_date:
             task.scheduled_date = scheduled_date
+        if update_due_date:
+            task.due_date = due_date
         if update_start_time:
             task.start_time = start_time
         if update_duration_minutes:
@@ -157,8 +167,28 @@ class TaskRepository:
             task.end_time = end_time
         if update_block_count:
             task.block_count = Decimal(str(block_count)) if block_count is not None else None
+        if update_period_start:
+            task.period_start = period_start
         self.session.flush()
         return task
+
+    def clear_pending_step_plans(self, *, parent_id: int, user_id: int) -> None:
+        query = (
+            update(Task)
+            .where(
+                Task.parent_id == parent_id,
+                Task.user_id == user_id,
+                Task.status == TaskStatus.PENDING.value,
+            )
+            .values(
+                scheduled_date=None,
+                period_start=None,
+                start_time=None,
+                end_time=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        self.session.execute(query)
 
     def set_rule(
         self,

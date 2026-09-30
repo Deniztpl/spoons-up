@@ -218,7 +218,7 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
         const changes = taskChanges(draft);
         if (changes) {
           const { data, error } = await updateTask(draft.task.id, changes);
-          if (!data) {
+          if (!data || data.scheduled_date === null) {
             setFormError(taskErrorMessage(error, "We couldn't save this task."));
             return;
           }

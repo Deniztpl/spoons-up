@@ -176,6 +176,11 @@ class GoalService:
                     {"rule_id": "This task already repeats"},
                     "This task already repeats",
                 )
+            if task.scheduled_date is None:
+                raise ValidationAppError(
+                    {"scheduled_date": "Repeat needs a scheduled task"},
+                    "Repeat needs a scheduled task",
+                )
             if task.scheduled_date.isoweekday() not in payload.byweekday:
                 raise ValidationAppError(
                     {"byweekday": "Repeat must include the task's own weekday"},

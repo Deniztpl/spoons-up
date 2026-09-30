@@ -152,6 +152,49 @@ def test_rule_and_task_schedule_values_can_be_null(
     assert task.block_count is None
 
 
+def test_journal_task_database_constraints(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user, goal, _ = create_task_context(
+        client,
+        db_session,
+        email="journal-task-constraints@example.com",
+    )
+    parent = journal_task(user_id=user.id)
+    db_session.add(parent)
+    db_session.flush()
+
+    invalid_tasks = [
+        # Goal tasks must remain scheduled.
+        journal_task(user_id=user.id, goal_id=goal.id),
+        # Schedule and period identity are nullable only as a pair.
+        journal_task(user_id=user.id, scheduled_date=date(2030, 10, 1)),
+        # A start time cannot exist without a calendar date.
+        journal_task(user_id=user.id, start_time=time(9)),
+        # Due dates belong only to top-level Journal work.
+        journal_task(
+            user_id=user.id,
+            parent_id=parent.id,
+            due_date=date(2030, 10, 1),
+        ),
+        # A step cannot also belong to a goal.
+        journal_task(
+            user_id=user.id,
+            goal_id=goal.id,
+            parent_id=parent.id,
+            scheduled_date=date(2030, 10, 1),
+            period_start=date(2030, 9, 30),
+        ),
+    ]
+
+    for invalid_task in invalid_tasks:
+        with pytest.raises(IntegrityError):
+            with db_session.begin_nested():
+                db_session.add(invalid_task)
+                db_session.flush()
+
+
 def test_rule_deletion_keeps_task_and_goal_deletion_removes_it(
     client: TestClient,
     db_session: Session,
@@ -255,6 +298,33 @@ def build_task(
             occurrence_date,
             week_start_day=user.week_start_day,
         ),
+    )
+
+
+def journal_task(
+    *,
+    user_id: int,
+    goal_id: int | None = None,
+    parent_id: int | None = None,
+    scheduled_date: date | None = None,
+    due_date: date | None = None,
+    start_time: time | None = None,
+    period_start: date | None = None,
+) -> Task:
+    return Task(
+        user_id=user_id,
+        goal_id=goal_id,
+        parent_id=parent_id,
+        rule_id=None,
+        title="Journal item",
+        occurrence_date=None,
+        scheduled_date=scheduled_date,
+        due_date=due_date,
+        start_time=start_time,
+        duration_minutes=None,
+        end_time=None,
+        block_count=None,
+        period_start=period_start,
     )
 
 

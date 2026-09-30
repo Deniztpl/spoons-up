@@ -485,15 +485,16 @@ export interface components {
         CreateTaskRequest: {
             /** Block Count */
             block_count?: number | null;
+            /** Due Date */
+            due_date?: string | null;
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Goal Id */
             goal_id?: string | null;
-            /**
-             * Scheduled Date
-             * Format: date
-             */
-            scheduled_date: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Scheduled Date */
+            scheduled_date?: string | null;
             /** Start Time */
             start_time?: string | null;
             /** Title */
@@ -707,6 +708,8 @@ export interface components {
             block_count: number | null;
             /** Completed At */
             completed_at: string | null;
+            /** Due Date */
+            due_date: string | null;
             /** Duration Minutes */
             duration_minutes: number | null;
             /** End Time */
@@ -717,18 +720,14 @@ export interface components {
             id: string;
             /** Occurrence Date */
             occurrence_date: string | null;
-            /**
-             * Period Start
-             * Format: date
-             */
-            period_start: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Period Start */
+            period_start: string | null;
             /** Rule Id */
             rule_id: string | null;
-            /**
-             * Scheduled Date
-             * Format: date
-             */
-            scheduled_date: string;
+            /** Scheduled Date */
+            scheduled_date: string | null;
             /** Start Time */
             start_time: string | null;
             /**
@@ -859,6 +858,8 @@ export interface components {
         UpdateTaskRequest: {
             /** Block Count */
             block_count?: number | null;
+            /** Due Date */
+            due_date?: string | null;
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Scheduled Date */

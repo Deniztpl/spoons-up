@@ -296,6 +296,18 @@
             ],
             "title": "Block Count"
           },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
           "duration_minutes": {
             "anyOf": [
               {
@@ -320,10 +332,29 @@
             ],
             "title": "Goal Id"
           },
+          "parent_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
           "scheduled_date": {
-            "format": "date",
-            "title": "Scheduled Date",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Date"
           },
           "start_time": {
             "anyOf": [
@@ -350,9 +381,6 @@
             "title": "Title"
           }
         },
-        "required": [
-          "scheduled_date"
-        ],
         "title": "CreateTaskRequest",
         "type": "object"
       },
@@ -897,6 +925,18 @@
             ],
             "title": "Completed At"
           },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
           "duration_minutes": {
             "anyOf": [
               {
@@ -946,10 +986,28 @@
             ],
             "title": "Occurrence Date"
           },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
           "period_start": {
-            "format": "date",
-            "title": "Period Start",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
           },
           "rule_id": {
             "anyOf": [
@@ -963,9 +1021,16 @@
             "title": "Rule Id"
           },
           "scheduled_date": {
-            "format": "date",
-            "title": "Scheduled Date",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Date"
           },
           "start_time": {
             "anyOf": [
@@ -996,9 +1061,11 @@
           "id",
           "goal_id",
           "rule_id",
+          "parent_id",
           "title",
           "occurrence_date",
           "scheduled_date",
+          "due_date",
           "start_time",
           "duration_minutes",
           "end_time",
@@ -1409,6 +1476,18 @@
               }
             ],
             "title": "Block Count"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
           },
           "duration_minutes": {
             "anyOf": [
