@@ -10,12 +10,15 @@ import {
   type UpdateTaskFields,
 } from "../../tasks/api/tasksApi";
 import type { JournalItem, JournalStep } from "../api/journalApi";
+import type { JournalPriority } from "../journalPriority";
 import { journalErrorMessage } from "./useJournal";
 
 export type JournalFields = {
   title: string;
   dueDate: string;
   startTime: string;
+  // Empty when the item has no priority.
+  priority: JournalPriority | "";
 };
 
 export type JournalDraft = {
@@ -34,7 +37,7 @@ export type UnsavedStep = {
 
 export type JournalDetailAction = "create" | "save" | "complete" | "reopen" | "delete";
 
-const emptyFields: JournalFields = { title: "", dueDate: "", startTime: "" };
+const emptyFields: JournalFields = { title: "", dueDate: "", startTime: "", priority: "" };
 const unreachableMessage = "We couldn't reach Spoons Up. Please try again.";
 
 export function useJournalDetail({ onChange }: { onChange: () => Promise<void> }) {
@@ -365,6 +368,7 @@ export function useJournalDetail({ onChange }: { onChange: () => Promise<void> }
     setDueDate: (dueDate: string) =>
       updateFields(dueDate ? { dueDate } : { dueDate: "", startTime: "" }),
     setStartTime: (startTime: string) => updateFields({ startTime }),
+    setPriority: (priority: JournalPriority | "") => updateFields({ priority }),
     discardChanges: () => {
       setError(null);
       setDraft((value) => (value ? { ...value, fields: value.saved } : value));
@@ -406,18 +410,22 @@ function journalFields(task: {
   title: string;
   due_date: string | null;
   start_time: string | null;
+  priority: JournalPriority | null;
 }): JournalFields {
   return {
     title: task.title,
     dueDate: task.due_date ?? "",
     startTime: task.due_date ? (task.start_time ?? "") : "",
+    priority: task.priority ?? "",
   };
 }
 
-function newItemFields({ title, dueDate, startTime }: JournalFields): CreateTaskFields {
-  return dueDate
-    ? { title: title.trim(), due_date: dueDate, start_time: startTime || null }
-    : { title: title.trim() };
+function newItemFields({ title, dueDate, startTime, priority }: JournalFields): CreateTaskFields {
+  return {
+    title: title.trim(),
+    ...(dueDate ? { due_date: dueDate, start_time: startTime || null } : {}),
+    ...(priority ? { priority } : {}),
+  };
 }
 
 function fieldChanges({ saved, fields }: JournalDraft) {
@@ -425,6 +433,9 @@ function fieldChanges({ saved, fields }: JournalDraft) {
   const title = fields.title.trim();
   if (title !== saved.title) {
     changes.title = title;
+  }
+  if (fields.priority !== saved.priority) {
+    changes.priority = fields.priority || null;
   }
   if (fields.dueDate !== saved.dueDate) {
     changes.due_date = fields.dueDate || null;

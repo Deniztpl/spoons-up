@@ -232,6 +232,14 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Manually cover undated items, due add/change/clear, a future-due item planned today, step planning, parent completion with open steps, Left behind, current-week goal identity and cascade delete
 - **Done when:** the same Journal task can move between Journal, Today and Week without duplication or due-date drift; steps retain one parent level; Areas, quotas and closed Growth results remain unchanged
 
+## Slice 6 follow-up — Journal priority and sorting — DONE
+
+- Add nullable `tasks.priority` (`HIGH`, `MEDIUM`, `LOW`), allowed only on top-level Journal items by database checks; steps and goal tasks are refused with 422
+- Accept it on `POST /tasks`, edit or clear it with `PATCH /tasks/{id}`, and return it on tasks and Journal items
+- Show it as a red, amber or green tag in its own column at the end of each Journal row, after the due date, and set it in the item detail when creating or editing
+- Return `created_at` on Journal items and let the active list be sorted by due date (default), date added (newest first) or priority (High to Low, then none); Completed stays newest-completed first
+- **Done when:** an item created with a priority shows its tag, changing or clearing it in the detail holds after a reload, and the active list reorders by date added or priority on demand
+
 ## Slice 7 — Notifications
 
 38. `reminders` and `devices` migration, token registration

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
@@ -7,6 +7,11 @@ import { JournalList, type JournalView } from "../../features/journal/components
 import { OpenStepsDialog } from "../../features/journal/components/OpenStepsDialog";
 import { useJournal } from "../../features/journal/hooks/useJournal";
 import { useJournalDetail } from "../../features/journal/hooks/useJournalDetail";
+import {
+  sortJournalItems,
+  sortOptions,
+  type JournalSort,
+} from "../../features/journal/journalSort";
 
 export function JournalPage({
   onLogout,
@@ -16,9 +21,15 @@ export function JournalPage({
   const journalState = useJournal();
   const detail = useJournalDetail({ onChange: journalState.reload });
   const [view, setView] = useState<JournalView>("active");
+  const [sort, setSort] = useState<JournalSort>("due");
   const newItemButtonRef = useRef<HTMLButtonElement>(null);
   const { journal, confirmingItem } = journalState;
   const { draft } = detail;
+  // Only active items are sorted; completed ones stay newest-completed first.
+  const activeItems = useMemo(
+    () => (journal ? sortJournalItems(journal.active, sort) : []),
+    [journal, sort],
+  );
   // The detail follows its item between the two lists.
   const detailItem =
     journal && draft?.itemId
@@ -104,15 +115,38 @@ export function JournalPage({
           ) : null}
 
           {journal ? (
-            <JournalList
-              key={view}
-              items={view === "active" ? journal.active : journal.completed}
-              view={view}
-              today={journal.today}
-              pendingItemIds={journalState.pendingItemIds}
-              onToggle={journalState.toggleItem}
-              onOpen={detail.openItem}
-            />
+            <div className="flex flex-col gap-2.5">
+              {view === "active" && journal.active.length > 1 ? (
+                <label className="flex items-center gap-2 self-end text-[12.5px] text-ink-soft">
+                  Sort by
+                  <select
+                    value={sort}
+                    className="rounded-[8px] border border-ink/14 bg-card px-2.5 py-1.5 text-[12.5px] font-medium text-ink outline-none transition focus:border-accent focus:ring-3 focus:ring-accent/15"
+                    onChange={(event) =>
+                      setSort(
+                        sortOptions.find((option) => option.value === event.target.value)?.value ??
+                          "due",
+                      )
+                    }
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <JournalList
+                key={view}
+                items={view === "active" ? activeItems : journal.completed}
+                view={view}
+                today={journal.today}
+                pendingItemIds={journalState.pendingItemIds}
+                onToggle={journalState.toggleItem}
+                onOpen={detail.openItem}
+              />
+            </div>
           ) : null}
         </div>
       </div>
@@ -140,6 +174,7 @@ export function JournalPage({
           onTitleChange={detail.setTitle}
           onDueDateChange={detail.setDueDate}
           onStartTimeChange={detail.setStartTime}
+          onPriorityChange={detail.setPriority}
           onSubmit={() => void detail.save()}
           onDiscard={detail.discardChanges}
           onClose={detail.close}

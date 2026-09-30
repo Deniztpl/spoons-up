@@ -216,6 +216,7 @@ def test_journal_orders_items_nests_steps_and_scopes_every_row(
     assert [item["id"] for item in body["completed"]] == completed_ids
 
     first = body["active"][0]
+    assert first["created_at"] == "2026-09-03T00:00:00Z"
     assert first["progress"] == {"done": 1, "total": 2}
     assert [step["id"] for step in first["steps"]] == step_ids
     assert first["steps"][0] == {

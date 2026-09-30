@@ -10,6 +10,7 @@ import {
   type JournalDraft,
   type UnsavedStep,
 } from "../hooks/useJournalDetail";
+import { type JournalPriority, priorityOptions, priorityTagClassName } from "../journalPriority";
 import { JournalDeleteConfirmation } from "./JournalDeleteConfirmation";
 import { JournalStepList } from "./JournalStepList";
 import { OpenStepsConfirmation } from "./OpenStepsConfirmation";
@@ -29,6 +30,7 @@ type JournalItemDialogProps = {
   onTitleChange: (title: string) => void;
   onDueDateChange: (dueDate: string) => void;
   onStartTimeChange: (startTime: string) => void;
+  onPriorityChange: (priority: JournalPriority | "") => void;
   onSubmit: () => void;
   onDiscard: () => void;
   onClose: () => void;
@@ -64,6 +66,7 @@ export function JournalItemDialog({
   onTitleChange,
   onDueDateChange,
   onStartTimeChange,
+  onPriorityChange,
   onSubmit,
   onDiscard,
   onClose,
@@ -82,6 +85,8 @@ export function JournalItemDialog({
   const headingId = useId();
   const dueDateId = useId();
   const dueDateHintId = useId();
+  const priorityLabelId = useId();
+  const priorityName = useId();
   const titleRef = useRef<HTMLInputElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
@@ -210,6 +215,43 @@ export function JournalItemDialog({
               Choose today or a later date.
             </p>
           ) : null}
+
+          <span id={priorityLabelId} className="mt-1.5 text-xs text-ink-soft">
+            Priority
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby={priorityLabelId}
+            className="mt-1.5 flex flex-wrap gap-1.5"
+          >
+            {[{ value: "" as const, label: "None", className: "bg-well text-ink" }, ...priorityOptions].map(
+              (option) => {
+                const isChosen = fields.priority === option.value;
+                return (
+                  <label key={option.value || "none"}>
+                    <input
+                      type="radio"
+                      name={priorityName}
+                      value={option.value}
+                      checked={isChosen}
+                      disabled={isSaving}
+                      className="peer sr-only"
+                      onChange={() => onPriorityChange(option.value)}
+                    />
+                    <span
+                      className={`${priorityTagClassName} cursor-pointer border transition peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent ${
+                        isChosen
+                          ? `${option.className} border-current/25`
+                          : "border-ink/14 bg-card text-ink-soft hover:text-ink"
+                      }`}
+                    >
+                      {option.label}
+                    </span>
+                  </label>
+                );
+              },
+            )}
+          </div>
         </div>
 
         <JournalStepList

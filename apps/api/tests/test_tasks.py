@@ -49,6 +49,7 @@ def test_task_completion_is_idempotent_and_reversible(
         "occurrence_date": None,
         "scheduled_date": "2026-09-20",
         "due_date": None,
+        "priority": None,
         "start_time": "09:00",
         "duration_minutes": None,
         "end_time": "10:00",
@@ -183,6 +184,7 @@ def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
         "occurrence_date": None,
         "scheduled_date": "2026-09-27",
         "due_date": None,
+        "priority": None,
         "start_time": None,
         "duration_minutes": None,
         "end_time": None,
@@ -284,6 +286,82 @@ def test_goal_tasks_still_require_a_schedule_and_reject_journal_fields(
     assert with_due.status_code == 422
     assert with_due.json()["fields"] == {
         "due_date": "Due date is only available on a top-level Journal item"
+    }
+
+
+def test_priority_is_set_and_changed_only_on_top_level_journal_items(
+    client: TestClient,
+) -> None:
+    headers = bearer(register(client, "task-priority@example.com"))
+    area = create_area(client, headers, "Work")
+    goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
+    only_top_level = {"priority": "Priority is only available on a top-level Journal item"}
+
+    item = client.post(
+        "/api/v1/tasks",
+        json={"title": "Conference", "priority": "HIGH"},
+        headers=headers,
+    )
+    plain = client.post("/api/v1/tasks", json={"title": "Return the book"}, headers=headers)
+    step_with_priority = client.post(
+        "/api/v1/tasks",
+        json={"parent_id": item.json()["id"], "title": "Slides", "priority": "LOW"},
+        headers=headers,
+    )
+    goal_task_with_priority = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "priority": "LOW"},
+        headers=headers,
+    )
+    unknown = client.post(
+        "/api/v1/tasks",
+        json={"title": "Odd", "priority": "URGENT"},
+        headers=headers,
+    )
+    changed = client.patch(
+        f"/api/v1/tasks/{item.json()['id']}",
+        json={"priority": "MEDIUM"},
+        headers=headers,
+    )
+    set_later = client.patch(
+        f"/api/v1/tasks/{plain.json()['id']}",
+        json={"priority": "LOW"},
+        headers=headers,
+    )
+    cleared = client.patch(
+        f"/api/v1/tasks/{item.json()['id']}",
+        json={"priority": None},
+        headers=headers,
+    )
+    step = client.post(
+        "/api/v1/tasks",
+        json={"parent_id": item.json()["id"], "title": "Rehearse"},
+        headers=headers,
+    )
+    step_changed = client.patch(
+        f"/api/v1/tasks/{step.json()['id']}",
+        json={"priority": "HIGH"},
+        headers=headers,
+    )
+    journal = client.get("/api/v1/journal", headers=headers)
+
+    assert item.status_code == 201
+    assert item.json()["priority"] == "HIGH"
+    assert plain.json()["priority"] is None
+    assert step_with_priority.status_code == 422
+    assert "priority" in step_with_priority.json()["fields"]
+    assert goal_task_with_priority.status_code == 422
+    assert goal_task_with_priority.json()["fields"] == only_top_level
+    assert unknown.status_code == 422
+    assert changed.json()["priority"] == "MEDIUM"
+    assert set_later.json()["priority"] == "LOW"
+    assert cleared.status_code == 200
+    assert cleared.json()["priority"] is None
+    assert step_changed.status_code == 422
+    assert step_changed.json()["fields"] == only_top_level
+    assert {row["title"]: row["priority"] for row in journal.json()["active"]} == {
+        "Conference": None,
+        "Return the book": "LOW",
     }
 
 

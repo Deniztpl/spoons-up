@@ -32,7 +32,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Tasks** — concrete work that may or may not currently sit on a local date. Start time, duration and `block_count` are independent and optional; `end_time` exists only when both time and duration exist. A non-null block value moves in steps of 0.5 and is not derived from duration. Changing one task changes only that task, not its rule. Goal tasks have `goal_id` set, always have a `scheduled_date`, and take their title from the goal. Journal tasks have no goal and keep their user-entered title. Renaming a goal renames all of its tasks, done ones included; closed weeks keep the old title in `period_results`.
 
-**Journal** — every goal-less task is a Journal task, wherever it was created. Journal uses the existing `tasks` table; there is no Journal entity, `in_journal` flag or second task table. The Journal page shows open top-level Journal items and completed top-level items with their steps. It is one ungrouped list: active items with a due date come first by date, time and creation order, followed by undated items in creation order. Completed items are newest-completed first. A row has a checkbox, title, due date and time when present, and a progress bar and fraction when it has steps. The displayed date is `due_date`, never the possibly different `scheduled_date`; an overdue due date is red but does not otherwise change the item. Completed rows show their completion date instead. The page has Active and Completed counts, a new-item action, and one detail component for viewing, editing and creating an item. The detail owns title, optional due date and time, the step checklist with inline add and remove actions, Complete or Reopen, and Delete. Title, due date and time are saved together with Save, or discarded; steps, completion and deletion are written as they happen, and a step that fails to save stays in the detail to retry. Areas, area progress and Growth do not include Journal work.
+**Journal** — every goal-less task is a Journal task, wherever it was created. Journal uses the existing `tasks` table; there is no Journal entity, `in_journal` flag or second task table. The Journal page shows open top-level Journal items and completed top-level items with their steps. It is one ungrouped list: active items with a due date come first by date, time and creation order, followed by undated items in creation order. That due-date order is the default; the active list can instead be sorted by date added, newest first, or by priority — High, Medium, Low, then none — with ties kept in the default order. The choice is not remembered between visits. Completed items are always newest-completed first. A row has a checkbox, title, due date and time when present, and a progress bar and fraction when it has steps. The displayed date is `due_date`, never the possibly different `scheduled_date`; an overdue due date is red but does not otherwise change the item. Completed rows show their completion date instead. A top-level item can carry an optional priority — High, Medium or Low — shown as a red, amber or green tag in its own column at the end of the row, after the due date; the column appears only while a row in the list has a priority, and steps and goal tasks never have one. The page has Active and Completed counts, a new-item action, and one detail component for viewing, editing and creating an item. The detail owns title, optional due date and time, optional priority, the step checklist with inline add and remove actions, Complete or Reopen, and Delete. Title, due date, time and priority are saved together with Save, or discarded; steps, completion and deletion are written as they happen, and a step that fails to save stays in the detail to retry. Areas, area progress and Growth do not include Journal work.
 
 **Journal dates** — `due_date` is an optional deadline or event date set only from the Journal. Setting or changing it also puts the item on that same `scheduled_date`; clearing it removes the item from its day. Planning actions in Today and Week change only `scheduled_date` and never change `due_date`. The time shown beside a due date is the task's `start_time`, not a separate due time, and is available in the Journal only while a due date is set. A task can therefore be due later but planned for today. `period_start` is derived when an unscheduled task is first put on a day, stays fixed while it is moved, and becomes null again when it is unscheduled. Journal blocks remain optional and count toward no quota.
 
@@ -224,6 +224,7 @@ erDiagram
         date occurrence_date
         date scheduled_date
         date due_date
+        text priority
         time start_time
         int duration_minutes
         time end_time
@@ -368,6 +369,7 @@ UNIQUE (habit_id, period_type, period_start)
 | occurrence_date | date | nullable, the date the rule produced |
 | scheduled_date | date | nullable only for Journal work; where the task currently appears in Today and Week |
 | due_date | date | nullable, only on a top-level Journal item; setting it also sets `scheduled_date` |
+| priority | text | nullable, HIGH \| MEDIUM \| LOW, only on a top-level Journal item |
 | start_time | time | nullable |
 | duration_minutes | int | nullable |
 | end_time | time | nullable, start_time + duration_minutes when both exist |
@@ -393,6 +395,8 @@ CHECK ((scheduled_date IS NULL) = (period_start IS NULL))
 CHECK (start_time IS NULL OR scheduled_date IS NOT NULL)
 CHECK (due_date IS NULL OR (goal_id IS NULL AND parent_id IS NULL))
 CHECK (parent_id IS NULL OR goal_id IS NULL)
+CHECK (priority IS NULL OR priority IN ('HIGH', 'MEDIUM', 'LOW'))
+CHECK (priority IS NULL OR (goal_id IS NULL AND parent_id IS NULL))
 ```
 
 The service additionally verifies that a parent belongs to the same user, is goal-less and top-level, and never lets a step receive another step. A step has only a title when created; a later planning write may give it schedule fields.

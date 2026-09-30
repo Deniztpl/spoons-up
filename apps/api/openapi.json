@@ -344,6 +344,22 @@
             ],
             "title": "Parent Id"
           },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
           "scheduled_date": {
             "anyOf": [
               {
@@ -709,6 +725,11 @@
             ],
             "title": "Completed At"
           },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
           "due_date": {
             "anyOf": [
               {
@@ -746,6 +767,22 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
           },
           "progress": {
             "$ref": "#/components/schemas/JournalProgressResponse"
@@ -797,6 +834,7 @@
           "id",
           "title",
           "due_date",
+          "priority",
           "scheduled_date",
           "start_time",
           "duration_minutes",
@@ -804,6 +842,7 @@
           "block_count",
           "status",
           "completed_at",
+          "created_at",
           "progress",
           "steps"
         ],
@@ -1406,6 +1445,22 @@
             ],
             "title": "Period Start"
           },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
           "rule_id": {
             "anyOf": [
               {
@@ -1463,6 +1518,7 @@
           "occurrence_date",
           "scheduled_date",
           "due_date",
+          "priority",
           "start_time",
           "duration_minutes",
           "end_time",
@@ -1935,6 +1991,22 @@
               }
             ],
             "title": "Duration Minutes"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
           },
           "scheduled_date": {
             "anyOf": [

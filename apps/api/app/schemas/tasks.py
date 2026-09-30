@@ -32,6 +32,7 @@ ResourceId = Annotated[str, Field(pattern=r"^[0-9]+$")]
 DurationMinutes = Annotated[int, Field(ge=1)]
 LocalTime = Annotated[time, AfterValidator(_reject_timezone)]
 BlockCount = Annotated[float, Field(gt=0, le=99.5, multiple_of=0.5)]
+TaskPriorityValue = Literal["HIGH", "MEDIUM", "LOW"]
 
 
 class CreateTaskRequest(BaseModel):
@@ -40,6 +41,7 @@ class CreateTaskRequest(BaseModel):
     title: TaskTitle | None = None
     scheduled_date: date | None = None
     due_date: date | None = None
+    priority: TaskPriorityValue | None = None
     start_time: LocalTime | None = None
     duration_minutes: DurationMinutes | None = None
     block_count: BlockCount | None = None
@@ -49,6 +51,7 @@ class UpdateTaskRequest(BaseModel):
     title: TaskTitle | None = None
     scheduled_date: date | None = None
     due_date: date | None = None
+    priority: TaskPriorityValue | None = None
     start_time: LocalTime | None = None
     duration_minutes: DurationMinutes | None = None
     block_count: BlockCount | None = None
@@ -79,6 +82,7 @@ class TaskResponse(BaseModel):
     occurrence_date: date | None
     scheduled_date: date | None
     due_date: date | None
+    priority: TaskPriorityValue | None
     start_time: time | None
     duration_minutes: int | None
     end_time: time | None

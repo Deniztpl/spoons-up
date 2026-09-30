@@ -28,6 +28,12 @@ class TaskStatus(StrEnum):
     DELETED = "DELETED"
 
 
+class TaskPriority(StrEnum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
 class Task(Base):
     __tablename__ = "tasks"
     __table_args__ = (
@@ -59,6 +65,14 @@ class Task(Base):
         CheckConstraint(
             "parent_id IS NULL OR goal_id IS NULL",
             name="parent_goal_less",
+        ),
+        CheckConstraint(
+            "priority IS NULL OR priority IN ('HIGH', 'MEDIUM', 'LOW')",
+            name="priority_values",
+        ),
+        CheckConstraint(
+            "priority IS NULL OR (goal_id IS NULL AND parent_id IS NULL)",
+            name="priority_top_level_journal",
         ),
         Index("ix_tasks_user_id_scheduled_date", "user_id", "scheduled_date"),
         Index(
@@ -97,6 +111,7 @@ class Task(Base):
     occurrence_date: Mapped[date | None] = mapped_column(Date)
     scheduled_date: Mapped[date | None] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date)
+    priority: Mapped[str | None] = mapped_column(Text)
     start_time: Mapped[time | None] = mapped_column(Time)
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
     end_time: Mapped[time | None] = mapped_column(Time)

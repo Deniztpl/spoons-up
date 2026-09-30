@@ -186,6 +186,16 @@ def test_journal_task_database_constraints(
             scheduled_date=date(2030, 10, 1),
             period_start=date(2030, 9, 30),
         ),
+        # Priority is one of three levels, and only top-level Journal work has one.
+        journal_task(user_id=user.id, priority="URGENT"),
+        journal_task(user_id=user.id, parent_id=parent.id, priority="HIGH"),
+        journal_task(
+            user_id=user.id,
+            goal_id=goal.id,
+            scheduled_date=date(2030, 10, 1),
+            period_start=date(2030, 9, 30),
+            priority="HIGH",
+        ),
     ]
 
     for invalid_task in invalid_tasks:
@@ -308,6 +318,7 @@ def journal_task(
     parent_id: int | None = None,
     scheduled_date: date | None = None,
     due_date: date | None = None,
+    priority: str | None = None,
     start_time: time | None = None,
     period_start: date | None = None,
 ) -> Task:
@@ -320,6 +331,7 @@ def journal_task(
         occurrence_date=None,
         scheduled_date=scheduled_date,
         due_date=due_date,
+        priority=priority,
         start_time=start_time,
         duration_minutes=None,
         end_time=None,

@@ -65,6 +65,7 @@ class TaskService:
                 title = payload.title
                 scheduled_date = None
                 due_date = None
+                priority = None
                 start_time = None
                 duration_minutes = None
                 block_count = None
@@ -79,6 +80,10 @@ class TaskService:
                     raise ValidationAppError(
                         {"due_date": "Due date is only available on a top-level Journal item"}
                     )
+                if "priority" in fields:
+                    raise ValidationAppError(
+                        {"priority": "Priority is only available on a top-level Journal item"}
+                    )
                 if "parent_id" in fields:
                     raise ValidationAppError({"parent_id": "A goal task cannot have a parent"})
                 goal = self.goal_repository.get_for_user(goal_id=goal_id, user_id=user_id)
@@ -87,6 +92,7 @@ class TaskService:
                 title = goal.title
                 scheduled_date = payload.scheduled_date
                 due_date = None
+                priority = None
                 start_time = payload.start_time
                 duration_minutes = payload.duration_minutes
                 block_count = payload.block_count
@@ -95,6 +101,7 @@ class TaskService:
                     raise ValidationAppError({"title": "Title is required without a goal"})
                 title = payload.title
                 due_date = payload.due_date
+                priority = payload.priority
                 scheduled_date = due_date or payload.scheduled_date
                 start_time = payload.start_time
                 duration_minutes = payload.duration_minutes
@@ -121,6 +128,7 @@ class TaskService:
                 title=title,
                 scheduled_date=scheduled_date,
                 due_date=due_date,
+                priority=priority,
                 start_time=start_time,
                 duration_minutes=duration_minutes,
                 end_time=_add_minutes(start_time, duration_minutes),
@@ -144,6 +152,10 @@ class TaskService:
             if due_date_supplied and (task.goal_id is not None or task.parent_id is not None):
                 raise ValidationAppError(
                     {"due_date": "Due date is only available on a top-level Journal item"}
+                )
+            if "priority" in fields and (task.goal_id is not None or task.parent_id is not None):
+                raise ValidationAppError(
+                    {"priority": "Priority is only available on a top-level Journal item"}
                 )
             if task.goal_id is not None and "title" in fields:
                 raise ValidationAppError({"title": "A goal-linked task uses its goal title"})
@@ -205,6 +217,7 @@ class TaskService:
                 title=payload.title if payload.title is not None else task.title,
                 scheduled_date=scheduled_date,
                 due_date=due_date,
+                priority=payload.priority,
                 start_time=start_time,
                 duration_minutes=payload.duration_minutes,
                 end_time=_add_minutes(start_time, duration_minutes),
@@ -213,6 +226,7 @@ class TaskService:
                 update_title="title" in fields,
                 update_scheduled_date=update_scheduled_date,
                 update_due_date=due_date_supplied,
+                update_priority="priority" in fields,
                 update_start_time=update_start_time,
                 update_duration_minutes="duration_minutes" in fields,
                 update_end_time=update_end_time,

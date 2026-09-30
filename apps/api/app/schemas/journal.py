@@ -35,6 +35,7 @@ class JournalItemResponse(BaseModel):
     id: str
     title: str
     due_date: date | None
+    priority: Literal["HIGH", "MEDIUM", "LOW"] | None
     scheduled_date: date | None
     start_time: time | None
     duration_minutes: int | None
@@ -42,6 +43,7 @@ class JournalItemResponse(BaseModel):
     block_count: float | None
     status: Literal["PENDING", "DONE"]
     completed_at: datetime | None
+    created_at: datetime
     progress: JournalProgressResponse
     steps: list[JournalStepResponse]
 

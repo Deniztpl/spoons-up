@@ -4,7 +4,7 @@ from app.models.goal import Goal, GoalRule
 from app.models.habit import Habit, HabitEntry, HabitMode, HabitPeriodType
 from app.models.period_result import PeriodResult, RequirementType
 from app.models.refresh_token import RefreshToken
-from app.models.task import Task, TaskStatus
+from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.user import User
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "RefreshToken",
     "RequirementType",
     "Task",
+    "TaskPriority",
     "TaskStatus",
     "User",
 ]

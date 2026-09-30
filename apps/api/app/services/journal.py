@@ -61,6 +61,7 @@ class JournalService:
             id=str(task.id),
             title=task.title,
             due_date=task.due_date,
+            priority=task.priority,
             scheduled_date=task.scheduled_date,
             start_time=task.start_time,
             duration_minutes=task.duration_minutes,
@@ -68,6 +69,7 @@ class JournalService:
             block_count=float(task.block_count) if task.block_count is not None else None,
             status=task.status,
             completed_at=task.completed_at,
+            created_at=task.created_at,
             progress=JournalProgressResponse(
                 done=sum(step.status == TaskStatus.DONE.value for step in steps),
                 total=len(steps),

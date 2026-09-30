@@ -12,9 +12,11 @@ type FakeTask = {
   parentId: string | null;
   title: string;
   dueDate: string | null;
+  priority: "HIGH" | "MEDIUM" | "LOW" | null;
   startTime: string | null;
   status: "PENDING" | "DONE";
   completedAt: string | null;
+  createdAt: string;
 };
 
 function task(id: string, title: string, fields: Partial<FakeTask> = {}): FakeTask {
@@ -23,9 +25,11 @@ function task(id: string, title: string, fields: Partial<FakeTask> = {}): FakeTa
     parentId: null,
     title,
     dueDate: null,
+    priority: null,
     startTime: null,
     status: "PENDING",
     completedAt: null,
+    createdAt: "2026-09-01T09:00:00Z",
     ...fields,
   };
 }
@@ -59,6 +63,7 @@ function fakeApi(initial: FakeTask[]) {
       id: item.id,
       title: item.title,
       due_date: item.dueDate,
+      priority: item.priority,
       scheduled_date: item.dueDate,
       start_time: item.startTime,
       duration_minutes: null,
@@ -66,6 +71,7 @@ function fakeApi(initial: FakeTask[]) {
       block_count: null,
       status: item.status,
       completed_at: item.completedAt,
+      created_at: item.createdAt,
       progress: {
         done: steps.filter((step) => step.status === "DONE").length,
         total: steps.length,
@@ -82,6 +88,7 @@ function fakeApi(initial: FakeTask[]) {
     occurrence_date: null,
     scheduled_date: row.dueDate,
     due_date: row.dueDate,
+    priority: row.priority,
     start_time: row.startTime,
     duration_minutes: null,
     end_time: null,
@@ -109,6 +116,7 @@ function fakeApi(initial: FakeTask[]) {
       const row = task(String(nextId++), body.title, {
         parentId: body.parent_id ?? null,
         dueDate: body.due_date ?? null,
+        priority: body.priority ?? null,
         startTime: body.start_time ?? null,
       });
       tasks.push(row);
@@ -140,6 +148,9 @@ function fakeApi(initial: FakeTask[]) {
       }
       if ("start_time" in body) {
         row.startTime = body.start_time;
+      }
+      if ("priority" in body) {
+        row.priority = body.priority;
       }
       return Response.json(taskBody(row));
     }
@@ -445,6 +456,105 @@ describe("Journal page", () => {
     expect(row).toHaveFocus();
     expect(row).toHaveAccessibleName("Pay the rent");
     expect(row).toHaveAccessibleDescription("No due date");
+  });
+
+  it("shows priorities as tags in their own column and sets them from the detail", async () => {
+    const api = fakeApi([
+      task("490", "Call the bank"),
+      task("491", "Return the book", { priority: "LOW" }),
+    ]);
+    vi.stubGlobal("fetch", api);
+    const user = userEvent.setup();
+    renderPage();
+
+    const active = await screen.findByRole("list", { name: "Active items" });
+    expect(within(active).getByText("Low")).toBeInTheDocument();
+    expect(within(active).getByRole("button", { name: "Return the book" })).toHaveAccessibleDescription(
+      "Low priority, No due date",
+    );
+    expect(within(active).getByRole("button", { name: "Call the bank" })).toHaveAccessibleDescription(
+      "No due date",
+    );
+
+    const created = await openNewItem(user);
+    await user.type(within(created).getByRole("textbox", { name: "Title" }), "Pay the rent");
+    expect(within(created).getByRole("radio", { name: "None" })).toBeChecked();
+    await user.click(within(created).getByRole("radio", { name: "High" }));
+    await user.click(within(created).getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(
+      await screen.findByRole("button", { name: "Pay the rent" }),
+    ).toHaveAccessibleDescription("High priority, No due date");
+
+    await user.click(screen.getByRole("button", { name: "Call the bank" }));
+    let dialog = screen.getByRole("dialog", { name: "Call the bank" });
+    await user.click(within(dialog).getByRole("radio", { name: "Medium" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await within(dialog).findByRole("button", { name: "Complete" });
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Return the book" }));
+    dialog = screen.getByRole("dialog", { name: "Return the book" });
+    expect(within(dialog).getByRole("radio", { name: "Low" })).toBeChecked();
+    await user.click(within(dialog).getByRole("radio", { name: "None" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await within(dialog).findByRole("button", { name: "Complete" });
+
+    expect(await bodiesOf(requestsTo(api, "POST", "/api/v1/tasks"))).toEqual([
+      { title: "Pay the rent", priority: "HIGH" },
+    ]);
+    expect(await bodiesOf(requestsTo(api, "PATCH", "/api/v1/tasks/490"))).toEqual([
+      { priority: "MEDIUM" },
+    ]);
+    expect(await bodiesOf(requestsTo(api, "PATCH", "/api/v1/tasks/491"))).toEqual([
+      { priority: null },
+    ]);
+  });
+
+  it("sorts active items by due date, date added or priority", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fakeApi([
+        task("480", "Renew the lease", {
+          dueDate: "2026-09-18",
+          priority: "LOW",
+          createdAt: "2026-09-10T09:00:00Z",
+        }),
+        task("481", "Pay the invoice", { dueDate: "2026-09-24", createdAt: "2026-09-20T09:00:00Z" }),
+        task("482", "Call the bank", { priority: "HIGH", createdAt: "2026-09-01T09:00:00Z" }),
+        task("483", "Return the book", { priority: "LOW", createdAt: "2026-09-15T09:00:00Z" }),
+        doneTask("484", "Pick up the parcel", { priority: "LOW" }),
+        doneTask("485", "Book the tickets", {
+          priority: "HIGH",
+          completedAt: "2026-09-22T12:00:00Z",
+        }),
+      ]),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const active = await screen.findByRole("list", { name: "Active items" });
+    const expectRows = (list: HTMLElement, names: string[]) =>
+      expectInOrder(names.map((name) => within(list).getByRole("checkbox", { name })));
+    const sort = screen.getByRole("combobox", { name: "Sort by" });
+    expect(sort).toHaveValue("due");
+    expectRows(active, ["Renew the lease", "Pay the invoice", "Call the bank", "Return the book"]);
+
+    await user.selectOptions(sort, "Date added");
+    expectRows(active, ["Pay the invoice", "Return the book", "Renew the lease", "Call the bank"]);
+
+    await user.selectOptions(sort, "Priority");
+    expectRows(active, ["Call the bank", "Renew the lease", "Return the book", "Pay the invoice"]);
+
+    await user.click(screen.getByRole("button", { name: "Completed 2" }));
+    expect(screen.queryByRole("combobox", { name: "Sort by" })).not.toBeInTheDocument();
+    expectRows(screen.getByRole("list", { name: "Completed items" }), [
+      "Pick up the parcel",
+      "Book the tickets",
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Active 4" }));
+    expect(screen.getByRole("combobox", { name: "Sort by" })).toHaveValue("priority");
   });
 
   it("discards unsaved changes to the fields", async () => {

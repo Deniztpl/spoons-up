@@ -229,6 +229,7 @@ class TaskRepository:
         title: str,
         scheduled_date: date | None,
         due_date: date | None,
+        priority: str | None,
         start_time: time | None,
         duration_minutes: int | None,
         end_time: time | None,
@@ -244,6 +245,7 @@ class TaskRepository:
             occurrence_date=None,
             scheduled_date=scheduled_date,
             due_date=due_date,
+            priority=priority,
             start_time=start_time,
             duration_minutes=duration_minutes,
             end_time=end_time,
@@ -261,6 +263,7 @@ class TaskRepository:
         title: str,
         scheduled_date: date | None,
         due_date: date | None,
+        priority: str | None,
         start_time: time | None,
         duration_minutes: int | None,
         end_time: time | None,
@@ -269,6 +272,7 @@ class TaskRepository:
         update_title: bool,
         update_scheduled_date: bool,
         update_due_date: bool,
+        update_priority: bool,
         update_start_time: bool,
         update_duration_minutes: bool,
         update_end_time: bool,
@@ -281,6 +285,8 @@ class TaskRepository:
             task.scheduled_date = scheduled_date
         if update_due_date:
             task.due_date = due_date
+        if update_priority:
+            task.priority = priority
         if update_start_time:
             task.start_time = start_time
         if update_duration_minutes:

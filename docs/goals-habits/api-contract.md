@@ -454,6 +454,7 @@ A task object:
   "occurrence_date": "2026-09-16",
   "scheduled_date": "2026-09-17",
   "due_date": null,
+  "priority": null,
   "start_time": "19:00",
   "duration_minutes": 60,
   "end_time": "20:00",
@@ -469,6 +470,7 @@ The task's identity and calendar fields mean different things:
 - `occurrence_date` — the date the rule produced. Never changes while the task belongs to its rule. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it.
 - `scheduled_date` — where the task sits now. This is what Today and Week draw. It may be null only on Journal work.
 - `due_date` — the optional deadline or event date of a top-level Journal item. Steps and goal tasks never have one.
+- `priority` — the optional `HIGH`, `MEDIUM` or `LOW` of a top-level Journal item. Steps and goal tasks never have one.
 - `period_start` — the week identity fixed when the task is first scheduled. It is null exactly while `scheduled_date` is null. Moving a scheduled task does not change it; scheduling it again after it was cleared derives a new value.
 - `parent_id` — the top-level Journal item that owns this step. Null on goal tasks and top-level Journal items. Nesting stops at one level.
 - `start_time`, `duration_minutes` and `block_count` — independent and nullable. `end_time` is present only when both time and duration exist. A null block value contributes zero when completed; otherwise it must be a positive multiple of 0.5.
@@ -494,7 +496,7 @@ Ad-hoc goal work, a top-level Journal item, or a Journal step created by the use
 
 For a goal task, `scheduled_date` is required and `due_date` and `parent_id` must be omitted.
 
-For a top-level Journal item, `goal_id` and `parent_id` are null and `scheduled_date` is optional. `due_date` is accepted only here. When it is supplied, the server sets `scheduled_date` to the same date regardless of whether the client also supplied a schedule. Journal creates from Today and Week instead supply `scheduled_date` with no `due_date`.
+For a top-level Journal item, `goal_id` and `parent_id` are null and `scheduled_date` is optional. `due_date` and `priority` are accepted only here. When it is supplied, the server sets `scheduled_date` to the same date regardless of whether the client also supplied a schedule. Journal creates from Today and Week instead supply `scheduled_date` with no `due_date`.
 
 A step create supplies only `parent_id` and `title`:
 
@@ -528,6 +530,8 @@ A non-null `scheduled_date`, including one derived from `due_date`, cannot be ea
 
 All fields are optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it. `title` is editable only on Journal work. `goal_id`, `parent_id`, `rule_id` and `occurrence_date` are never editable here.
 
+`priority` is editable only on a top-level Journal item; send null to remove it.
+
 `due_date` is editable only on a top-level Journal item and may be null. Supplying a date also sets `scheduled_date` to it. Supplying `due_date: null` clears `scheduled_date`, `period_start`, `start_time` and `end_time` so the item leaves Today and Week; duration and blocks remain as optional size information. If `due_date` is absent, planning and moving through `scheduled_date` never changes the saved due date.
 
 Supplying a date for a previously unscheduled Journal item or step derives `period_start`. Further moves keep that identity fixed. A goal task always remains scheduled. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited.
@@ -540,7 +544,7 @@ Changing a timed task updates its reminder. Clearing its time cancels the remind
 
 | Error | When |
 |---|---|
-| 422 `validation_error` | a supplied or due-derived schedule is before today; a time would remain without a schedule; `due_date` is used on a goal task or step; a goal task would become unscheduled; a non-null `duration_minutes` is below 1; or a non-null `block_count` is not a positive multiple of 0.5 |
+| 422 `validation_error` | a supplied or due-derived schedule is before today; a time would remain without a schedule; `due_date` or `priority` is used on a goal task or step; `priority` is not `HIGH`, `MEDIUM` or `LOW`; a goal task would become unscheduled; a non-null `duration_minutes` is below 1; or a non-null `block_count` is not a positive multiple of 0.5 |
 
 #### DELETE /tasks/{id}
 
@@ -612,6 +616,7 @@ The Journal page: every non-deleted, goal-less, top-level task, split into `acti
       "id": "490",
       "title": "Conference",
       "due_date": "2026-10-02",
+      "priority": "HIGH",
       "scheduled_date": "2026-10-02",
       "start_time": "10:00",
       "duration_minutes": null,
@@ -619,6 +624,7 @@ The Journal page: every non-deleted, goal-less, top-level task, split into `acti
       "block_count": null,
       "status": "PENDING",
       "completed_at": null,
+      "created_at": "2026-09-20T09:15:00Z",
       "progress": { "done": 2, "total": 4 },
       "steps": [
         {
@@ -642,7 +648,7 @@ The Journal page: every non-deleted, goal-less, top-level task, split into `acti
 
 `today` is derived in the user's timezone so the client can mark overdue dates without relying on the browser timezone. Counts in the Active and Completed switch are the two arrays' lengths; the response does not duplicate them.
 
-Active items with `due_date` come first, ordered by due date, non-null time before null time, creation time and id. Undated items follow in creation order. Completed items are ordered by `completed_at` descending, then id descending. Steps stay in their creation order. `progress` is always present and counts `DONE` steps over all steps, including `0 / 0` for an item without steps.
+Active items with `due_date` come first, ordered by due date, non-null time before null time, creation time and id. Undated items follow in creation order. Completed items are ordered by `completed_at` descending, then id descending. This is the Journal's default order; the client can re-sort the active list by `created_at` or `priority` without another request. Steps stay in their creation order. `progress` is always present and counts `DONE` steps over all steps, including `0 / 0` for an item without steps.
 
 An active item with steps remains in this response after every step is complete; the user still completes the item explicitly. A completed item can contain pending steps because completing the parent does not check them.
 

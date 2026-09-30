@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { CheckIcon } from "../../../components/ui/CheckIcon";
 import type { JournalItem } from "../api/journalApi";
 import { dueDescription, dueLabel } from "../journalDates";
+import { priorityOption, priorityTagClassName } from "../journalPriority";
 
 export type JournalView = "active" | "completed";
 
@@ -33,6 +34,8 @@ export function JournalList({
 }: JournalListProps) {
   const listRef = useRef<HTMLUListElement>(null);
   const toggledRow = useRef<{ id: string; index: number } | null>(null);
+  // Priorities get their own column at the end of the rows, kept only while some row has one.
+  const showsPriority = items.some((item) => Boolean(item.priority));
 
   // When a checked row leaves this list, keep keyboard focus on the row that took its place.
   useEffect(() => {
@@ -114,7 +117,7 @@ export function JournalList({
                 >
                   {item.title}
                 </span>
-                {total > 0 || when ? (
+                {total > 0 || when || item.priority ? (
                   <span aria-hidden="true" className="flex shrink-0 items-center gap-3">
                     {total > 0 ? (
                       <span className="flex items-center gap-1.5">
@@ -137,6 +140,19 @@ export function JournalList({
                       >
                         {when}
                       </span>
+                    ) : null}
+                    {item.priority ? (
+                      <span className="flex shrink-0 sm:w-[62px]">
+                        <span
+                          className={`${priorityTagClassName} ${priorityOption(item.priority).className} ${
+                            isDone ? "opacity-60" : ""
+                          }`}
+                        >
+                          {priorityOption(item.priority).label}
+                        </span>
+                      </span>
+                    ) : showsPriority ? (
+                      <span className="hidden w-[62px] shrink-0 sm:block" />
                     ) : null}
                   </span>
                 ) : null}
@@ -162,6 +178,9 @@ function whenLabel(item: JournalItem, view: JournalView, today: string) {
 
 function itemDetails(item: JournalItem, view: JournalView, today: string) {
   const parts: string[] = [];
+  if (item.priority) {
+    parts.push(`${priorityOption(item.priority).label} priority`);
+  }
   if (view === "completed") {
     if (item.completed_at) {
       parts.push(`Completed ${completedLabel(item.completed_at, today)}`);

@@ -510,6 +510,8 @@ export interface components {
             goal_id?: string | null;
             /** Parent Id */
             parent_id?: string | null;
+            /** Priority */
+            priority?: ("HIGH" | "MEDIUM" | "LOW") | null;
             /** Scheduled Date */
             scheduled_date?: string | null;
             /** Start Time */
@@ -638,6 +640,11 @@ export interface components {
             block_count: number | null;
             /** Completed At */
             completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
             /** Due Date */
             due_date: string | null;
             /** Duration Minutes */
@@ -646,6 +653,8 @@ export interface components {
             end_time: string | null;
             /** Id */
             id: string;
+            /** Priority */
+            priority: ("HIGH" | "MEDIUM" | "LOW") | null;
             progress: components["schemas"]["JournalProgressResponse"];
             /** Scheduled Date */
             scheduled_date: string | null;
@@ -855,6 +864,8 @@ export interface components {
             parent_id: string | null;
             /** Period Start */
             period_start: string | null;
+            /** Priority */
+            priority: ("HIGH" | "MEDIUM" | "LOW") | null;
             /** Rule Id */
             rule_id: string | null;
             /** Scheduled Date */
@@ -998,6 +1009,8 @@ export interface components {
             due_date?: string | null;
             /** Duration Minutes */
             duration_minutes?: number | null;
+            /** Priority */
+            priority?: ("HIGH" | "MEDIUM" | "LOW") | null;
             /** Scheduled Date */
             scheduled_date?: string | null;
             /** Start Time */
