@@ -80,9 +80,7 @@ class TaskService:
                         {"due_date": "Due date is only available on a top-level Journal item"}
                     )
                 if "parent_id" in fields:
-                    raise ValidationAppError(
-                        {"parent_id": "A goal task cannot have a parent"}
-                    )
+                    raise ValidationAppError({"parent_id": "A goal task cannot have a parent"})
                 goal = self.goal_repository.get_for_user(goal_id=goal_id, user_id=user_id)
                 if goal is None:
                     raise NotFoundError
@@ -108,9 +106,7 @@ class TaskService:
                 field="due_date" if due_date is not None else "scheduled_date",
             )
             if start_time is not None and scheduled_date is None:
-                raise ValidationAppError(
-                    {"start_time": "Start time requires a scheduled date"}
-                )
+                raise ValidationAppError({"start_time": "Start time requires a scheduled date"})
 
             period_start = (
                 get_week_start(scheduled_date, week_start_day=user.week_start_day)
@@ -161,9 +157,7 @@ class TaskService:
                 scheduled_date = task.scheduled_date
 
             date_to_validate = payload.due_date if due_date_supplied else scheduled_date
-            if date_to_validate is not None and (
-                "scheduled_date" in fields or due_date_supplied
-            ):
+            if date_to_validate is not None and ("scheduled_date" in fields or due_date_supplied):
                 user = self.user_repository.get_by_id(user_id)
                 if user is None:
                     raise NotFoundError
@@ -182,9 +176,7 @@ class TaskService:
                 else task.start_time
             )
             if start_time is not None and scheduled_date is None:
-                raise ValidationAppError(
-                    {"start_time": "Start time requires a scheduled date"}
-                )
+                raise ValidationAppError({"start_time": "Start time requires a scheduled date"})
 
             duration_minutes = (
                 payload.duration_minutes if "duration_minutes" in fields else task.duration_minutes

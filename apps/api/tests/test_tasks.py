@@ -252,9 +252,7 @@ def test_create_journal_items_can_be_undated_or_driven_by_due_date(
         "start_time": "Start time requires a scheduled date"
     }
     assert past_due.status_code == 422
-    assert past_due.json()["fields"] == {
-        "due_date": "Scheduled date cannot be before today"
-    }
+    assert past_due.json()["fields"] == {"due_date": "Scheduled date cannot be before today"}
 
 
 def test_goal_tasks_still_require_a_schedule_and_reject_journal_fields(
@@ -345,18 +343,14 @@ def test_create_step_requires_an_owned_top_level_journal_parent_and_title_only(
     assert step.json()["period_start"] is None
 
     assert nested.status_code == 422
-    assert nested.json()["fields"] == {
-        "parent_id": "Parent must be a top-level Journal item"
-    }
+    assert nested.json()["fields"] == {"parent_id": "Parent must be a top-level Journal item"}
     assert planned_on_create.status_code == 422
     assert planned_on_create.json()["fields"] == {
         "scheduled_date": "A step is created with only parent_id and title"
     }
     assert foreign_parent.status_code == 404
     assert goal_parent.status_code == 422
-    assert goal_parent.json()["fields"] == {
-        "parent_id": "Parent must be a top-level Journal item"
-    }
+    assert goal_parent.json()["fields"] == {"parent_id": "Parent must be a top-level Journal item"}
 
 
 def test_create_rejects_a_date_before_today_in_the_user_timezone(
