@@ -160,7 +160,7 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - Web tests cover the area rows and panel, Today's week panel and the Growth cards and filter
 - **Done when:** a closed week's outcome does not move after `weekly_target` is changed, and the same week reads the same percent on the Areas screen before it closes and on Growth after
 
-## Slice 6 — Journal
+## Slice 6 — Journal — DONE
 
 Goal tasks keep their existing rules and area progress. Every goal-less task is Journal work, whether it was created in Journal, Today or Week. The visual reference is the Journal portion of the design files, adapted to the current web shell and the newer Today and Week implementations; Areas and Growth do not change.
 
@@ -170,7 +170,7 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Settle `GET /journal`, keep Left behind inside `/today`, and settle active, undated, completed and left-behind ordering
 - Move Notifications to slice 7
 
-### Block 1 — Task data model and domain rules
+### Block 1 — Task data model and domain rules — DONE
 
 - Add nullable `tasks.due_date` and self-FK `parent_id ON DELETE CASCADE`; make `scheduled_date` and `period_start` nullable together
 - Add database checks for goal schedules, schedule/period nullability, time requiring a schedule, top-level-only due dates and goal-less steps; index `parent_id`
@@ -179,14 +179,14 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Completing a top-level item with open steps leaves them pending but clears their schedule, period and time in the same transaction; deleting the item cascades to its steps
 - API tests cover every field combination, timezone-aware past-date rejection, due changes, step nesting, completion cleanup, deletion and existing goal-task regressions
 
-### Block 2 — Journal read API
+### Block 2 — Journal read API — DONE
 
 - Add `GET /journal` with the user's local today, complete active and completed top-level lists, nested steps and step progress
 - Read parents and steps without per-item queries and scope every row by the authenticated user
 - Active ordering is due date, non-null time, creation and id, then undated creation order; completed ordering is newest completion first; steps keep creation order
 - Regenerate `apps/api/openapi.json` and `packages/api-client/src/generated/schema.d.ts`
 
-### Block 3 — Journal page
+### Block 3 — Journal page — DONE
 
 - Add the Journal route and sidebar destination without changing the Areas screen
 - Build the ungrouped Active / Completed list with counts, due-date emphasis, time and step progress in the current app's visual and responsive system
@@ -194,7 +194,7 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Confirm completion when steps remain open; show saved partial results and retryable errors rather than discarding successful writes
 - Web tests cover loading, errors, empty states, ordering, keyboard step entry, progress, CRUD, completion confirmation, reopening and focus behavior
 
-### Block 4 — Separate Goal and Journal task entry
+### Block 4 — Separate Goal and Journal task entry — DONE
 
 - Replace the shared `No goal` task form with separate Goal and Journal components used by both Today and Week; Today switches to them in block 5 and Week in block 7, which removes the `No goal` choice
 - Editing a task already on a day keeps one form for both kinds, as goal tasks are edited: a Journal task shows its title instead of a goal and has no Repeat
@@ -203,7 +203,7 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Journal has no search or combined New / Journal tabs; its plan section owns optional time, duration and blocks
 - Load Journal choices when the component opens and keep independent reads parallel; add no client state or query dependency
 
-### Block 5 — Today integration
+### Block 5 — Today integration — DONE
 
 - Put `+ Goal` and `+ Journal` in the Today header and remove the old combined add-task entry
 - Creating a Journal task writes one goal-less task for today; choosing an item or step patches that existing row
@@ -211,14 +211,14 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Render steps as normal full-width cards ordered with other tasks, with their parent and progress as secondary text
 - Ask before completing a top-level item with open steps; keep the Daily, Weekly, habits and right-side progress panel behavior unchanged
 
-### Block 6 — Left behind
+### Block 6 — Left behind — DONE
 
 - Add `left_behind` to `/today`: every past scheduled pending Journal task, plus pending goal tasks from past days whose `period_start` is the current open week
 - Order rows oldest first and include original date, time and a `Journal` or area source label
 - Add the count-bearing Today view only while non-empty; each row has only `Move to today`
 - Moving changes `scheduled_date` alone, so Journal due dates and goal week identity stay fixed; tests cover the week turn
 
-### Block 7 — Week integration
+### Block 7 — Week integration — DONE
 
 - Ask Goal or Journal before opening a component from the header or a today-or-future slot
 - Keep the Journal date editable from today onward and patch selected items or steps instead of duplicating them
@@ -226,7 +226,7 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Allow pending work on an elapsed day of the current week to move to today or later while past drop targets remain blocked
 - Keep unscheduled Journal work out of the calendar and include manually scheduled or due-dated Journal work in `later_tasks`
 
-### Block 8 — Verification
+### Block 8 — Verification — DONE
 
 - Run API migration, pytest and Ruff checks; run web lint, typecheck, Vitest and build; verify OpenAPI and generated-client sync
 - Manually cover undated items, due add/change/clear, a future-due item planned today, step planning, parent completion with open steps, Left behind, current-week goal identity and cascade delete
