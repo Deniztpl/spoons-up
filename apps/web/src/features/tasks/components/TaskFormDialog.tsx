@@ -12,11 +12,15 @@ import {
   type TaskDraft,
 } from "../hooks/useTaskForm";
 import { TaskDeleteConfirmation } from "./TaskDeleteConfirmation";
+import { TaskPlanFields } from "./TaskPlanFields";
 
 type TaskFormDialogProps = {
   draft: TaskDraft;
   dateMode: "fixed" | "editable";
   minimumScheduledDate: string;
+  // A new task can still be created without a goal until Today and Week switch to the
+  // separate Journal entry; without it, creating a task requires a goal.
+  allowNoGoal?: boolean;
   areas: Area[] | null;
   goals: Goal[] | null;
   optionsError: string | null;
@@ -47,8 +51,6 @@ const weekdays = [
   { value: 6, letter: "S", name: "Saturday" },
   { value: 7, letter: "S", name: "Sunday" },
 ];
-const durationOptions = [15, 30, 45, 60, 90, 120, 180];
-const blockOptions = ["", "0.5", "1", "2", "4"];
 const fieldLabelClassName =
   "text-[10px] font-semibold uppercase tracking-[0.09em] text-ink-soft";
 const fieldClassName =
@@ -60,6 +62,7 @@ export function TaskFormDialog({
   draft,
   dateMode,
   minimumScheduledDate,
+  allowNoGoal = true,
   areas,
   goals,
   optionsError,
@@ -83,9 +86,10 @@ export function TaskFormDialog({
   const headingId = useId();
   const goalId = useId();
   const titleId = useId();
-  const blockName = useId();
   const initialFocusRef = useRef<HTMLInputElement>(null);
+  const goalSelectRef = useRef<HTMLSelectElement>(null);
   const isEditing = draft.task !== null;
+  const isGoalOnly = !isEditing && !allowNoGoal;
   const isGoalLinked = draft.goalId !== "";
   const hasSchedule = Boolean(draft.task?.rule_id);
   const taskChanged = isTaskChanged(draft);
@@ -95,8 +99,6 @@ export function TaskFormDialog({
   const selectedWeekday = draft.scheduledDate
     ? weekdayForDate(draft.scheduledDate)
     : undefined;
-  const shownDurations = withNumberValue(durationOptions, draft.durationMinutes);
-  const shownBlocks = withStringValue(blockOptions, draft.blockCount);
   const areaNames = new Map(areas?.map((area) => [area.id, area.name]));
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -107,14 +109,18 @@ export function TaskFormDialog({
   };
 
   return (
-    <ModalDialog labelledBy={headingId} initialFocusRef={initialFocusRef} onClose={onClose}>
+    <ModalDialog
+      labelledBy={headingId}
+      initialFocusRef={isGoalOnly ? goalSelectRef : initialFocusRef}
+      onClose={onClose}
+    >
       <div className="flex items-start gap-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <h2 id={headingId} className="text-lg font-semibold">
             {isEditing ? "Edit task" : "New task"}
           </h2>
           <span className="rounded-[5px] bg-accent/12 px-[7px] py-[3px] text-[10px] font-medium uppercase tracking-[0.06em] text-accent">
-            Task
+            {isGoalOnly ? "Goal" : "Task"}
           </span>
         </div>
         <button
@@ -151,23 +157,34 @@ export function TaskFormDialog({
               <label htmlFor={goalId} className={fieldLabelClassName}>
                 Goal
               </label>
+              {/* Without a No goal option the select takes the first focus, so it stays enabled. */}
               <select
+                ref={goalSelectRef}
                 id={goalId}
                 value={draft.goalId}
-                disabled={areas === null || goals === null}
+                disabled={!isGoalOnly && (areas === null || goals === null)}
                 className={`${fieldClassName} disabled:cursor-wait disabled:text-ink-soft`}
                 onChange={(event) => onGoalChange(event.target.value)}
               >
-                <option value="">No goal</option>
+                {allowNoGoal ? (
+                  <option value="">No goal</option>
+                ) : (
+                  <option value="" disabled>
+                    {areas === null || goals === null ? "Loading goals…" : "Choose a goal"}
+                  </option>
+                )}
                 {goals?.map((goal) => (
                   <option key={goal.id} value={goal.id}>
                     {areaNames.get(goal.area_id)} - {goal.title}
                   </option>
                 ))}
               </select>
+              {isGoalOnly && goals?.length === 0 ? (
+                <p className="text-xs text-ink-soft">Add a goal to an area first.</p>
+              ) : null}
             </div>
 
-            {draft.goalId === "" ? (
+            {allowNoGoal && draft.goalId === "" ? (
               <TitleField
                 inputId={titleId}
                 inputRef={initialFocusRef}
@@ -191,55 +208,15 @@ export function TaskFormDialog({
           />
         </label>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <label className="flex flex-col gap-1.5">
-            <span className={fieldLabelClassName}>Start time</span>
-            <input
-              ref={isEditing && isGoalLinked ? initialFocusRef : undefined}
-              type="time"
-              value={draft.startTime}
-              className={fieldClassName}
-              onChange={(event) => onStartTimeChange(event.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className={fieldLabelClassName}>Duration</span>
-            <select
-              value={draft.durationMinutes}
-              className={fieldClassName}
-              onChange={(event) => onDurationChange(event.target.value)}
-            >
-              <option value="">No duration</option>
-              {shownDurations.map((minutes) => (
-                <option key={minutes} value={minutes}>
-                  {durationLabel(minutes)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className={`${fieldLabelClassName} mb-1.5`}>Blocks</legend>
-          <div className="grid auto-cols-fr grid-flow-col gap-0.5 rounded-[7px] border border-ink/12 bg-card p-0.5">
-            {shownBlocks.map((count) => (
-              <label key={count || "none"}>
-                <input
-                  type="radio"
-                  name={blockName}
-                  value={count}
-                  checked={draft.blockCount === count}
-                  aria-label={blockLabel(count)}
-                  className="peer sr-only"
-                  onChange={() => onBlockCountChange(count)}
-                />
-                <span className="block cursor-pointer rounded-[5px] py-1 text-center text-xs font-medium text-ink-soft transition peer-checked:bg-accent peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-accent">
-                  {count === "" ? "—" : count === "0.5" ? "½" : count}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <TaskPlanFields
+          startTime={draft.startTime}
+          durationMinutes={draft.durationMinutes}
+          blockCount={draft.blockCount}
+          startTimeRef={isEditing && isGoalLinked ? initialFocusRef : undefined}
+          onStartTimeChange={onStartTimeChange}
+          onDurationChange={onDurationChange}
+          onBlockCountChange={onBlockCountChange}
+        />
 
         {isGoalLinked ? (
           <fieldset className="flex flex-col gap-2.5">
@@ -400,36 +377,4 @@ function WeekdayPicker({
 function weekdayForDate(value: string) {
   const date = new Date(`${value}T00:00:00Z`);
   return date.getUTCDay() || 7;
-}
-
-function durationLabel(minutes: number) {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-  const hours = Math.floor(minutes / 60);
-  return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
-}
-
-function withNumberValue(options: number[], value: string) {
-  if (value === "") {
-    return options;
-  }
-  const number = Number(value);
-  return options.includes(number) ? options : [...options, number].sort((a, b) => a - b);
-}
-
-function withStringValue(options: string[], value: string) {
-  return value === "" || options.includes(value)
-    ? options
-    : [...options, value].sort((a, b) => Number(a || 0) - Number(b || 0));
-}
-
-function blockLabel(value: string) {
-  if (value === "") {
-    return "No block value";
-  }
-  if (value === "0.5") {
-    return "Half a block";
-  }
-  return value === "1" ? "1 block" : `${value} blocks`;
 }

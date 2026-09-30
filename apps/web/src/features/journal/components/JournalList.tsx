@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { CheckIcon } from "../../../components/ui/CheckIcon";
 import type { JournalItem } from "../api/journalApi";
+import { dueDescription, dueLabel } from "../journalDates";
 
 export type JournalView = "active" | "completed";
 
@@ -15,13 +16,6 @@ type JournalListProps = {
   onOpen: (item: JournalItem) => void;
 };
 
-const dayFormat = new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric" });
-const dayWithYearFormat = new Intl.DateTimeFormat("en", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
 const completedFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
 const completedWithYearFormat = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -163,11 +157,7 @@ function whenLabel(item: JournalItem, view: JournalView, today: string) {
   if (view === "completed") {
     return item.completed_at ? completedLabel(item.completed_at, today) : "";
   }
-  if (!item.due_date) {
-    return "";
-  }
-  const day = item.due_date === today ? "Today" : dueDayLabel(item.due_date, today);
-  return item.start_time ? `${day} · ${item.start_time}` : day;
+  return item.due_date ? dueLabel(item.due_date, item.start_time, today) : "";
 }
 
 function itemDetails(item: JournalItem, view: JournalView, today: string) {
@@ -176,12 +166,10 @@ function itemDetails(item: JournalItem, view: JournalView, today: string) {
     if (item.completed_at) {
       parts.push(`Completed ${completedLabel(item.completed_at, today)}`);
     }
-  } else if (item.due_date) {
-    const day = item.due_date === today ? "today" : dueDayLabel(item.due_date, today);
-    const time = item.start_time ? ` at ${item.start_time}` : "";
-    parts.push(`Due ${day}${time}${item.due_date < today ? ", overdue" : ""}`);
   } else {
-    parts.push("No due date");
+    parts.push(
+      item.due_date ? dueDescription(item.due_date, item.start_time, today) : "No due date",
+    );
   }
   if (item.progress.total > 0) {
     parts.push(`${item.progress.done} of ${item.progress.total} steps done`);
@@ -189,23 +177,9 @@ function itemDetails(item: JournalItem, view: JournalView, today: string) {
   return parts.join(", ");
 }
 
-function dueDayLabel(dueDate: string, today: string) {
-  const format = dueDate.slice(0, 4) === today.slice(0, 4) ? dayFormat : dayWithYearFormat;
-  return format.format(localDate(dueDate));
-}
-
 function completedLabel(completedAt: string, today: string) {
   const date = new Date(completedAt);
   const format =
     String(date.getFullYear()) === today.slice(0, 4) ? completedFormat : completedWithYearFormat;
   return format.format(date);
-}
-
-// Avoid UTC shifts for date-only values.
-function localDate(value: string) {
-  return new Date(
-    Number(value.slice(0, 4)),
-    Number(value.slice(5, 7)) - 1,
-    Number(value.slice(8, 10)),
-  );
 }

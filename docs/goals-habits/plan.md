@@ -196,7 +196,8 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 
 ### Block 4 — Separate Goal and Journal task entry
 
-- Replace the shared `No goal` task form with separate Goal and Journal components used by both Today and Week
+- Replace the shared `No goal` task form with separate Goal and Journal components used by both Today and Week; Today switches to them in block 5 and Week in block 7, which removes the `No goal` choice
+- Editing a task already on a day keeps one form for both kinds, as goal tasks are edited: a Journal task shows its title instead of a goal and has no Repeat
 - Goal requires `Area - Goal`, keeps the goal title, schedule and Repeat behavior
 - Journal starts with `+ New task`, then the first five open-item rows with `Show all (N)` when needed; an item with steps drills into only its open steps and is not itself selectable
 - Journal has no search or combined New / Journal tabs; its plan section owns optional time, duration and blocks
