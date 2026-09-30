@@ -228,7 +228,6 @@ export function TodayPage({
           draft={taskForm.draft}
           dateMode="fixed"
           minimumScheduledDate={today?.date ?? taskForm.draft.scheduledDate}
-          allowNoGoal={false}
           areas={taskForm.areas}
           goals={taskForm.goals}
           optionsError={taskForm.optionsError}

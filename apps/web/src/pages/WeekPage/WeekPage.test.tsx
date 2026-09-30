@@ -21,6 +21,20 @@ function task(id: string, title: string, date: string, time: string | null = "09
     end_time: time ? "10:00" : null,
     block_count: null,
     status: "PENDING",
+    parent_id: null as string | null,
+    step_progress: null as { done: number; total: number } | null,
+    parent: null as { id: string; title: string; step_progress: { done: number; total: number } } | null,
+  };
+}
+
+// The week response with extra tasks added to one of its days.
+function weekWith(date: string, extraTasks: ReturnType<typeof task>[]) {
+  const response = weekResponse();
+  return {
+    ...response,
+    days: response.days.map((day) =>
+      day.date === date ? { ...day, tasks: [...day.tasks, ...extraTasks] } : day,
+    ),
   };
 }
 
@@ -93,6 +107,9 @@ function defaultFetch() {
     if (request.method === "GET" && url.pathname === "/api/v1/goals") {
       return Response.json({ goals: [] });
     }
+    if (request.method === "GET" && url.pathname === "/api/v1/journal") {
+      return Response.json({ today: "2026-09-24", active: [], completed: [] });
+    }
     throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
   });
 }
@@ -140,25 +157,174 @@ describe("Week page", () => {
     expect(await screen.findByText("Sep 21 – 27")).toBeInTheDocument();
   });
 
-  it("opens the shared form with today or the clicked calendar slot", async () => {
+  it("asks for Goal or Journal, then opens that form with today or the clicked slot", async () => {
     vi.stubGlobal("fetch", defaultFetch());
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("Sep 21 – 27");
 
     await user.click(screen.getAllByRole("button", { name: "Add task" })[0]!);
+    let chooser = screen.getByRole("dialog", { name: "Add a task" });
+    expect(chooser).toHaveTextContent("Thu, Sep 24");
+    expect(within(chooser).getByRole("button", { name: "Goal task" })).toHaveFocus();
+    await user.click(within(chooser).getByRole("button", { name: "Goal task" }));
     let dialog = screen.getByRole("dialog", { name: "New task" });
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-24");
     expect(within(dialog).getByLabelText("Date")).toHaveAttribute("min", "2026-09-24");
     expect(within(dialog).getByLabelText("Date")).toBeEnabled();
+    expect(within(dialog).queryByRole("option", { name: "No goal" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Add a task on 2026-09-25" }), {
       clientY: 608,
     });
-    dialog = screen.getByRole("dialog", { name: "New task" });
+    chooser = screen.getByRole("dialog", { name: "Add a task" });
+    expect(chooser).toHaveTextContent("Fri, Sep 25 · 09:30");
+    await user.click(within(chooser).getByRole("button", { name: "Journal task" }));
+    dialog = screen.getByRole("dialog", { name: "Journal task" });
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-25");
+    expect(within(dialog).getByLabelText("Date")).toHaveAttribute("min", "2026-09-24");
+    expect(within(dialog).getByLabelText("Date")).toBeEnabled();
     expect(within(dialog).getByLabelText("Start time")).toHaveValue("09:30");
+  });
+
+  it("plans open Journal work on a clicked slot without creating a task", async () => {
+    let planned = false;
+    const fetchMock = defaultFetch();
+    fetchMock.mockImplementation(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json(
+          planned ? weekWith("2026-09-25", [task("60", "Buy a gift", "2026-09-25", "09:30")]) : weekResponse(),
+        );
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/journal") {
+        return Response.json({
+          today: "2026-09-24",
+          active: [
+            {
+              ...task("60", "Buy a gift", "2026-09-24", null),
+              scheduled_date: null,
+              due_date: null,
+              completed_at: null,
+              progress: { done: 0, total: 0 },
+              steps: [],
+            },
+          ],
+          completed: [],
+        });
+      }
+      if (request.method === "PATCH" && url.pathname === "/api/v1/tasks/60") {
+        expect(await request.clone().json()).toEqual({
+          scheduled_date: "2026-09-25",
+          start_time: "09:30",
+          duration_minutes: null,
+          block_count: null,
+        });
+        planned = true;
+        return Response.json({ ...task("60", "Buy a gift", "2026-09-25", "09:30") });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Sep 21 – 27");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a task on 2026-09-25" }), {
+      clientY: 608,
+    });
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Add a task" })).getByRole("button", {
+        name: "Journal task",
+      }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Journal task" });
+    await user.click(await within(dialog).findByRole("button", { name: "Buy a gift" }));
+    await user.click(within(dialog).getByRole("button", { name: "Plan" }));
+
+    expect(await screen.findByRole("button", { name: "Buy a gift, 09:30 to 10:00" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([request]) => request.method === "POST")).toBe(false);
+  });
+
+  it("shows a step's item on the calendar and asks before finishing an item with open steps", async () => {
+    let finished = false;
+    const item = { ...task("70", "Conference", "2026-09-24", null), step_progress: { done: 1, total: 3 } };
+    const step = {
+      ...task("71", "Prepare the slides", "2026-09-24", "13:00"),
+      parent_id: "70",
+      parent: { id: "70", title: "Conference", step_progress: { done: 1, total: 3 } },
+    };
+    const fetchMock = defaultFetch();
+    fetchMock.mockImplementation(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json(
+          weekWith("2026-09-24", finished ? [{ ...item, status: "DONE" }] : [item, step]),
+        );
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/tasks/70/check") {
+        finished = true;
+        return Response.json({ ...item, status: "DONE", completed_at: "2026-09-24T09:00:00Z" });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Prepare the slides, a step of Conference, 1 of 3 steps done, 13:00 to 10:00",
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("checkbox", { name: "Conference" })[0]!);
+    const dialog = screen.getByRole("dialog", { name: "Conference" });
+    expect(dialog).toHaveTextContent("2 steps are not complete. Finish anyway?");
+    await user.click(within(dialog).getByRole("button", { name: "Finish anyway" }));
+
+    await waitFor(() =>
+      expect(screen.queryAllByRole("checkbox", { name: "Prepare the slides" })).toHaveLength(0),
+    );
+    expect(fetchMock.mock.calls.filter(([request]) => request.method === "POST")).toHaveLength(1);
+  });
+
+  it("keeps finished work on an elapsed day in place and lets open work move on", async () => {
+    const fetchMock = defaultFetch();
+    fetchMock.mockImplementation(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json(
+          weekWith("2026-09-22", [
+            task("80", "Open review", "2026-09-22"),
+            { ...task("81", "Finished review", "2026-09-22", "11:00"), status: "DONE" },
+          ]),
+        );
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+
+    const open = (await screen.findByRole("button", { name: "Open review, 09:00 to 10:00" })).closest(
+      "article",
+    );
+    const finished = screen
+      .getByRole("button", { name: "Finished review, 11:00 to 10:00" })
+      .closest("article");
+    expect(open).toHaveAttribute("draggable", "true");
+    expect(finished).toHaveAttribute("draggable", "false");
+    expect(screen.queryByRole("button", { name: "Add a task on 2026-09-22" })).not.toBeInTheDocument();
   });
 
   it("shows the count and list of later tasks from the week response", async () => {

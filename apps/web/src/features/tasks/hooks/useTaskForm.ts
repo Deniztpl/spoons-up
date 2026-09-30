@@ -270,13 +270,11 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
           return;
         }
       } else {
-        const fields = {
+        const { data, error } = await createTask({
+          goal_id: draft.goalId,
           scheduled_date: draft.scheduledDate,
           ...scheduleValues(draft),
-        };
-        const { data, error } = draft.goalId
-          ? await createTask({ ...fields, goal_id: draft.goalId })
-          : await createTask({ ...fields, goal_id: null, title: draft.title.trim() });
+        });
         if (!data) {
           setFormError(taskErrorMessage(error, "We couldn't add this task."));
           return;
@@ -389,7 +387,9 @@ export function isTaskDraftComplete(draft: TaskDraft) {
   if (draft.scheduledDate === "") {
     return false;
   }
-  const hasWork = draft.goalId === "" ? draft.title.trim().length > 0 : true;
+  // A new task is goal work; a Journal task being edited keeps a title instead of a goal.
+  const hasWork =
+    draft.goalId !== "" || (draft.task !== null && draft.title.trim().length > 0);
   const canCreateRepeat =
     !draft.isRepeating ||
     Boolean(draft.task?.rule_id) ||

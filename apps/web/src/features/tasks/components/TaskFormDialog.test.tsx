@@ -21,7 +21,6 @@ function GoalEntry() {
           draft={form.draft}
           dateMode="fixed"
           minimumScheduledDate="2026-09-24"
-          allowNoGoal={false}
           areas={form.areas}
           goals={form.goals}
           optionsError={form.optionsError}

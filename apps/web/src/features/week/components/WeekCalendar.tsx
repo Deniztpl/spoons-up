@@ -21,6 +21,8 @@ const MIN_BLOCK_HEIGHT = 18;
 const TALL_BLOCK_HEIGHT = 40;
 // Blocks of 90 minutes or more also name their area under the title.
 const AREA_LABEL_BLOCK_HEIGHT = 94;
+// A step's block names its item under the title once there is room for the line.
+const PARENT_LABEL_BLOCK_HEIGHT = 56;
 const LAST_START_MINUTES = 23 * 60 + 45;
 const TASK_DRAG_TYPE = "application/x-spoons-up-task";
 const calendarColumns = "grid grid-cols-[52px_repeat(7,minmax(0,1fr))]";
@@ -318,6 +320,7 @@ function UntimedDropZone({
           key={task.id}
           task={task}
           area={taskArea(task, areaByGoalId)}
+          isPast={isPast}
           isPending={pendingTaskIds.has(task.id)}
           onEdit={onEdit}
           onToggle={onToggle}
@@ -390,6 +393,7 @@ function DayTimeline({
           task={task}
           area={taskArea(task, areaByGoalId)}
           placement={blockPlacement(task, column, columns)}
+          isPast={isPast}
           isPending={pendingTaskIds.has(task.id)}
           onEdit={onEdit}
           onToggle={onToggle}
@@ -424,6 +428,7 @@ function TaskBlock({
   task,
   area,
   placement,
+  isPast,
   isPending,
   onEdit,
   onToggle,
@@ -431,13 +436,21 @@ function TaskBlock({
   task: WeekTask;
   area: Area | undefined;
   placement?: BlockPlacement;
+  isPast: boolean;
   isPending: boolean;
   onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
 }) {
   const isDone = task.status === "DONE";
+  // Open work on an elapsed day can still move to today or later; finished work stays put.
+  const isMovable = !isPending && !(isPast && isDone);
   const isTall = placement !== undefined && placement.height >= TALL_BLOCK_HEIGHT;
   const showsArea = area !== undefined && isTall && placement.height >= AREA_LABEL_BLOCK_HEIGHT;
+  const parentLine = task.parent
+    ? `${task.parent.title} · ${task.parent.step_progress.done}/${task.parent.step_progress.total}`
+    : null;
+  const showsParent =
+    parentLine !== null && isTall && placement.height >= PARENT_LABEL_BLOCK_HEIGHT;
   const titleClassName = `min-w-0 text-[12px] font-medium leading-[1.25] text-ink ${isDone ? "line-through" : ""}`;
   const badge =
     task.block_count !== null || task.rule_id !== null ? (
@@ -454,8 +467,8 @@ function TaskBlock({
 
   return (
     <article
-      draggable={!isPending}
-      title={task.title}
+      draggable={isMovable}
+      title={parentLine ? `${task.title} · ${parentLine}` : task.title}
       className={`${
         placement ? "absolute z-[2] hover:z-[3]" : "relative h-[22px] shrink-0"
       } overflow-hidden rounded-[7px] border shadow-[0_1px_2px_rgb(28_43_33/0.06)] transition-shadow hover:shadow-[0_4px_12px_rgb(28_43_33/0.14)] ${
@@ -470,7 +483,7 @@ function TaskBlock({
         type="button"
         aria-label={taskSummary(task, area)}
         className={`absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-          isPending ? "cursor-wait" : "cursor-grab active:cursor-grabbing"
+          isPending ? "cursor-wait" : isMovable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
         }`}
         onClick={() => onEdit(task)}
       />
@@ -490,10 +503,13 @@ function TaskBlock({
             </div>
             <span
               className={titleClassName}
-              style={titleClamp(placement.height - (showsArea ? 15 : 0))}
+              style={titleClamp(placement.height - (showsArea || showsParent ? 15 : 0))}
             >
               {task.title}
             </span>
+            {showsParent ? (
+              <span className="mt-auto truncate text-[10.5px] text-ink-soft">{parentLine}</span>
+            ) : null}
             {showsArea ? (
               <span className="mt-auto flex min-w-0 items-center gap-[5px] text-[10.5px] font-medium text-area-strong">
                 <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-area" />
@@ -541,8 +557,16 @@ function MobileTaskCard({
         className="flex min-w-0 flex-1 items-center gap-2.5 self-stretch pr-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         onClick={() => onEdit(task)}
       >
-        <span className={`min-w-0 flex-1 truncate text-sm font-medium ${isDone ? "line-through" : ""}`}>
-          {task.title}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={`truncate text-sm font-medium ${isDone ? "line-through" : ""}`}>
+            {task.title}
+          </span>
+          {task.parent ? (
+            <span className="truncate text-[11.5px] text-ink-soft">
+              {task.parent.title} · {task.parent.step_progress.done}/
+              {task.parent.step_progress.total}
+            </span>
+          ) : null}
         </span>
         {task.rule_id ? (
           <span className="text-ink-soft">
@@ -674,6 +698,10 @@ function taskArea(task: WeekTask, areaByGoalId: ReadonlyMap<string, Area>) {
 function taskSummary(task: WeekTask, area: Area | undefined) {
   const details = [task.title];
   if (area) details.push(area.name);
+  if (task.parent) {
+    const { done, total } = task.parent.step_progress;
+    details.push(`a step of ${task.parent.title}`, `${done} of ${total} steps done`);
+  }
   if (task.start_time) {
     details.push(task.end_time ? `${task.start_time} to ${task.end_time}` : task.start_time);
   }

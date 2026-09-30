@@ -3,9 +3,17 @@ import { useState } from "react";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { useAreaLookup } from "../../features/areas/hooks/useAreaLookup";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
+import { JournalTaskDialog } from "../../features/journal/components/JournalTaskDialog";
+import { OpenStepsDialog } from "../../features/journal/components/OpenStepsDialog";
+import { useJournalTaskForm } from "../../features/journal/hooks/useJournalTaskForm";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
-import { useTaskForm } from "../../features/tasks/hooks/useTaskForm";
+import { type NewTaskDefaults, useTaskForm } from "../../features/tasks/hooks/useTaskForm";
+import type { WeekTask } from "../../features/week/api/weekApi";
 import { LaterTasksDialog } from "../../features/week/components/LaterTasksDialog";
+import {
+  type NewTaskKind,
+  NewTaskKindDialog,
+} from "../../features/week/components/NewTaskKindDialog";
 import { WeekCalendar } from "../../features/week/components/WeekCalendar";
 import { useWeek } from "../../features/week/hooks/useWeek";
 
@@ -22,8 +30,41 @@ export function WeekPage({
     onSaved: weekState.reload,
     onDeleted: weekState.reload,
   });
+  const journalForm = useJournalTaskForm({ onSaved: weekState.reload });
   const [isLaterOpen, setIsLaterOpen] = useState(false);
+  // A slot or the add button first asks which kind of task it is for.
+  const [newTask, setNewTask] = useState<NewTaskDefaults | null>(null);
+  const [confirmingTask, setConfirmingTask] = useState<WeekTask | null>(null);
   const { week, todayDate } = weekState;
+
+  const openNewTask = (kind: NewTaskKind) => {
+    if (!newTask) return;
+    setNewTask(null);
+    if (kind === "goal") {
+      taskForm.openCreate(newTask);
+    } else {
+      journalForm.open(newTask);
+    }
+  };
+
+  // A step and its item show each other's progress, and finishing an item takes its open steps
+  // off the calendar, so checking either reads the week again.
+  const toggleTask = async (task: WeekTask) => {
+    await weekState.toggleTask(task);
+    if (task.parent || task.step_progress) {
+      weekState.reload();
+    }
+  };
+
+  // Finishing an item with open steps asks first.
+  const requestToggle = (task: WeekTask) => {
+    const openSteps = task.step_progress ? task.step_progress.total - task.step_progress.done : 0;
+    if (task.status !== "DONE" && openSteps > 0) {
+      setConfirmingTask(task);
+      return;
+    }
+    void toggleTask(task);
+  };
 
   return (
     <AppLayout onLogout={onLogout}>
@@ -90,7 +131,7 @@ export function WeekPage({
             disabled={!todayDate}
             className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-lg border border-accent bg-accent px-3.5 text-[13px] font-medium text-white transition hover:border-accent-strong hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => {
-              if (todayDate) taskForm.openCreate({ scheduledDate: todayDate });
+              if (todayDate) setNewTask({ scheduledDate: todayDate });
             }}
           >
             <span aria-hidden="true">+</span>
@@ -116,9 +157,9 @@ export function WeekPage({
             todayDate={todayDate}
             areaByGoalId={areaLookup.areaByGoalId}
             pendingTaskIds={weekState.pendingTaskIds}
-            onCreate={taskForm.openCreate}
+            onCreate={setNewTask}
             onEdit={taskForm.openEdit}
-            onToggle={(task) => void weekState.toggleTask(task)}
+            onToggle={requestToggle}
             onMove={(task, scheduledDate, startTime) =>
               void weekState.moveTask(task, scheduledDate, startTime)
             }
@@ -165,6 +206,47 @@ export function WeekPage({
             taskForm.openEdit(task);
           }}
           onClose={() => setIsLaterOpen(false)}
+        />
+      ) : null}
+
+      {newTask ? (
+        <NewTaskKindDialog
+          scheduledDate={newTask.scheduledDate}
+          startTime={newTask.startTime}
+          onChoose={openNewTask}
+          onClose={() => setNewTask(null)}
+        />
+      ) : null}
+
+      {journalForm.draft && todayDate ? (
+        <JournalTaskDialog
+          draft={journalForm.draft}
+          dateMode="editable"
+          today={todayDate}
+          items={journalForm.items}
+          loadError={journalForm.loadError}
+          error={journalForm.formError}
+          isSaving={journalForm.isSaving}
+          onChoose={journalForm.choose}
+          onNewTitleChange={journalForm.setNewTitle}
+          onScheduledDateChange={journalForm.setScheduledDate}
+          onStartTimeChange={journalForm.setStartTime}
+          onDurationChange={journalForm.setDurationMinutes}
+          onBlockCountChange={journalForm.setBlockCount}
+          onSubmit={() => void journalForm.save()}
+          onClose={journalForm.close}
+        />
+      ) : null}
+
+      {confirmingTask?.step_progress ? (
+        <OpenStepsDialog
+          title={confirmingTask.title}
+          openCount={confirmingTask.step_progress.total - confirmingTask.step_progress.done}
+          onCancel={() => setConfirmingTask(null)}
+          onConfirm={() => {
+            setConfirmingTask(null);
+            void toggleTask(confirmingTask);
+          }}
         />
       ) : null}
     </AppLayout>

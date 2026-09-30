@@ -18,9 +18,6 @@ type TaskFormDialogProps = {
   draft: TaskDraft;
   dateMode: "fixed" | "editable";
   minimumScheduledDate: string;
-  // A new task can still be created without a goal until Today and Week switch to the
-  // separate Journal entry; without it, creating a task requires a goal.
-  allowNoGoal?: boolean;
   areas: Area[] | null;
   goals: Goal[] | null;
   optionsError: string | null;
@@ -62,7 +59,6 @@ export function TaskFormDialog({
   draft,
   dateMode,
   minimumScheduledDate,
-  allowNoGoal = true,
   areas,
   goals,
   optionsError,
@@ -89,7 +85,7 @@ export function TaskFormDialog({
   const initialFocusRef = useRef<HTMLInputElement>(null);
   const goalSelectRef = useRef<HTMLSelectElement>(null);
   const isEditing = draft.task !== null;
-  const isGoalOnly = !isEditing && !allowNoGoal;
+  // New work here is always goal work; Journal work is added in its own form.
   const isGoalLinked = draft.goalId !== "";
   const hasSchedule = Boolean(draft.task?.rule_id);
   const taskChanged = isTaskChanged(draft);
@@ -111,7 +107,7 @@ export function TaskFormDialog({
   return (
     <ModalDialog
       labelledBy={headingId}
-      initialFocusRef={isGoalOnly ? goalSelectRef : initialFocusRef}
+      initialFocusRef={isEditing ? initialFocusRef : goalSelectRef}
       onClose={onClose}
     >
       <div className="flex items-start gap-2.5">
@@ -120,7 +116,7 @@ export function TaskFormDialog({
             {isEditing ? "Edit task" : "New task"}
           </h2>
           <span className="rounded-[5px] bg-accent/12 px-[7px] py-[3px] text-[10px] font-medium uppercase tracking-[0.06em] text-accent">
-            {isGoalOnly ? "Goal" : "Task"}
+            {isEditing && !isGoalLinked ? "Journal" : "Goal"}
           </span>
         </div>
         <button
@@ -152,47 +148,31 @@ export function TaskFormDialog({
             />
           )
         ) : (
-          <>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={goalId} className={fieldLabelClassName}>
-                Goal
-              </label>
-              {/* Without a No goal option the select takes the first focus, so it stays enabled. */}
-              <select
-                ref={goalSelectRef}
-                id={goalId}
-                value={draft.goalId}
-                disabled={!isGoalOnly && (areas === null || goals === null)}
-                className={`${fieldClassName} disabled:cursor-wait disabled:text-ink-soft`}
-                onChange={(event) => onGoalChange(event.target.value)}
-              >
-                {allowNoGoal ? (
-                  <option value="">No goal</option>
-                ) : (
-                  <option value="" disabled>
-                    {areas === null || goals === null ? "Loading goals…" : "Choose a goal"}
-                  </option>
-                )}
-                {goals?.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {areaNames.get(goal.area_id)} - {goal.title}
-                  </option>
-                ))}
-              </select>
-              {isGoalOnly && goals?.length === 0 ? (
-                <p className="text-xs text-ink-soft">Add a goal to an area first.</p>
-              ) : null}
-            </div>
-
-            {allowNoGoal && draft.goalId === "" ? (
-              <TitleField
-                inputId={titleId}
-                inputRef={initialFocusRef}
-                title={draft.title}
-                onChange={onTitleChange}
-              />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={goalId} className={fieldLabelClassName}>
+              Goal
+            </label>
+            {/* The select takes the first focus, so it stays enabled while the goals load. */}
+            <select
+              ref={goalSelectRef}
+              id={goalId}
+              value={draft.goalId}
+              className={fieldClassName}
+              onChange={(event) => onGoalChange(event.target.value)}
+            >
+              <option value="" disabled>
+                {areas === null || goals === null ? "Loading goals…" : "Choose a goal"}
+              </option>
+              {goals?.map((goal) => (
+                <option key={goal.id} value={goal.id}>
+                  {areaNames.get(goal.area_id)} - {goal.title}
+                </option>
+              ))}
+            </select>
+            {goals?.length === 0 ? (
+              <p className="text-xs text-ink-soft">Add a goal to an area first.</p>
             ) : null}
-          </>
+          </div>
         )}
 
         <label className="flex flex-col gap-1.5">

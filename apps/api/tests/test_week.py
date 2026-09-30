@@ -269,6 +269,36 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
     assert later_tasks["items"][2]["occurrence_date"] == "2026-09-28"
 
 
+def test_week_leaves_unscheduled_journal_work_out_and_lists_far_due_items_later(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    headers = bearer(register(client, "week-journal@example.com"))
+
+    with db_session.begin():
+        user = get_user(db_session, "week-journal@example.com")
+        db_session.add_all(
+            [
+                build_task(user_id=user.id, title="Someday", scheduled_date=None),
+                build_task(user_id=user.id, title="Dentist", scheduled_date=date(2026, 9, 25)),
+                # A due date schedules the item on that day, after the following week here.
+                build_task(
+                    user_id=user.id,
+                    title="Passport",
+                    scheduled_date=date(2026, 10, 20),
+                    due_date=date(2026, 10, 20),
+                ),
+            ]
+        )
+
+    response = client.get("/api/v1/week", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [task["title"] for day in body["days"] for task in day["tasks"]] == ["Dentist"]
+    assert [item["title"] for item in body["later_tasks"]["items"]] == ["Passport"]
+
+
 def freeze_week_service_time(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -335,10 +365,11 @@ def build_task(
     *,
     user_id: int,
     title: str,
-    scheduled_date: date,
+    scheduled_date: date | None,
     goal_id: int | None = None,
     rule_id: int | None = None,
     occurrence_date: date | None = None,
+    due_date: date | None = None,
     start_time: time | None = None,
     status: TaskStatus = TaskStatus.PENDING,
 ) -> Task:
@@ -350,10 +381,11 @@ def build_task(
         title=title,
         occurrence_date=occurrence_date,
         scheduled_date=scheduled_date,
+        due_date=due_date,
         start_time=start_time,
         duration_minutes=None,
         end_time=None,
         block_count=Decimal("1.0"),
-        period_start=get_week_start(quota_date, week_start_day=1),
+        period_start=get_week_start(quota_date, week_start_day=1) if quota_date else None,
         status=status.value,
     )
