@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 
 import { checkHabit, uncheckHabit } from "../../habits/api/habitsApi";
-import { checkTask, uncheckTask } from "../../tasks/api/tasksApi";
-import { getToday, type Today, type TodayHabit, type TodayTask } from "../api/todayApi";
+import { checkTask, uncheckTask, updateTask } from "../../tasks/api/tasksApi";
+import {
+  getToday,
+  type LeftBehindItem,
+  type Today,
+  type TodayHabit,
+  type TodayTask,
+} from "../api/todayApi";
 
 const missingHabitMessage = "This habit no longer exists. Reload the page to see the latest list.";
 const missingTaskMessage = "This task no longer exists. Reload the page to see the latest list.";
@@ -133,6 +139,33 @@ export function useToday() {
     }
   };
 
+  // Moving changes only the day, so due dates and a goal task's week stay as they were.
+  // Resolves true once the row has moved.
+  const moveToToday = async (item: LeftBehindItem) => {
+    if (!today || pendingTaskIds.includes(item.id)) {
+      return false;
+    }
+    setPendingTaskIds((current) => [...current, item.id]);
+    setActionError(null);
+    try {
+      const { data, error } = await updateTask(item.id, { scheduled_date: today.date });
+      if (!data) {
+        setActionError(
+          todayErrorMessage(error, `We couldn't move ${item.title} to today.`, missingTaskMessage),
+        );
+        return false;
+      }
+      // The row joins today's tasks and leaves Left behind, in the server's order.
+      setLoadCount((count) => count + 1);
+      return true;
+    } catch {
+      setActionError("We couldn't reach Spoons Up. Please try again.");
+      return false;
+    } finally {
+      setPendingTaskIds((current) => current.filter((id) => id !== item.id));
+    }
+  };
+
   return {
     today,
     isLoading,
@@ -143,6 +176,7 @@ export function useToday() {
     reload: () => setLoadCount((count) => count + 1),
     toggleHabit,
     toggleTask,
+    moveToToday,
   };
 }
 

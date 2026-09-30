@@ -70,6 +70,7 @@ function todayResponse(overrides: Record<string, unknown> = {}) {
     daily_habits: [todayHabit("12", "Read", false), todayHabit("13", "Stretch", true)],
     weekly_habits: [todayHabit("15", "Call home", false)],
     tasks: [],
+    left_behind: { count: 0, items: [] },
     ...overrides,
   });
 }
@@ -124,6 +125,7 @@ describe("Today page", () => {
       "aria-pressed",
       "true",
     );
+    expect(within(views).queryByRole("button", { name: /Left behind/ })).not.toBeInTheDocument();
     await user.click(within(views).getByRole("button", { name: "Weekly" }));
 
     expect(screen.getByText("Sep 21 – 27")).toBeInTheDocument();
@@ -816,6 +818,82 @@ describe("Today page", () => {
       expect(screen.queryByRole("checkbox", { name: "Prepare the slides" })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole("checkbox", { name: "Conference" })).toBeChecked();
+  });
+
+  it("lists work left behind in its own view and moves it to today", async () => {
+    let moved: string[] = [];
+    const rows = [
+      {
+        id: "520",
+        title: "Renew the lease",
+        goal_id: null,
+        parent_id: null,
+        scheduled_date: "2026-09-17",
+        start_time: "14:00",
+        source_type: "JOURNAL",
+        source_label: "Journal",
+      },
+      {
+        id: "521",
+        title: "CS Block",
+        goal_id: "7",
+        parent_id: null,
+        scheduled_date: "2026-09-22",
+        start_time: null,
+        source_type: "AREA",
+        source_label: "Finance",
+      },
+    ];
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        const items = rows.filter((row) => !moved.includes(row.id));
+        return todayResponse({ left_behind: { count: items.length, items } });
+      }
+      if (request.method === "PATCH" && url.pathname.startsWith("/api/v1/tasks/")) {
+        // Moving changes only the day.
+        expect(await request.clone().json()).toEqual({ scheduled_date: "2026-09-24" });
+        const id = url.pathname.split("/").at(-1) ?? "";
+        moved = [...moved, id];
+        return Response.json({ id });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    stubFetch(fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    const views = await screen.findByRole("group", { name: "Today views" });
+    await user.click(await within(views).findByRole("button", { name: "Left behind 2" }));
+    expect(screen.queryByRole("button", { name: "Add goal task" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Read" })).not.toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Left behind" });
+    const [lease, block] = within(list).getAllByRole("listitem");
+    expect(lease).toHaveTextContent("Renew the lease");
+    expect(lease).toHaveTextContent("Journal");
+    expect(lease).toHaveTextContent("Thu, Sep 17 · 14:00");
+    expect(block).toHaveTextContent("CS Block");
+    expect(block).toHaveTextContent("Finance");
+    expect(block).toHaveTextContent("Tue, Sep 22");
+
+    await user.click(within(lease!).getByRole("button", { name: "Move to today" }));
+    expect(await within(views).findByRole("button", { name: "Left behind 1" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(screen.getByRole("list", { name: "Left behind" })).getAllByRole("listitem")).toHaveLength(1);
+
+    // The last row leaving closes the view and Today shows the day again.
+    await user.click(screen.getByRole("button", { name: "Move to today" }));
+    await waitFor(() =>
+      expect(within(views).queryByRole("button", { name: /Left behind/ })).not.toBeInTheDocument(),
+    );
+    expect(within(views).getByRole("button", { name: "Daily" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("checkbox", { name: "Read" })).toBeInTheDocument();
+    expect(moved).toEqual(["520", "521"]);
   });
 
   it("points to areas when there are no habits yet", async () => {

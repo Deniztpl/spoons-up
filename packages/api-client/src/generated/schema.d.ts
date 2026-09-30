@@ -713,6 +713,38 @@ export interface components {
             /** Items */
             items: components["schemas"]["TodayTaskResponse"][];
         };
+        /** LeftBehindItemResponse */
+        LeftBehindItemResponse: {
+            /** Goal Id */
+            goal_id: string | null;
+            /** Id */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "JOURNAL" | "AREA";
+            /** Start Time */
+            start_time: string | null;
+            /** Title */
+            title: string;
+        };
+        /** LeftBehindResponse */
+        LeftBehindResponse: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["LeftBehindItemResponse"][];
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -857,6 +889,7 @@ export interface components {
              * Format: date
              */
             date: string;
+            left_behind: components["schemas"]["LeftBehindResponse"];
             /** Tasks */
             tasks: components["schemas"]["TodayTaskResponse"][];
             /**

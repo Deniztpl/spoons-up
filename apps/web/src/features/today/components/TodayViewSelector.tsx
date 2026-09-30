@@ -1,7 +1,9 @@
-export type TodayView = "daily" | "weekly";
+export type TodayView = "daily" | "weekly" | "left-behind";
 
 type TodayViewSelectorProps = {
   value: TodayView;
+  // Left behind is offered only while it has rows.
+  leftBehindCount: number;
   onChange: (view: TodayView) => void;
 };
 
@@ -25,16 +27,26 @@ const viewOptions: ViewOption[] = [
     markerClassName: "rounded-full bg-habit",
     pressedClassName: "bg-habit/8",
   },
+  {
+    value: "left-behind",
+    label: "Left behind",
+    markerClassName: "rounded-[2px] bg-danger",
+    pressedClassName: "bg-danger-soft",
+  },
 ];
 
-export function TodayViewSelector({ value, onChange }: TodayViewSelectorProps) {
+export function TodayViewSelector({ value, leftBehindCount, onChange }: TodayViewSelectorProps) {
+  const options = viewOptions.filter(
+    (option) => option.value !== "left-behind" || leftBehindCount > 0,
+  );
+  // Left behind with its count is wider than the column, so the group may reach into the gap.
   return (
     <div
       role="group"
       aria-label="Today views"
-      className="flex gap-0.5 text-[13px] font-medium sm:flex-col sm:self-start"
+      className="flex gap-0.5 text-[13px] font-medium sm:w-max sm:flex-col sm:self-start"
     >
-      {viewOptions.map((option) => {
+      {options.map((option) => {
         const isPressed = value === option.value;
         return (
           <button
@@ -55,6 +67,14 @@ export function TodayViewSelector({ value, onChange }: TodayViewSelectorProps) {
               }`}
             />
             {option.label}
+            {option.value === "left-behind" ? (
+              <>
+                {" "}
+                <span className="-ml-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-track px-[5px] text-[11px] font-semibold text-ink tabular-nums">
+                  {leftBehindCount}
+                </span>
+              </>
+            ) : null}
           </button>
         );
       })}

@@ -52,6 +52,28 @@ class TodayTaskResponse(BaseModel):
         return value.strftime("%H:%M") if value is not None else None
 
 
+class LeftBehindItemResponse(BaseModel):
+    model_config = ConfigDict(coerce_numbers_to_str=True)
+
+    id: str
+    title: str
+    goal_id: str | None
+    parent_id: str | None
+    scheduled_date: date
+    start_time: time | None
+    source_type: Literal["JOURNAL", "AREA"]
+    source_label: str
+
+    @field_serializer("start_time")
+    def serialize_time(self, value: time | None) -> str | None:
+        return value.strftime("%H:%M") if value is not None else None
+
+
+class LeftBehindResponse(BaseModel):
+    count: int
+    items: list[LeftBehindItemResponse]
+
+
 class TodayResponse(BaseModel):
     date: date
     week_start: date
@@ -59,3 +81,4 @@ class TodayResponse(BaseModel):
     daily_habits: list[TodayHabitResponse]
     weekly_habits: list[TodayHabitResponse]
     tasks: list[TodayTaskResponse]
+    left_behind: LeftBehindResponse

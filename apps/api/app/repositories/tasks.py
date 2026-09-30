@@ -41,6 +41,38 @@ class TaskRepository:
         )
         return list(self.session.scalars(query))
 
+    def list_left_behind(
+        self,
+        *,
+        user_id: int,
+        today: date,
+        week_start: date,
+    ) -> list[tuple[Task, str | None]]:
+        """Pending work from earlier days, with its area's name: Journal work of any age, and goal
+        work from earlier days of the open week that still counts toward that week."""
+        query = (
+            select(Task, Area.name)
+            .outerjoin(Goal, Task.goal_id == Goal.id)
+            .outerjoin(Area, Goal.area_id == Area.id)
+            .where(
+                Task.user_id == user_id,
+                Task.status == TaskStatus.PENDING.value,
+                Task.scheduled_date < today,
+                or_(
+                    Task.goal_id.is_(None),
+                    and_(
+                        Goal.user_id == user_id,
+                        Area.user_id == user_id,
+                        Area.archived_at.is_(None),
+                        Task.period_start == week_start,
+                        Task.scheduled_date >= week_start,
+                    ),
+                ),
+            )
+            .order_by(Task.scheduled_date, Task.start_time.asc().nulls_last(), Task.id)
+        )
+        return [(task, area_name) for task, area_name in self.session.execute(query)]
+
     def list_active_journal_items(self, *, user_id: int) -> list[Task]:
         journal_time = case(
             (Task.due_date.is_not(None), Task.start_time),

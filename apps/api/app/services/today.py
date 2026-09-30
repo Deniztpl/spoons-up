@@ -11,6 +11,8 @@ from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.schemas.journal import JournalProgressResponse
 from app.schemas.today import (
+    LeftBehindItemResponse,
+    LeftBehindResponse,
     TaskParentResponse,
     TodayHabitResponse,
     TodayResponse,
@@ -37,7 +39,8 @@ class TodayService:
             if user is None:
                 raise NotFoundError
 
-            resolved_date = target_date or datetime.now(ZoneInfo(user.timezone)).date()
+            local_today = datetime.now(ZoneInfo(user.timezone)).date()
+            resolved_date = target_date or local_today
             week_start = get_week_start(
                 resolved_date,
                 week_start_day=user.week_start_day,
@@ -54,6 +57,12 @@ class TodayService:
             tasks = self.task_repository.list_for_today(
                 user_id=user_id,
                 target_date=resolved_date,
+            )
+            # Left behind is measured from the real today and open week, whatever day is asked for.
+            left_behind = self.task_repository.list_left_behind(
+                user_id=user_id,
+                today=local_today,
+                week_start=get_week_start(local_today, week_start_day=user.week_start_day),
             )
 
             daily_habits: list[TodayHabitResponse] = []
@@ -81,7 +90,29 @@ class TodayService:
                     task_repository=self.task_repository,
                     user_id=user_id,
                 ),
+                left_behind=LeftBehindResponse(
+                    count=len(left_behind),
+                    items=[
+                        left_behind_item(task, area_name=area_name)
+                        for task, area_name in left_behind
+                    ],
+                ),
             )
+
+
+def left_behind_item(task: Task, *, area_name: str | None) -> LeftBehindItemResponse:
+    """A left-behind row names where the work comes from: the Journal, or its goal's area."""
+    is_journal = task.goal_id is None
+    return LeftBehindItemResponse(
+        id=str(task.id),
+        title=task.title,
+        goal_id=str(task.goal_id) if task.goal_id is not None else None,
+        parent_id=str(task.parent_id) if task.parent_id is not None else None,
+        scheduled_date=task.scheduled_date,
+        start_time=task.start_time,
+        source_type="JOURNAL" if is_journal else "AREA",
+        source_label="Journal" if is_journal else (area_name or ""),
+    )
 
 
 def scheduled_task_responses(

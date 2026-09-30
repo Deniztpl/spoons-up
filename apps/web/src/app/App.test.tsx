@@ -26,6 +26,7 @@ function emptyTodayResponse() {
     daily_habits: [],
     weekly_habits: [],
     tasks: [],
+    left_behind: { count: 0, items: [] },
   });
 }
 

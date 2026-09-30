@@ -985,6 +985,101 @@
         "title": "LaterTasksResponse",
         "type": "object"
       },
+      "LeftBehindItemResponse": {
+        "properties": {
+          "goal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "scheduled_date": {
+            "format": "date",
+            "title": "Scheduled Date",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "JOURNAL",
+              "AREA"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "goal_id",
+          "parent_id",
+          "scheduled_date",
+          "start_time",
+          "source_type",
+          "source_label"
+        ],
+        "title": "LeftBehindItemResponse",
+        "type": "object"
+      },
+      "LeftBehindResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LeftBehindItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "count",
+          "items"
+        ],
+        "title": "LeftBehindResponse",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -1421,6 +1516,9 @@
             "title": "Date",
             "type": "string"
           },
+          "left_behind": {
+            "$ref": "#/components/schemas/LeftBehindResponse"
+          },
           "tasks": {
             "items": {
               "$ref": "#/components/schemas/TodayTaskResponse"
@@ -1452,7 +1550,8 @@
           "week_end",
           "daily_habits",
           "weekly_habits",
-          "tasks"
+          "tasks",
+          "left_behind"
         ],
         "title": "TodayResponse",
         "type": "object"

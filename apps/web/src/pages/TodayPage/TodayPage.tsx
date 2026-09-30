@@ -10,8 +10,9 @@ import { useJournalTaskForm } from "../../features/journal/hooks/useJournalTaskF
 import { useProgress } from "../../features/results/hooks/useProgress";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
 import { useTaskForm } from "../../features/tasks/hooks/useTaskForm";
-import type { Today, TodayTask } from "../../features/today/api/todayApi";
+import type { LeftBehindItem, Today, TodayTask } from "../../features/today/api/todayApi";
 import { TodayHabitList } from "../../features/today/components/TodayHabitList";
+import { TodayLeftBehindList } from "../../features/today/components/TodayLeftBehindList";
 import { TodayTaskList } from "../../features/today/components/TodayTaskList";
 import { TodayWeekPanel } from "../../features/today/components/TodayWeekPanel";
 import {
@@ -54,8 +55,26 @@ export function TodayPage({
   const [view, setView] = useState<TodayView>("daily");
   const [confirmingTask, setConfirmingTask] = useState<TodayTask | null>(null);
   const { today } = todayState;
-  const habits = today ? (view === "daily" ? today.daily_habits : today.weekly_habits) : [];
-  const tasks = today && view === "daily" ? today.tasks : [];
+  const leftBehind = today?.left_behind;
+  const leftBehindCount = leftBehind?.count ?? 0;
+  // Left behind is offered only while it has rows; once it empties, Today shows the day again.
+  const shownView: TodayView = view === "left-behind" && leftBehindCount === 0 ? "daily" : view;
+  const habits = today
+    ? shownView === "daily"
+      ? today.daily_habits
+      : shownView === "weekly"
+        ? today.weekly_habits
+        : []
+    : [];
+  const tasks = today && shownView === "daily" ? today.tasks : [];
+
+  // Moving the last row closes the view.
+  const moveToToday = async (item: LeftBehindItem) => {
+    const wasLast = leftBehindCount === 1;
+    if ((await todayState.moveToToday(item)) && wasLast) {
+      setView("daily");
+    }
+  };
 
   // A step and its item show each other's progress, and finishing an item takes its open steps
   // off the day, so checking either reads the day again.
@@ -89,11 +108,11 @@ export function TodayPage({
                 </h1>
                 {today ? (
                   <p className="whitespace-nowrap text-[13px] text-ink-soft">
-                    {dateLabel(today, view)}
+                    {dateLabel(today, shownView)}
                   </p>
                 ) : null}
               </div>
-              {today && view === "daily" ? (
+              {today && shownView === "daily" ? (
                 <div className="flex shrink-0 gap-1.5 pt-1.5">
                   <button
                     type="button"
@@ -117,11 +136,21 @@ export function TodayPage({
               ) : null}
             </div>
 
-            <TodayViewSelector value={view} onChange={setView} />
+            <TodayViewSelector
+              value={shownView}
+              leftBehindCount={leftBehindCount}
+              onChange={setView}
+            />
 
             {/* The left gutter holds the task list's progress rail. */}
             <section
-              aria-label={view === "daily" ? "Today's tasks and habits" : "Weekly habits"}
+              aria-label={
+                shownView === "daily"
+                  ? "Today's tasks and habits"
+                  : shownView === "weekly"
+                    ? "Weekly habits"
+                    : "Work left behind"
+              }
               className="flex min-w-0 flex-col gap-2 pl-[26px]"
             >
               {todayState.isLoading ? (
@@ -140,6 +169,16 @@ export function TodayPage({
                 <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-[13px] text-danger">
                   {todayState.actionError}
                 </p>
+              ) : null}
+
+              {today && leftBehind && shownView === "left-behind" ? (
+                <TodayLeftBehindList
+                  items={leftBehind.items}
+                  today={today.date}
+                  areaByGoalId={areaLookup.areaByGoalId}
+                  pendingTaskIds={todayState.pendingTaskIds}
+                  onMove={(item) => void moveToToday(item)}
+                />
               ) : null}
 
               {tasks.length > 0 ? (
@@ -161,10 +200,10 @@ export function TodayPage({
                 />
               ) : null}
 
-              {today && habits.length === 0 && tasks.length === 0 ? (
+              {today && shownView !== "left-behind" && habits.length === 0 && tasks.length === 0 ? (
                 <div className="rounded-[10px] border border-dashed border-ink/16 px-5 py-7 text-center">
                   <h2 className="text-[13.5px] font-medium">
-                    {view === "daily" ? "No daily habits yet" : "No weekly habits yet"}
+                    {shownView === "daily" ? "No daily habits yet" : "No weekly habits yet"}
                   </h2>
                   <p className="mt-1 text-[13px] leading-5 text-ink-soft">
                     Add habits to an area and they will show up here.
@@ -248,9 +287,9 @@ export function TodayPage({
 }
 
 function dateLabel(today: Today, view: TodayView) {
-  return view === "daily"
-    ? dayFormat.format(localDate(today.date))
-    : weekFormat.formatRange(localDate(today.week_start), localDate(today.week_end));
+  return view === "weekly"
+    ? weekFormat.formatRange(localDate(today.week_start), localDate(today.week_end))
+    : dayFormat.format(localDate(today.date));
 }
 
 // Avoid UTC shifts for date-only values.
