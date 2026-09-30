@@ -218,7 +218,8 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
         const changes = taskChanges(draft);
         if (changes) {
           const { data, error } = await updateTask(draft.task.id, changes);
-          if (!data || data.scheduled_date === null) {
+          const scheduledDate = data?.scheduled_date ?? null;
+          if (!data || scheduledDate === null) {
             setFormError(taskErrorMessage(error, "We couldn't save this task."));
             return;
           }
@@ -232,13 +233,13 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
                     goal_id: data.goal_id,
                     rule_id: data.rule_id,
                     title: data.title,
-                    scheduled_date: data.scheduled_date,
+                    scheduled_date: scheduledDate,
                     start_time: data.start_time,
                     duration_minutes: data.duration_minutes,
                     block_count: data.block_count,
                   },
                   title: data.title,
-                  scheduledDate: data.scheduled_date,
+                  scheduledDate,
                   startTime: data.start_time ?? "",
                   durationMinutes:
                     data.duration_minutes === null ? "" : String(data.duration_minutes),
