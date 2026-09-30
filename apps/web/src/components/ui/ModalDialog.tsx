@@ -10,6 +10,8 @@ import {
 type ModalDialogProps = {
   labelledBy: string;
   initialFocusRef: RefObject<HTMLElement | null>;
+  // Takes focus on close when the element that opened the dialog is gone.
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
   onClose: () => void;
 };
@@ -20,6 +22,7 @@ const focusableSelector =
 export function ModalDialog({
   labelledBy,
   initialFocusRef,
+  fallbackFocusRef,
   children,
   onClose,
 }: ModalDialogProps) {
@@ -28,13 +31,16 @@ export function ModalDialog({
   // Restore focus when the dialog closes.
   useEffect(() => {
     const opener = document.activeElement;
+    const fallback = fallbackFocusRef?.current;
     initialFocusRef.current?.focus();
     return () => {
-      if (opener instanceof HTMLElement) {
+      if (opener instanceof HTMLElement && opener.isConnected) {
         opener.focus();
+      } else {
+        fallback?.focus();
       }
     };
-  }, [initialFocusRef]);
+  }, [initialFocusRef, fallbackFocusRef]);
 
   // Keep keyboard focus inside the dialog.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

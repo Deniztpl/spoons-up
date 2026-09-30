@@ -7,6 +7,7 @@ const pages: { to: string; label: string; icon: ReactNode }[] = [
   { to: "/areas", label: "Areas", icon: <AreaIcon /> },
   { to: "/today", label: "Today", icon: <TodayIcon /> },
   { to: "/week", label: "Week", icon: <WeekIcon /> },
+  { to: "/journal", label: "Journal", icon: <JournalIcon /> },
 ];
 
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -82,6 +83,16 @@ function WeekIcon() {
       <rect x="4.5" y="5.5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
       <path d="M8 3.8v3.4M16 3.8v3.4M4.8 9.5h14.4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
       <path d="M8 13h2M13 13h2M8 16h2M13 16h2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function JournalIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none">
+      <rect x="5.5" y="4.5" width="13" height="15" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M9 4.8v14.4" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 9.5h3.5M12 13h3.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.4" />
     </svg>
   );
 }

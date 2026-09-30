@@ -140,6 +140,10 @@ apps/web/src/
   rail belong to `features/today`.
 - `ModalDialog` in `components/ui/` is the shared modal shell: backdrop, focus
   trap, Escape and focus return. Form content stays in its feature.
+- The Journal read, its list, the item detail and their hooks belong to
+  `features/journal`; its task writes go through `features/tasks/api`. The
+  confirmation for finishing an item with open steps lives there too, so Today
+  and Week reuse it.
 - Parts of a design that wait for a later slice are marked with
   `TODO(slice-N)` comments at the place they plug in, and disabled "Soon"
   controls where the design shows them. No mock data is rendered in their place.

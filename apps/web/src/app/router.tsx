@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router";
 import { useAuth } from "../features/auth/hooks/useAuth";
 import { AreasPage } from "../pages/AreasPage/AreasPage";
 import { AuthPage } from "../pages/AuthPage/AuthPage";
+import { JournalPage } from "../pages/JournalPage/JournalPage";
 import { TodayPage } from "../pages/TodayPage/TodayPage";
 import { WeekPage } from "../pages/WeekPage/WeekPage";
 
@@ -18,6 +19,7 @@ export function AppRouter() {
       <Routes>
         <Route path="/today" element={<TodayPage onLogout={logout} />} />
         <Route path="/week" element={<WeekPage onLogout={logout} />} />
+        <Route path="/journal" element={<JournalPage onLogout={logout} />} />
         <Route path="/areas" element={<AreasPage onLogout={logout} />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>
