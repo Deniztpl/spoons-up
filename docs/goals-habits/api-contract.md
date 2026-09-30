@@ -33,7 +33,7 @@ Errors are raised as application exception classes and rendered by one handler. 
 Two different things, don't mix them:
 
 - Instants (`created_at`, `completed_at`, `scheduled_at`) — UTC, ISO-8601 with `Z`: `"2026-09-19T07:30:00Z"`
-- Local dates and times (`scheduled_date`, `occurrence_date`, `period_start`, `start_time`, `end_time`) — no timezone, they mean what the user's calendar says: `"2026-09-19"`, `"19:00"`
+- Local dates and times (`scheduled_date`, `due_date`, `occurrence_date`, `period_start`, `start_time`, `end_time`) — no timezone, they mean what the user's calendar says: `"2026-09-19"`, `"19:00"`
 
 **Common errors**
 
@@ -225,7 +225,7 @@ Areas are the only thing that archives. Habits and goals have delete only.
 
 **204** — the area and everything under it: habits with their entries, goals with their rules and tasks. Its `period_results` rows stay, so past weeks keep reading correctly. Not recoverable.
 
-Active and archived areas can both be deleted. The client asks for confirmation with a strong warning that names what goes with the area — its habits, goals and all of their history — and offers archive as the reversible way to put an area down.
+Active and archived areas can both be deleted. The client asks for confirmation with a strong warning that the area's habits and goals go with it, along with their tasks and check-off history, and offers archive as the reversible way to put an area down. Frozen weekly results in `period_results` remain readable in Growth.
 
 ---
 
@@ -449,9 +449,11 @@ A task object:
   "id": "481",
   "goal_id": "7",
   "rule_id": "21",
+  "parent_id": null,
   "title": "CS Block",
   "occurrence_date": "2026-09-16",
   "scheduled_date": "2026-09-17",
+  "due_date": null,
   "start_time": "19:00",
   "duration_minutes": 60,
   "end_time": "20:00",
@@ -462,18 +464,20 @@ A task object:
 }
 ```
 
-The three dates mean different things and only one of them moves:
+The task's identity and calendar fields mean different things:
 
 - `occurrence_date` — the date the rule produced. Never changes while the task belongs to its rule. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it.
-- `scheduled_date` — where the task sits now. This is what the calendar draws.
-- `period_start` — the week the task counts toward. Fixed at generation, so postponing across a week boundary doesn't move the quota.
+- `scheduled_date` — where the task sits now. This is what Today and Week draw. It may be null only on Journal work.
+- `due_date` — the optional deadline or event date of a top-level Journal item. Steps and goal tasks never have one.
+- `period_start` — the week identity fixed when the task is first scheduled. It is null exactly while `scheduled_date` is null. Moving a scheduled task does not change it; scheduling it again after it was cleared derives a new value.
+- `parent_id` — the top-level Journal item that owns this step. Null on goal tasks and top-level Journal items. Nesting stops at one level.
 - `start_time`, `duration_minutes` and `block_count` — independent and nullable. `end_time` is present only when both time and duration exist. A null block value contributes zero when completed; otherwise it must be a positive multiple of 0.5.
 
-There is no `GET /tasks`. Tasks are read through `/today` and `/week`.
+There is no `GET /tasks`. Scheduled tasks are read through `/today` and `/week`; the Journal aggregate is read through `/journal`.
 
 #### POST /tasks
 
-Ad-hoc task, created by the user rather than a rule.
+Ad-hoc goal work, a top-level Journal item, or a Journal step created by the user rather than a rule.
 
 ```json
 {
@@ -488,38 +492,61 @@ Ad-hoc task, created by the user rather than a rule.
 
 `goal_id` is optional. When present, `title` must be omitted; the server verifies the goal through its active area and copies its title. Without a goal, `title` is required and the task is standalone. `start_time`, `duration_minutes` and `block_count` are independently optional.
 
-`scheduled_date` cannot be earlier than today in the user's timezone. There is no upper bound.
+For a goal task, `scheduled_date` is required and `due_date` and `parent_id` must be omitted.
 
-**201** — the created task. `rule_id` and `occurrence_date` are null; `period_start` is derived from `scheduled_date`. `end_time` is derived only when both `start_time` and `duration_minutes` are present.
+For a top-level Journal item, `goal_id` and `parent_id` are null and `scheduled_date` is optional. `due_date` is accepted only here. When it is supplied, the server sets `scheduled_date` to the same date regardless of whether the client also supplied a schedule. Journal creates from Today and Week instead supply `scheduled_date` with no `due_date`.
+
+A step create supplies only `parent_id` and `title`:
+
+```json
+{ "parent_id": "490", "title": "Prepare the slides" }
+```
+
+The parent must belong to the user and be a goal-less top-level task. A step cannot have a goal, parent of its own, due date, schedule, time, duration or blocks at creation. Those plan fields, except `due_date`, may be added later with `PATCH /tasks/{id}`.
+
+A non-null `scheduled_date`, including one derived from `due_date`, cannot be earlier than today in the user's timezone. There is no upper bound. `start_time` requires a scheduled date.
+
+**201** — the created task. `rule_id` and `occurrence_date` are null. `period_start` is derived when `scheduled_date` is non-null and otherwise stays null. `end_time` is derived only when both `start_time` and `duration_minutes` are present.
 
 | Error | When |
 |---|---|
-| 404 `not_found` | no such goal |
-| 422 `validation_error` | `scheduled_date` is before today in the user's timezone, missing standalone title, a title supplied for a goal-linked task, a non-null `duration_minutes` below 1, or a non-null `block_count` that is not a positive multiple of 0.5 |
+| 404 `not_found` | no such goal or parent, including one owned by another user |
+| 422 `validation_error` | an invalid goal/Journal/step field combination; a non-null schedule before today; a time without a schedule; missing Journal title; a title supplied for a goal task; nested steps; a non-null `duration_minutes` below 1; or a non-null `block_count` that is not a positive multiple of 0.5 |
 
 #### PATCH /tasks/{id}
 
 ```json
-{ "title": "...", "scheduled_date": "2026-09-24", "start_time": "20:00", "duration_minutes": 30, "block_count": 2 }
+{
+  "title": "...",
+  "scheduled_date": "2026-09-24",
+  "due_date": "2026-10-18",
+  "start_time": "20:00",
+  "duration_minutes": 30,
+  "block_count": 2
+}
 ```
 
-All fields optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it. `title` is editable only on a standalone task. This is also how postpone works — send a new `scheduled_date`. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited.
+All fields are optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it. `title` is editable only on Journal work. `goal_id`, `parent_id`, `rule_id` and `occurrence_date` are never editable here.
+
+`due_date` is editable only on a top-level Journal item and may be null. Supplying a date also sets `scheduled_date` to it. Supplying `due_date: null` clears `scheduled_date`, `period_start`, `start_time` and `end_time` so the item leaves Today and Week; duration and blocks remain as optional size information. If `due_date` is absent, planning and moving through `scheduled_date` never changes the saved due date.
+
+Supplying a date for a previously unscheduled Journal item or step derives `period_start`. Further moves keep that identity fixed. A goal task always remains scheduled. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited.
 
 When supplied, `scheduled_date` cannot be earlier than today in the user's timezone. There is no upper bound.
 
-**200** — the updated task. `occurrence_date` and `period_start` are unchanged whatever the new date is.
+**200** — the updated task. `occurrence_date` never changes here. `period_start` follows the first-schedule and clear rules above.
 
 Changing a timed task updates its reminder. Clearing its time cancels the reminder; adding a time creates one.
 
 | Error | When |
 |---|---|
-| 422 `validation_error` | the supplied `scheduled_date` is before today in the user's timezone, a non-null `duration_minutes` is below 1, or a non-null `block_count` is not a positive multiple of 0.5 |
+| 422 `validation_error` | a supplied or due-derived schedule is before today; a time would remain without a schedule; `due_date` is used on a goal task or step; a goal task would become unscheduled; a non-null `duration_minutes` is below 1; or a non-null `block_count` is not a positive multiple of 0.5 |
 
 #### DELETE /tasks/{id}
 
 **204**
 
-Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc (`occurrence_date` null) is hard-deleted, since nothing would recreate it.
+Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc goal tasks and Journal tasks (`occurrence_date` null) are hard-deleted, since nothing would recreate them. Deleting a top-level Journal item cascades to every step.
 
 Either way its reminder, if any, is cancelled.
 
@@ -531,9 +558,11 @@ No body.
 
 Completing a task already done is a no-op and returns the task unchanged.
 
+When the task is a top-level Journal item with pending steps, the client confirms first. In the same completion transaction the server leaves those steps `PENDING` but clears their `scheduled_date`, `period_start`, `start_time` and `end_time`, so they leave Today, Week and Left behind. Completed steps and every step's duration and block value are untouched. Completing all steps never completes their parent automatically.
+
 #### DELETE /tasks/{id}/check
 
-**200** — the task back at `status: "PENDING"`, `completed_at` null.
+**200** — the task back at `status: "PENDING"`, `completed_at` null. Reopening a top-level Journal item does not restore plans cleared when it was completed.
 
 #### POST /tasks/{id}/repeat
 
@@ -565,13 +594,61 @@ Repeat off, from the edit form of a repeating task.
 
 ### Views
 
-These two take their shape from the screens. `/today` is settled by the today screen built in slice 2; `/week` stays a draft until the calendar is built.
+These aggregate reads take their shape from their screens. `/journal` returns the complete Journal list, `/today` returns all three Today views, and `/week` returns the two reachable calendar weeks plus its later summary.
 
-Neither adds anything. Tasks are on screen because a rule write created them, or because the daily job did. Both endpoints read what exists — except for a user returning after the daily job stopped running for them, whose window is added once before the first read.
+None adds anything. Tasks are on screen because a user write, rule write or the daily job put them there. The reads only return what exists — except for a user returning after the daily job stopped running for them, whose generated window is added once before the first read.
+
+#### GET /journal
+
+The Journal page: every non-deleted, goal-less, top-level task, split into `active` (`PENDING`) and `completed` (`DONE`) lists with its steps. Steps are nested under their item and never appear at the top level. It is not paginated in this slice.
+
+**200**
+
+```json
+{
+  "today": "2026-09-24",
+  "active": [
+    {
+      "id": "490",
+      "title": "Conference",
+      "due_date": "2026-10-02",
+      "scheduled_date": "2026-10-02",
+      "start_time": "10:00",
+      "duration_minutes": null,
+      "end_time": null,
+      "block_count": null,
+      "status": "PENDING",
+      "completed_at": null,
+      "progress": { "done": 2, "total": 4 },
+      "steps": [
+        {
+          "id": "491",
+          "parent_id": "490",
+          "title": "Prepare the slides",
+          "scheduled_date": "2026-09-30",
+          "start_time": "14:00",
+          "duration_minutes": 60,
+          "end_time": "15:00",
+          "block_count": 1,
+          "status": "DONE",
+          "completed_at": "2026-09-29T12:00:00Z"
+        }
+      ]
+    }
+  ],
+  "completed": []
+}
+```
+
+`today` is derived in the user's timezone so the client can mark overdue dates without relying on the browser timezone. Counts in the Active and Completed switch are the two arrays' lengths; the response does not duplicate them.
+
+Active items with `due_date` come first, ordered by due date, non-null time before null time, creation time and id. Undated items follow in creation order. Completed items are ordered by `completed_at` descending, then id descending. Steps stay in their creation order. `progress` is always present and counts `DONE` steps over all steps, including `0 / 0` for an item without steps.
+
+An active item with steps remains in this response after every step is complete; the user still completes the item explicitly. A completed item can contain pending steps because completing the parent does not check them.
 
 #### GET /today
 
-The today screen: a daily view with habits and the day's tasks, and a weekly view with weekly habits. One request returns all three lists; the client switches between the two views.
+The Today screen: a daily view with habits and the day's tasks, a weekly view with weekly habits, and a conditional Left behind view. One request returns all of their data; the client switches between them.
 
 | Query | Default |
 |---|---|
@@ -595,6 +672,7 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
       "id": "481",
       "goal_id": "7",
       "rule_id": "21",
+      "parent_id": null,
       "title": "CS Block",
       "start_time": "19:00",
       "duration_minutes": 60,
@@ -603,9 +681,26 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
       "status": "PENDING",
       "scheduled_date": "2026-09-19",
       "occurrence_date": "2026-09-16",
-      "period_start": "2026-09-14"
+      "period_start": "2026-09-14",
+      "step_progress": null,
+      "parent": null
     }
-  ]
+  ],
+  "left_behind": {
+    "count": 1,
+    "items": [
+      {
+        "id": "520",
+        "title": "Pay the invoice",
+        "goal_id": null,
+        "parent_id": null,
+        "scheduled_date": "2026-09-17",
+        "start_time": "14:00",
+        "source_type": "JOURNAL",
+        "source_label": "Journal"
+      }
+    ]
+  }
 }
 ```
 
@@ -614,6 +709,25 @@ The today screen: a daily view with habits and the day's tasks, and a weekly vie
 `week_start` and `week_end` bound the week `date` falls in, using the user's `week_start_day`. The weekly view labels itself with them, so the client never computes a week boundary. To check off or undo a habit shown here, the client sends this response's `date`; the server resolves it to the habit's day or week.
 
 Timed tasks are ordered by `start_time`, followed by untimed tasks; `DELETED` is excluded. Anything under an archived area is excluded.
+
+The scheduled task shape is shared by `/today`, `/week` and `later_tasks`. A top-level Journal item with steps has `step_progress: { "done": 1, "total": 3 }`. A scheduled step instead has `parent_id` and:
+
+```json
+{
+  "id": "490",
+  "title": "Change the bicycle tire",
+  "step_progress": { "done": 1, "total": 3 }
+}
+```
+
+in `parent`; its own `step_progress` is null. Goal tasks and Journal items without steps have both fields null. This context lets a step card show its parent's title and progress and lets the client confirm before completing a parent with open steps without another read.
+
+`left_behind` belongs to this screen and is returned here rather than through a separate endpoint. `count` always equals the number of items. It is calculated against the user's actual local today and current open week, even if the optional `date` query asks for another day:
+
+- every pending goal-less task with a non-null `scheduled_date` before today, including steps, with no age limit;
+- pending goal tasks scheduled before today whose `period_start` is the current open week and whose scheduled day is inside that week.
+
+Rows are ordered by `scheduled_date`, non-null time before null time, then id. `source_type` is `JOURNAL` with label `Journal`, or `AREA` with the goal's current area name. The client hides the view when `count` is zero. `Move to today` patches only `scheduled_date`; it never changes a Journal due date or a task's existing `period_start`.
 
 #### GET /week
 
@@ -647,7 +761,9 @@ Any date inside the current or following week works — the server resolves it t
 
 The list includes non-deleted ad-hoc tasks (`occurrence_date` is null) and rule-generated tasks the user moved there (`scheduled_date != occurrence_date`). Untouched occurrences generated automatically by rules are excluded. The normal visibility rule still applies: tasks under an archived area are excluded.
 
-The shared task form always includes `scheduled_date`. On Today it displays today and is disabled. On Week it is editable with today as its minimum and no maximum. Clicking a today-or-future calendar slot opens the form with that slot's date and time; elapsed slots in the current week remain visible but do not create tasks. The header add-task button opens the form with today's date.
+Today and Week have separate Goal and Journal task components. On Today the date is today and disabled. On Week it is editable with today as its minimum and no maximum. Clicking a today-or-future calendar slot or the header add action first asks which kind, then opens that component with the proposed date and time. Elapsed slots in the current week remain visible and pending tasks on them may be dragged or edited to today or later, but a past slot never accepts creation or a drop.
+
+Tasks with a null `scheduled_date` are absent. A Journal item put after the following week by its due date or a planning action participates in `later_tasks` like any other manually placed task. A top-level item with steps is not selectable from the Journal planning component; its open steps are selected individually.
 
 Habits are not in this response — the calendar shows scheduled work only.
 

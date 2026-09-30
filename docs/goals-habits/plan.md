@@ -160,10 +160,81 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 - Web tests cover the area rows and panel, Today's week panel and the Growth cards and filter
 - **Done when:** a closed week's outcome does not move after `weekly_target` is changed, and the same week reads the same percent on the Areas screen before it closes and on Growth after
 
-## Slice 6 — Notifications
+## Slice 6 — Journal
+
+Goal tasks keep their existing rules and area progress. Every goal-less task is Journal work, whether it was created in Journal, Today or Week. The visual reference is the Journal portion of the design files, adapted to the current web shell and the newer Today and Week implementations; Areas and Growth do not change.
+
+### Block 0 — Canonical documentation — DONE
+
+- Merge `journal-context.md` into `design.md`, `api-contract.md` and this plan before application code
+- Settle `GET /journal`, keep Left behind inside `/today`, and settle active, undated, completed and left-behind ordering
+- Move Notifications to slice 7
+
+### Block 1 — Task data model and domain rules
+
+- Add nullable `tasks.due_date` and self-FK `parent_id ON DELETE CASCADE`; make `scheduled_date` and `period_start` nullable together
+- Add database checks for goal schedules, schedule/period nullability, time requiring a schedule, top-level-only due dates and goal-less steps; index `parent_id`
+- Extend task create and update for unscheduled Journal items, due-date synchronization and title-only step creation; validate parent ownership and one-level nesting
+- Derive `period_start` the first time Journal work is scheduled, preserve it while moved, and clear it when unscheduled
+- Completing a top-level item with open steps leaves them pending but clears their schedule, period and time in the same transaction; deleting the item cascades to its steps
+- API tests cover every field combination, timezone-aware past-date rejection, due changes, step nesting, completion cleanup, deletion and existing goal-task regressions
+
+### Block 2 — Journal read API
+
+- Add `GET /journal` with the user's local today, complete active and completed top-level lists, nested steps and step progress
+- Read parents and steps without per-item queries and scope every row by the authenticated user
+- Active ordering is due date, non-null time, creation and id, then undated creation order; completed ordering is newest completion first; steps keep creation order
+- Regenerate `apps/api/openapi.json` and `packages/api-client/src/generated/schema.d.ts`
+
+### Block 3 — Journal page
+
+- Add the Journal route and sidebar destination without changing the Areas screen
+- Build the ungrouped Active / Completed list with counts, due-date emphasis, time and step progress in the current app's visual and responsive system
+- Reuse one detail component for existing and new items: title, optional due date and time, inline step create/check/delete, complete or reopen, and confirmed delete
+- Confirm completion when steps remain open; show saved partial results and retryable errors rather than discarding successful writes
+- Web tests cover loading, errors, empty states, ordering, keyboard step entry, progress, CRUD, completion confirmation, reopening and focus behavior
+
+### Block 4 — Separate Goal and Journal task entry
+
+- Replace the shared `No goal` task form with separate Goal and Journal components used by both Today and Week
+- Goal requires `Area - Goal`, keeps the goal title, schedule and Repeat behavior
+- Journal starts with `+ New task`, then the first five open-item rows with `Show all (N)` when needed; an item with steps drills into only its open steps and is not itself selectable
+- Journal has no search or combined New / Journal tabs; its plan section owns optional time, duration and blocks
+- Load Journal choices when the component opens and keep independent reads parallel; add no client state or query dependency
+
+### Block 5 — Today integration
+
+- Put `+ Goal` and `+ Journal` in the Today header and remove the old combined add-task entry
+- Creating a Journal task writes one goal-less task for today; choosing an item or step patches that existing row
+- Extend scheduled task responses with a top-level item's progress and a step's parent id, title and progress
+- Render steps as normal full-width cards ordered with other tasks, with their parent and progress as secondary text
+- Ask before completing a top-level item with open steps; keep the Daily, Weekly, habits and right-side progress panel behavior unchanged
+
+### Block 6 — Left behind
+
+- Add `left_behind` to `/today`: every past scheduled pending Journal task, plus pending goal tasks from past days whose `period_start` is the current open week
+- Order rows oldest first and include original date, time and a `Journal` or area source label
+- Add the count-bearing Today view only while non-empty; each row has only `Move to today`
+- Moving changes `scheduled_date` alone, so Journal due dates and goal week identity stay fixed; tests cover the week turn
+
+### Block 7 — Week integration
+
+- Ask Goal or Journal before opening a component from the header or a today-or-future slot
+- Keep the Journal date editable from today onward and patch selected items or steps instead of duplicating them
+- Show step parent context and use the shared open-step completion confirmation
+- Allow pending work on an elapsed day of the current week to move to today or later while past drop targets remain blocked
+- Keep unscheduled Journal work out of the calendar and include manually scheduled or due-dated Journal work in `later_tasks`
+
+### Block 8 — Verification
+
+- Run API migration, pytest and Ruff checks; run web lint, typecheck, Vitest and build; verify OpenAPI and generated-client sync
+- Manually cover undated items, due add/change/clear, a future-due item planned today, step planning, parent completion with open steps, Left behind, current-week goal identity and cascade delete
+- **Done when:** the same Journal task can move between Journal, Today and Week without duplication or due-date drift; steps retain one parent level; Areas, quotas and closed Growth results remain unchanged
+
+## Slice 7 — Notifications
 
 38. `reminders` and `devices` migration, token registration
-39. Write a reminder on timed task create, update or create it when timing changes, cancel on time removal or delete
+39. Write a reminder on timed scheduled task create, update it when timing changes, and cancel it on time or schedule removal or delete
 40. Reminders for timed tasks the slice 3 job generated before this slice existed — backfill once, then generation writes them itself
 41. Scheduler — scan due reminders every minute, fan out to the user's tokens, prune invalid ones
 42. `apps/mobile`: Expo, the same generated client, push registration
@@ -174,5 +245,5 @@ The Areas screen and Today show the open week live; Growth shows closed weeks fr
 ## Notes
 
 - Architectural work that doesn't fit one slice goes into the slice that needs it first, and the next slice reuses it. Watch for a slice swelling because it is carrying the infrastructure for the ones after it.
-- Aggregate endpoints (`/today`, `/week`) take their shape from the screen. Sketch the screen before writing the endpoint.
+- Aggregate endpoints (`/journal`, `/today`, `/week`) take their shape from the screen. Sketch the screen before writing the endpoint.
 - CRUD endpoints don't. Write them straight from the schema.
