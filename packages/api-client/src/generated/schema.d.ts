@@ -251,6 +251,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Journal */
+        get: operations["get_journal_api_v1_journal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/progress": {
         parameters: {
             query?: never;
@@ -612,6 +629,80 @@ export interface components {
             /** Id */
             id: string;
             mode: components["schemas"]["HabitMode"];
+            /** Title */
+            title: string;
+        };
+        /** JournalItemResponse */
+        JournalItemResponse: {
+            /** Block Count */
+            block_count: number | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** End Time */
+            end_time: string | null;
+            /** Id */
+            id: string;
+            progress: components["schemas"]["JournalProgressResponse"];
+            /** Scheduled Date */
+            scheduled_date: string | null;
+            /** Start Time */
+            start_time: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "DONE";
+            /** Steps */
+            steps: components["schemas"]["JournalStepResponse"][];
+            /** Title */
+            title: string;
+        };
+        /** JournalProgressResponse */
+        JournalProgressResponse: {
+            /** Done */
+            done: number;
+            /** Total */
+            total: number;
+        };
+        /** JournalResponse */
+        JournalResponse: {
+            /** Active */
+            active: components["schemas"]["JournalItemResponse"][];
+            /** Completed */
+            completed: components["schemas"]["JournalItemResponse"][];
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+        };
+        /** JournalStepResponse */
+        JournalStepResponse: {
+            /** Block Count */
+            block_count: number | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** End Time */
+            end_time: string | null;
+            /** Id */
+            id: string;
+            /** Parent Id */
+            parent_id: string;
+            /** Scheduled Date */
+            scheduled_date: string | null;
+            /** Start Time */
+            start_time: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "DONE";
             /** Title */
             title: string;
         };
@@ -2050,6 +2141,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    get_journal_api_v1_journal_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

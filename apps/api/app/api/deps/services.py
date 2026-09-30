@@ -14,6 +14,7 @@ from app.services.areas import AreaService
 from app.services.auth import AuthService
 from app.services.goals import GoalService
 from app.services.habits import HabitService
+from app.services.journal import JournalService
 from app.services.results import ResultsService
 from app.services.tasks import TaskService
 from app.services.today import TodayService
@@ -103,6 +104,17 @@ def get_habit_service(session: DatabaseSession) -> HabitService:
 
 
 HabitServiceDependency = Annotated[HabitService, Depends(get_habit_service)]
+
+
+def get_journal_service(session: DatabaseSession) -> JournalService:
+    return JournalService(
+        session,
+        TaskRepository(session),
+        UserRepository(session),
+    )
+
+
+JournalServiceDependency = Annotated[JournalService, Depends(get_journal_service)]
 
 
 def get_today_service(session: DatabaseSession) -> TodayService:

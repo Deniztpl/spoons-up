@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Select, and_, delete, func, or_, select, update
+from sqlalchemy import Select, and_, case, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,56 @@ class TaskRepository:
             self._select_visible_tasks_for_user(user_id=user_id)
             .where(Task.scheduled_date == target_date)
             .order_by(Task.start_time.asc().nulls_last(), Task.id)
+        )
+        return list(self.session.scalars(query))
+
+    def list_active_journal_items(self, *, user_id: int) -> list[Task]:
+        journal_time = case(
+            (Task.due_date.is_not(None), Task.start_time),
+            else_=None,
+        )
+        query = (
+            select(Task)
+            .where(
+                Task.user_id == user_id,
+                Task.goal_id.is_(None),
+                Task.parent_id.is_(None),
+                Task.status == TaskStatus.PENDING.value,
+            )
+            .order_by(
+                Task.due_date.asc().nulls_last(),
+                journal_time.asc().nulls_last(),
+                Task.created_at,
+                Task.id,
+            )
+        )
+        return list(self.session.scalars(query))
+
+    def list_completed_journal_items(self, *, user_id: int) -> list[Task]:
+        query = (
+            select(Task)
+            .where(
+                Task.user_id == user_id,
+                Task.goal_id.is_(None),
+                Task.parent_id.is_(None),
+                Task.status == TaskStatus.DONE.value,
+            )
+            .order_by(Task.completed_at.desc().nulls_last(), Task.id.desc())
+        )
+        return list(self.session.scalars(query))
+
+    def list_journal_steps(self, *, user_id: int, parent_ids: list[int]) -> list[Task]:
+        if not parent_ids:
+            return []
+        query = (
+            select(Task)
+            .where(
+                Task.user_id == user_id,
+                Task.goal_id.is_(None),
+                Task.parent_id.in_(parent_ids),
+                Task.status.in_([TaskStatus.PENDING.value, TaskStatus.DONE.value]),
+            )
+            .order_by(Task.created_at, Task.id)
         )
         return list(self.session.scalars(query))
 

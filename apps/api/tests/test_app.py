@@ -26,6 +26,7 @@ def test_openapi_smoke() -> None:
         "/api/v1/habits",
         "/api/v1/habits/{habit_id}",
         "/api/v1/habits/{habit_id}/check",
+        "/api/v1/journal",
         "/api/v1/progress",
         "/api/v1/rules/{rule_id}",
         "/api/v1/tasks",
