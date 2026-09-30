@@ -1,11 +1,18 @@
 from datetime import date, datetime, time
 from decimal import Decimal
+from typing import NamedTuple
 
 from sqlalchemy import Select, and_, case, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.models import Area, Goal, GoalRule, Task, TaskStatus
+
+
+class StepSummary(NamedTuple):
+    title: str
+    done: int
+    total: int
 
 
 class TaskRepository:
@@ -127,6 +134,39 @@ class TaskRepository:
             )
         )
         return list(self.session.scalars(query))
+
+    def list_step_summaries(
+        self,
+        *,
+        user_id: int,
+        task_ids: list[int],
+    ) -> dict[int, StepSummary]:
+        """Each task's title with its done and total steps, read in one query."""
+        if not task_ids:
+            return {}
+        step = aliased(Task)
+        query = (
+            select(
+                Task.id,
+                Task.title,
+                func.count(step.id).filter(step.status == TaskStatus.DONE.value),
+                func.count(step.id),
+            )
+            .outerjoin(
+                step,
+                and_(
+                    step.parent_id == Task.id,
+                    step.user_id == user_id,
+                    step.status.in_([TaskStatus.PENDING.value, TaskStatus.DONE.value]),
+                ),
+            )
+            .where(Task.user_id == user_id, Task.id.in_(task_ids))
+            .group_by(Task.id, Task.title)
+        )
+        return {
+            task_id: StepSummary(title=title, done=done, total=total)
+            for task_id, title, done, total in self.session.execute(query)
+        }
 
     def sum_done_blocks_by_goal(self, *, user_id: int, period_start: date) -> dict[int, Decimal]:
         query = (

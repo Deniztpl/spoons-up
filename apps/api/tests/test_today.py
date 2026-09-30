@@ -355,6 +355,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "id": expected_ids[0],
             "goal_id": active_goal["id"],
             "rule_id": None,
+            "parent_id": None,
             "title": "Morning block",
             "start_time": "08:00",
             "duration_minutes": None,
@@ -364,11 +365,14 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "scheduled_date": "2026-09-24",
             "occurrence_date": "2026-09-24",
             "period_start": "2026-09-21",
+            "step_progress": None,
+            "parent": None,
         },
         {
             "id": expected_ids[1],
             "goal_id": None,
             "rule_id": None,
+            "parent_id": None,
             "title": "Standalone task",
             "start_time": "09:00",
             "duration_minutes": None,
@@ -378,11 +382,14 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "scheduled_date": "2026-09-24",
             "occurrence_date": None,
             "period_start": "2026-09-21",
+            "step_progress": None,
+            "parent": None,
         },
         {
             "id": expected_ids[2],
             "goal_id": active_goal["id"],
             "rule_id": None,
+            "parent_id": None,
             "title": "Evening block",
             "start_time": "18:00",
             "duration_minutes": None,
@@ -392,11 +399,14 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "scheduled_date": "2026-09-24",
             "occurrence_date": "2026-09-23",
             "period_start": "2026-09-21",
+            "step_progress": None,
+            "parent": None,
         },
         {
             "id": expected_ids[3],
             "goal_id": None,
             "rule_id": None,
+            "parent_id": None,
             "title": "Untimed task",
             "start_time": None,
             "duration_minutes": None,
@@ -406,6 +416,8 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "scheduled_date": "2026-09-24",
             "occurrence_date": None,
             "period_start": "2026-09-21",
+            "step_progress": None,
+            "parent": None,
         },
     ]
     with db_session.begin():
@@ -461,6 +473,63 @@ def test_today_requires_authentication_and_validates_the_date(client: TestClient
     assert invalid_date.status_code == 422
     assert invalid_date.json()["code"] == "validation_error"
     assert "date" in invalid_date.json()["fields"]
+
+
+def test_scheduled_journal_work_carries_its_item_and_step_progress(client: TestClient) -> None:
+    headers = bearer(register(client, "today-steps@example.com"))
+    area = create_area(client, headers, "Work")
+    goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
+    day = "2030-01-10"
+
+    item = create_task(client, headers, {"title": "Conference", "due_date": day})
+    done_step = create_task(client, headers, {"parent_id": item["id"], "title": "Book the hall"})
+    planned_step = create_task(
+        client,
+        headers,
+        {"parent_id": item["id"], "title": "Prepare the slides"},
+    )
+    create_task(client, headers, {"parent_id": item["id"], "title": "Rehearse"})
+    create_task(client, headers, {"goal_id": goal["id"], "scheduled_date": day})
+    create_task(client, headers, {"title": "Pay the invoice", "scheduled_date": day})
+    checked = client.post(f"/api/v1/tasks/{done_step['id']}/check", headers=headers)
+    planned = client.patch(
+        f"/api/v1/tasks/{planned_step['id']}",
+        json={"scheduled_date": day},
+        headers=headers,
+    )
+
+    today = client.get("/api/v1/today", params={"date": day}, headers=headers)
+    week = client.get("/api/v1/week", headers=headers)
+
+    assert checked.status_code == 200
+    assert planned.status_code == 200
+    assert today.status_code == 200
+    assert week.status_code == 200
+    progress = {"done": 1, "total": 3}
+    parent = {"id": item["id"], "title": "Conference", "step_progress": progress}
+    assert {
+        task["title"]: (task["parent_id"], task["step_progress"], task["parent"])
+        for task in today.json()["tasks"]
+    } == {
+        "Conference": (None, progress, None),
+        "Prepare the slides": (item["id"], None, parent),
+        "Deep work": (None, None, None),
+        "Pay the invoice": (None, None, None),
+    }
+    # Work placed after the following week reads the same in Week's later list.
+    later = {task["title"]: task for task in week.json()["later_tasks"]["items"]}
+    assert later["Prepare the slides"]["parent"] == parent
+    assert later["Conference"]["step_progress"] == progress
+
+
+def create_task(
+    client: TestClient,
+    headers: dict[str, str],
+    payload: dict[str, object],
+) -> dict[str, object]:
+    response = client.post("/api/v1/tasks", json=payload, headers=headers)
+    assert response.status_code == 201
+    return response.json()
 
 
 def build_today_task(

@@ -31,6 +31,21 @@ function todayTask(
     scheduled_date: "2026-09-24",
     occurrence_date: "2026-09-24",
     period_start: "2026-09-21",
+    parent_id: null,
+    step_progress: null,
+    parent: null,
+  };
+}
+
+// Goal-less work: a Journal task planned on the day.
+function journalTask(id: string, title: string, fields: Record<string, unknown> = {}) {
+  return {
+    ...todayTask(id, title, [null, null], null),
+    goal_id: null,
+    rule_id: null,
+    duration_minutes: null,
+    occurrence_date: null,
+    ...fields,
   };
 }
 
@@ -101,7 +116,8 @@ describe("Today page", () => {
     expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByText("Thursday, Sep 24")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Stretch" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Add task" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Add goal task" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Add Journal task" })).toBeEnabled();
 
     const views = screen.getByRole("group", { name: "Today views" });
     expect(within(views).getByRole("button", { name: "Daily" })).toHaveAttribute(
@@ -113,7 +129,7 @@ describe("Today page", () => {
     expect(screen.getByText("Sep 21 – 27")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Call home" })).not.toBeChecked();
     expect(screen.queryByRole("checkbox", { name: "Read" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Add task/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Add .* task$/ })).not.toBeInTheDocument();
   });
 
   it("checks off and undoes habits with the date from the today response", async () => {
@@ -294,10 +310,8 @@ describe("Today page", () => {
     expect(within(tasks).getByText("½")).toBeInTheDocument();
     expect(within(tasks).getByText("×2")).toBeInTheDocument();
 
-    const addGoal = screen.getByRole("button", { name: "Add task" });
     const firstHabit = screen.getByRole("checkbox", { name: "Read" });
-    expect(tasks.compareDocumentPosition(addGoal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(addGoal.compareDocumentPosition(firstHabit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tasks.compareDocumentPosition(firstHabit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await user.click(
       within(screen.getByRole("group", { name: "Today views" })).getByRole("button", {
@@ -644,13 +658,15 @@ describe("Today page", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Add task" }));
+    await user.click(await screen.findByRole("button", { name: "Add goal task" }));
     const dialog = screen.getByRole("dialog", { name: "New task" });
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-24");
     expect(within(dialog).getByLabelText("Date")).toBeDisabled();
     const goalSelect = within(dialog).getByLabelText("Goal");
     await within(goalSelect).findByRole("option", { name: "Finance - CS Block" });
     expect(within(dialog).queryByLabelText("Area")).not.toBeInTheDocument();
+    expect(within(goalSelect).queryByRole("option", { name: "No goal" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Title")).not.toBeInTheDocument();
     expect(goalSelect).toHaveValue("");
     await user.selectOptions(goalSelect, "7");
     fireEvent.change(within(dialog).getByLabelText("Start time"), {
@@ -676,35 +692,18 @@ describe("Today page", () => {
     ).toHaveLength(0);
   });
 
-  it("adds a standalone task without requiring schedule values", async () => {
+  it("adds a Journal task for today from its title, without a goal or schedule values", async () => {
     let hasTask = false;
     const fetchMock = vi.fn(async (request: Request) => {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/api/v1/today") {
-        return todayResponse({
-          tasks: hasTask
-            ? [
-                {
-                  ...todayTask("491", "Dentist", [null, null], null),
-                  goal_id: null,
-                  rule_id: null,
-                  duration_minutes: null,
-                  occurrence_date: null,
-                },
-              ]
-            : [],
-        });
+        return todayResponse({ tasks: hasTask ? [journalTask("491", "Dentist")] : [] });
       }
-      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
-        return Response.json({ areas: [area("3", "SWE")] });
-      }
-      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
-        expect(url.searchParams.has("area_id")).toBe(false);
-        return Response.json({ goals: [] });
+      if (request.method === "GET" && url.pathname === "/api/v1/journal") {
+        return Response.json({ today: "2026-09-24", active: [], completed: [] });
       }
       if (request.method === "POST" && url.pathname === "/api/v1/tasks") {
         expect(await request.clone().json()).toEqual({
-          goal_id: null,
           title: "Dentist",
           scheduled_date: "2026-09-24",
           start_time: null,
@@ -717,9 +716,11 @@ describe("Today page", () => {
             id: "491",
             goal_id: null,
             rule_id: null,
+            parent_id: null,
             title: "Dentist",
             occurrence_date: null,
             scheduled_date: "2026-09-24",
+            due_date: null,
             start_time: null,
             duration_minutes: null,
             end_time: null,
@@ -737,18 +738,84 @@ describe("Today page", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Add task" }));
-    const dialog = screen.getByRole("dialog", { name: "New task" });
-    const goalSelect = within(dialog).getByLabelText("Goal");
-    await waitFor(() => expect(goalSelect).toBeEnabled());
-    expect(within(goalSelect).getAllByRole("option")).toHaveLength(1);
-    expect(within(goalSelect).getByRole("option", { name: "No goal" })).toBeInTheDocument();
-    expect(within(dialog).queryByText("Add a goal in Areas")).not.toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText("Title"), "Dentist");
-    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await user.click(await screen.findByRole("button", { name: "Add Journal task" }));
+    const dialog = screen.getByRole("dialog", { name: "Journal task" });
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-24");
+    expect(within(dialog).getByLabelText("Date")).toBeDisabled();
+    await within(dialog).findByText("Nothing open in the Journal.");
+    await user.click(within(dialog).getByRole("button", { name: "New task" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "New task title" }), "Dentist{Enter}");
 
     expect(await screen.findByRole("checkbox", { name: "Dentist" })).not.toBeChecked();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows a planned step as its own card with its item and progress", async () => {
+    stubFetch(
+      vi.fn(async () =>
+        todayResponse({
+          tasks: [
+            todayTask("483", "CS Block", ["09:00", "10:00"], 1),
+            journalTask("492", "Prepare the slides", {
+              start_time: "10:30",
+              block_count: 1,
+              parent_id: "490",
+              parent: { id: "490", title: "Conference", step_progress: { done: 1, total: 3 } },
+            }),
+          ],
+        }),
+      ),
+    );
+    renderPage();
+
+    const tasks = await screen.findByRole("list", { name: "Tasks" });
+    expect(within(tasks).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(tasks).getByRole("checkbox", { name: "Prepare the slides" })).toHaveAccessibleDescription(
+      "Starts at 10:30, 1 block, a step of Conference, 1 of 3 steps done",
+    );
+    expect(within(tasks).getByText("Conference · 1/3")).toBeInTheDocument();
+  });
+
+  it("asks before finishing an item with open steps, then reads the day again", async () => {
+    let finished = false;
+    const item = journalTask("490", "Conference", { step_progress: { done: 1, total: 3 } });
+    const step = journalTask("492", "Prepare the slides", {
+      parent_id: "490",
+      parent: { id: "490", title: "Conference", step_progress: { done: 1, total: 3 } },
+    });
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return todayResponse({ tasks: finished ? [{ ...item, status: "DONE" }] : [item, step] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/tasks/490/check") {
+        finished = true;
+        return Response.json({ ...item, status: "DONE", completed_at: "2026-09-24T09:00:00Z" });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    stubFetch(fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("checkbox", { name: "Conference" }));
+    const dialog = screen.getByRole("dialog", { name: "Conference" });
+    expect(dialog).toHaveTextContent("2 steps are not complete. Finish anyway?");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("checkbox", { name: "Conference" })).not.toBeChecked();
+    expect(fetchMock.mock.calls.some(([request]) => request.method === "POST")).toBe(false);
+
+    await user.click(screen.getByRole("checkbox", { name: "Conference" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Conference" })).getByRole("button", {
+        name: "Finish anyway",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole("checkbox", { name: "Prepare the slides" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("checkbox", { name: "Conference" })).toBeChecked();
   });
 
   it("points to areas when there are no habits yet", async () => {

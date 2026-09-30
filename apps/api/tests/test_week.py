@@ -94,6 +94,7 @@ def test_week_returns_seven_ordered_days_and_tasks(
         "id": early_id,
         "goal_id": None,
         "rule_id": None,
+        "parent_id": None,
         "title": "Early",
         "start_time": "08:00",
         "duration_minutes": None,
@@ -103,6 +104,8 @@ def test_week_returns_seven_ordered_days_and_tasks(
         "scheduled_date": "2026-09-21",
         "occurrence_date": None,
         "period_start": "2026-09-21",
+        "step_progress": None,
+        "parent": None,
     }
     assert body["days"][1]["tasks"] == []
     assert [task["title"] for task in body["days"][2]["tasks"]] == ["Midweek"]

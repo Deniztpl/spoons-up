@@ -5,11 +5,17 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
 from app.core.periods import get_week_end, get_week_start
-from app.models import HabitMode
+from app.models import HabitMode, Task
 from app.repositories.habits import HabitRepository
 from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
-from app.schemas.today import TodayHabitResponse, TodayResponse, TodayTaskResponse
+from app.schemas.journal import JournalProgressResponse
+from app.schemas.today import (
+    TaskParentResponse,
+    TodayHabitResponse,
+    TodayResponse,
+    TodayTaskResponse,
+)
 
 
 class TodayService:
@@ -70,5 +76,46 @@ class TodayService:
                 week_end=week_end,
                 daily_habits=daily_habits,
                 weekly_habits=weekly_habits,
-                tasks=[TodayTaskResponse.model_validate(task) for task in tasks],
+                tasks=scheduled_task_responses(
+                    tasks,
+                    task_repository=self.task_repository,
+                    user_id=user_id,
+                ),
             )
+
+
+def scheduled_task_responses(
+    tasks: list[Task],
+    *,
+    task_repository: TaskRepository,
+    user_id: int,
+) -> list[TodayTaskResponse]:
+    """Scheduled tasks as Today and Week draw them: a Journal item with its own step progress,
+    and a step with its item's title and progress. One query covers every item involved."""
+    item_ids = {task.id for task in tasks if task.goal_id is None and task.parent_id is None}
+    parent_ids = {task.parent_id for task in tasks if task.parent_id is not None}
+    summaries = task_repository.list_step_summaries(
+        user_id=user_id,
+        task_ids=sorted(item_ids | parent_ids),
+    )
+
+    responses: list[TodayTaskResponse] = []
+    for task in tasks:
+        response = TodayTaskResponse.model_validate(task)
+        if task.parent_id is not None:
+            parent = summaries.get(task.parent_id)
+            if parent is not None:
+                response.parent = TaskParentResponse(
+                    id=str(task.parent_id),
+                    title=parent.title,
+                    step_progress=JournalProgressResponse(done=parent.done, total=parent.total),
+                )
+        elif task.goal_id is None:
+            summary = summaries.get(task.id)
+            if summary is not None and summary.total > 0:
+                response.step_progress = JournalProgressResponse(
+                    done=summary.done,
+                    total=summary.total,
+                )
+        responses.append(response)
+    return responses

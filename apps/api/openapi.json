@@ -1180,6 +1180,28 @@
         "title": "ResultDayResponse",
         "type": "object"
       },
+      "TaskParentResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "step_progress": {
+            "$ref": "#/components/schemas/JournalProgressResponse"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "step_progress"
+        ],
+        "title": "TaskParentResponse",
+        "type": "object"
+      },
       "TaskResponse": {
         "properties": {
           "block_count": {
@@ -1497,6 +1519,27 @@
             ],
             "title": "Occurrence Date"
           },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskParentResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
           "period_start": {
             "format": "date",
             "title": "Period Start",
@@ -1537,6 +1580,16 @@
             "title": "Status",
             "type": "string"
           },
+          "step_progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JournalProgressResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1546,6 +1599,7 @@
           "id",
           "goal_id",
           "rule_id",
+          "parent_id",
           "title",
           "start_time",
           "duration_minutes",
@@ -1554,7 +1608,9 @@
           "status",
           "scheduled_date",
           "occurrence_date",
-          "period_start"
+          "period_start",
+          "step_progress",
+          "parent"
         ],
         "title": "TodayTaskResponse",
         "type": "object"

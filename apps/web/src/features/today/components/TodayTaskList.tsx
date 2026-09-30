@@ -16,6 +16,8 @@ type TodayTaskListProps = {
 // A task is as tall as its blocks: 72px per block, with the 8px gaps between them.
 const blockHeight = 72;
 const blockGap = 8;
+// A step's line naming its item, under the title.
+const contextLineHeight = 17;
 
 export function TodayTaskList({
   tasks,
@@ -63,6 +65,10 @@ export function TodayTaskList({
           const titleId = `task-${task.id}-title`;
           const detailsId = `task-${task.id}-details`;
           const area = task.goal_id ? areaByGoalId.get(task.goal_id) : undefined;
+          // A step is a normal card; its item and that item's progress sit under the title.
+          const parentLine = task.parent
+            ? `${task.parent.title} · ${task.parent.step_progress.done}/${task.parent.step_progress.total}`
+            : null;
           return (
             <li
               key={task.id}
@@ -107,13 +113,31 @@ export function TodayTaskList({
                   onClick={() => onEdit(task)}
                 >
                   <span
-                    id={titleId}
-                    className={`min-w-0 flex-1 text-sm font-medium leading-[1.35] ${
-                      isShort ? "truncate" : "break-words text-pretty"
-                    } ${isDone ? "text-ink-soft line-through" : "text-ink"}`}
-                    style={isShort ? undefined : titleClamp(height)}
+                    className={`flex min-w-0 flex-1 ${
+                      isShort ? "items-baseline gap-1.5" : "flex-col gap-0.5"
+                    }`}
                   >
-                    {task.title}
+                    <span
+                      id={titleId}
+                      className={`min-w-0 text-sm font-medium leading-[1.35] ${
+                        isShort ? "truncate" : "break-words text-pretty"
+                      } ${isDone ? "text-ink-soft line-through" : "text-ink"}`}
+                      style={
+                        isShort
+                          ? undefined
+                          : titleClamp(parentLine ? height - contextLineHeight : height)
+                      }
+                    >
+                      {task.title}
+                    </span>
+                    {parentLine ? (
+                      <span
+                        aria-hidden="true"
+                        className="min-w-0 truncate text-[11.5px] leading-[1.35] text-ink-soft"
+                      >
+                        {parentLine}
+                      </span>
+                    ) : null}
                   </span>
                   <span
                     aria-hidden="true"
@@ -180,7 +204,12 @@ function taskDetails(task: TodayTask) {
       ? `${task.start_time} to ${task.end_time}`
       : `Starts at ${task.start_time}`
     : "No start time";
-  return `${time}, ${blockCountText(task.block_count)}`;
+  const details = `${time}, ${blockCountText(task.block_count)}`;
+  if (!task.parent) {
+    return details;
+  }
+  const { done, total } = task.parent.step_progress;
+  return `${details}, a step of ${task.parent.title}, ${done} of ${total} steps done`;
 }
 
 function blockCountText(count: number | null) {

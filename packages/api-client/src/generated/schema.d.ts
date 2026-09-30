@@ -793,6 +793,14 @@ export interface components {
             /** Done */
             done: boolean;
         };
+        /** TaskParentResponse */
+        TaskParentResponse: {
+            /** Id */
+            id: string;
+            step_progress: components["schemas"]["JournalProgressResponse"];
+            /** Title */
+            title: string;
+        };
         /** TaskResponse */
         TaskResponse: {
             /** Block Count */
@@ -878,6 +886,9 @@ export interface components {
             id: string;
             /** Occurrence Date */
             occurrence_date: string | null;
+            parent: components["schemas"]["TaskParentResponse"] | null;
+            /** Parent Id */
+            parent_id: string | null;
             /**
              * Period Start
              * Format: date
@@ -897,6 +908,7 @@ export interface components {
              * @enum {string}
              */
             status: "PENDING" | "DONE";
+            step_progress: components["schemas"]["JournalProgressResponse"] | null;
             /** Title */
             title: string;
         };

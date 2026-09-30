@@ -13,6 +13,7 @@ from app.schemas.week import (
     WeekDayResponse,
     WeekResponse,
 )
+from app.services.today import scheduled_task_responses
 
 
 class WeekService:
@@ -52,16 +53,24 @@ class WeekService:
                 week_start=period_start,
                 week_end=period_end,
             )
-            tasks_by_date = {period_start + timedelta(days=offset): [] for offset in range(7)}
-            for task in tasks:
-                tasks_by_date[task.scheduled_date].append(TodayTaskResponse.model_validate(task))
-
             following_week_end = following_week_start + timedelta(days=6)
             later_tasks = self.task_repository.list_later_tasks(
                 user_id=user_id,
                 cutoff_date=following_week_end,
             )
-            later_items = [TodayTaskResponse.model_validate(task) for task in later_tasks]
+            # The week and the later list share one read of their Journal items' steps.
+            responses = scheduled_task_responses(
+                [*tasks, *later_tasks],
+                task_repository=self.task_repository,
+                user_id=user_id,
+            )
+            later_items = responses[len(tasks) :]
+
+            tasks_by_date: dict[date, list[TodayTaskResponse]] = {
+                period_start + timedelta(days=offset): [] for offset in range(7)
+            }
+            for response in responses[: len(tasks)]:
+                tasks_by_date[response.scheduled_date].append(response)
 
             return WeekResponse(
                 period_start=period_start,

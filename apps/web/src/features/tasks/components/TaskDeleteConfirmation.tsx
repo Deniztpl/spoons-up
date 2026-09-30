@@ -1,6 +1,8 @@
 type TaskDeleteConfirmationProps = {
   taskTitle: string;
   isGoalLinked: boolean;
+  // The steps a Journal item takes with it.
+  stepCount?: number;
   isSaving: boolean;
   onCancel: () => void;
   onDelete: () => void;
@@ -9,6 +11,7 @@ type TaskDeleteConfirmationProps = {
 export function TaskDeleteConfirmation({
   taskTitle,
   isGoalLinked,
+  stepCount = 0,
   isSaving,
   onCancel,
   onDelete,
@@ -23,7 +26,9 @@ export function TaskDeleteConfirmation({
       <p className="mt-1 text-[13px] leading-5 text-danger">
         {isGoalLinked
           ? "Only this task will be removed. Its goal and any repeating schedule stay unchanged."
-          : "This standalone task will be permanently deleted."}
+          : `It leaves the Journal too${
+              stepCount > 0 ? `, with its ${stepCount === 1 ? "step" : `${stepCount} steps`}` : ""
+            }. This can't be undone.`}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button

@@ -1,16 +1,17 @@
 import { useId, useRef } from "react";
 
 import { ModalDialog } from "../../../components/ui/ModalDialog";
-import type { JournalItem } from "../api/journalApi";
 import { OpenStepsConfirmation } from "./OpenStepsConfirmation";
 
-// Asks before an item with open steps is completed outside its detail.
+// Asks before an item with open steps is completed outside its Journal detail.
 export function OpenStepsDialog({
-  item,
+  title,
+  openCount,
   onCancel,
   onConfirm,
 }: {
-  item: JournalItem;
+  title: string;
+  openCount: number;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -20,10 +21,10 @@ export function OpenStepsDialog({
   return (
     <ModalDialog labelledBy={headingId} initialFocusRef={cancelRef} onClose={onCancel}>
       <h2 id={headingId} className="break-words text-lg font-semibold">
-        {item.title}
+        {title}
       </h2>
       <OpenStepsConfirmation
-        openCount={item.progress.total - item.progress.done}
+        openCount={openCount}
         isSaving={false}
         cancelButtonRef={cancelRef}
         onCancel={onCancel}

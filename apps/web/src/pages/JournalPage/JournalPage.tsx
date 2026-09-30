@@ -119,7 +119,8 @@ export function JournalPage({
 
       {confirmingItem ? (
         <OpenStepsDialog
-          item={confirmingItem}
+          title={confirmingItem.title}
+          openCount={confirmingItem.progress.total - confirmingItem.progress.done}
           onCancel={journalState.cancelCompletion}
           onConfirm={journalState.confirmCompletion}
         />

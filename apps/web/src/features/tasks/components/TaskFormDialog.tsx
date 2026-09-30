@@ -266,6 +266,7 @@ export function TaskFormDialog({
           <TaskDeleteConfirmation
             taskTitle={draft.task?.title ?? draft.title}
             isGoalLinked={isGoalLinked}
+            stepCount={draft.task?.step_progress?.total ?? 0}
             isSaving={isSaving}
             onCancel={onCancelDeleting}
             onDelete={onDelete}

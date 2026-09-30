@@ -4,10 +4,13 @@ import { Link } from "react-router";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { useAreaLookup } from "../../features/areas/hooks/useAreaLookup";
 import type { AuthActionResult } from "../../features/auth/AuthContext";
+import { JournalTaskDialog } from "../../features/journal/components/JournalTaskDialog";
+import { OpenStepsDialog } from "../../features/journal/components/OpenStepsDialog";
+import { useJournalTaskForm } from "../../features/journal/hooks/useJournalTaskForm";
 import { useProgress } from "../../features/results/hooks/useProgress";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
 import { useTaskForm } from "../../features/tasks/hooks/useTaskForm";
-import type { Today } from "../../features/today/api/todayApi";
+import type { Today, TodayTask } from "../../features/today/api/todayApi";
 import { TodayHabitList } from "../../features/today/components/TodayHabitList";
 import { TodayTaskList } from "../../features/today/components/TodayTaskList";
 import { TodayWeekPanel } from "../../features/today/components/TodayWeekPanel";
@@ -23,6 +26,8 @@ const dayFormat = new Intl.DateTimeFormat("en", {
   day: "numeric",
 });
 const weekFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+const addButtonClassName =
+  "inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-lg border border-accent/35 bg-card px-2.5 text-[12.5px] font-medium text-accent transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 export function TodayPage({
   onLogout,
@@ -45,22 +50,70 @@ export function TodayPage({
     onSaved: reloadAll,
     onDeleted: reloadAll,
   });
+  const journalForm = useJournalTaskForm({ onSaved: reloadAll });
   const [view, setView] = useState<TodayView>("daily");
+  const [confirmingTask, setConfirmingTask] = useState<TodayTask | null>(null);
   const { today } = todayState;
   const habits = today ? (view === "daily" ? today.daily_habits : today.weekly_habits) : [];
   const tasks = today && view === "daily" ? today.tasks : [];
+
+  // A step and its item show each other's progress, and finishing an item takes its open steps
+  // off the day, so checking either reads the day again.
+  const toggleTask = async (task: TodayTask) => {
+    await todayState.toggleTask(task);
+    if (task.parent || task.step_progress) {
+      todayState.reload();
+    }
+    progressState.reload();
+  };
+
+  // Finishing an item with open steps asks first.
+  const requestToggle = (task: TodayTask) => {
+    const openSteps = task.step_progress ? task.step_progress.total - task.step_progress.done : 0;
+    if (task.status !== "DONE" && openSteps > 0) {
+      setConfirmingTask(task);
+      return;
+    }
+    void toggleTask(task);
+  };
 
   return (
     <AppLayout onLogout={onLogout}>
       <div className="flex flex-1 flex-col md:flex-row">
         <div className="flex flex-1 justify-center px-4 py-6 sm:px-8 sm:py-8 lg:px-[30px] lg:pt-[34px]">
           <div className="grid w-full max-w-[464px] content-start gap-y-5 sm:grid-cols-[96px_minmax(0,340px)] sm:gap-x-7 sm:gap-y-[26px]">
-            <div className="flex items-baseline justify-between gap-3.5 sm:col-start-2">
-              <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.02em]">Today</h1>
-              {today ? (
-                <span className="whitespace-nowrap text-[13px] text-ink-soft">
-                  {dateLabel(today, view)}
-                </span>
+            <div className="flex items-start justify-between gap-3 sm:col-start-2">
+              <div className="min-w-0">
+                <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.02em]">
+                  Today
+                </h1>
+                {today ? (
+                  <p className="whitespace-nowrap text-[13px] text-ink-soft">
+                    {dateLabel(today, view)}
+                  </p>
+                ) : null}
+              </div>
+              {today && view === "daily" ? (
+                <div className="flex shrink-0 gap-1.5 pt-1.5">
+                  <button
+                    type="button"
+                    aria-label="Add goal task"
+                    className={addButtonClassName}
+                    onClick={() => taskForm.openCreate({ scheduledDate: today.date })}
+                  >
+                    <span aria-hidden="true">+</span>
+                    Goal
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Add Journal task"
+                    className={addButtonClassName}
+                    onClick={() => journalForm.open({ scheduledDate: today.date })}
+                  >
+                    <span aria-hidden="true">+</span>
+                    Journal
+                  </button>
+                </div>
               ) : null}
             </div>
 
@@ -94,22 +147,9 @@ export function TodayPage({
                   tasks={tasks}
                   areaByGoalId={areaLookup.areaByGoalId}
                   pendingTaskIds={todayState.pendingTaskIds}
-                  onToggle={(task) => void refreshProgressAfter(todayState.toggleTask(task))}
+                  onToggle={requestToggle}
                   onEdit={taskForm.openEdit}
                 />
-              ) : null}
-
-              {today && view === "daily" ? (
-                <button
-                  type="button"
-                  className="flex h-8 items-center gap-2.5 rounded-[10px] border border-dashed border-ink/18 pl-[13px] pr-2 text-left text-[13.5px] font-medium text-ink-soft transition hover:bg-well hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  onClick={() => taskForm.openCreate({ scheduledDate: today.date })}
-                >
-                  <span aria-hidden="true" className="w-4 text-center text-base leading-none">
-                    +
-                  </span>
-                  Add task
-                </button>
               ) : null}
 
               {today && habits.length > 0 ? (
@@ -149,6 +189,7 @@ export function TodayPage({
           draft={taskForm.draft}
           dateMode="fixed"
           minimumScheduledDate={today?.date ?? taskForm.draft.scheduledDate}
+          allowNoGoal={false}
           areas={taskForm.areas}
           goals={taskForm.goals}
           optionsError={taskForm.optionsError}
@@ -168,6 +209,38 @@ export function TodayPage({
           onStartDeleting={taskForm.startDeleting}
           onCancelDeleting={taskForm.cancelDeleting}
           onDelete={() => void taskForm.deleteTask()}
+        />
+      ) : null}
+
+      {journalForm.draft && today ? (
+        <JournalTaskDialog
+          draft={journalForm.draft}
+          dateMode="fixed"
+          today={today.date}
+          items={journalForm.items}
+          loadError={journalForm.loadError}
+          error={journalForm.formError}
+          isSaving={journalForm.isSaving}
+          onChoose={journalForm.choose}
+          onNewTitleChange={journalForm.setNewTitle}
+          onScheduledDateChange={journalForm.setScheduledDate}
+          onStartTimeChange={journalForm.setStartTime}
+          onDurationChange={journalForm.setDurationMinutes}
+          onBlockCountChange={journalForm.setBlockCount}
+          onSubmit={() => void journalForm.save()}
+          onClose={journalForm.close}
+        />
+      ) : null}
+
+      {confirmingTask?.step_progress ? (
+        <OpenStepsDialog
+          title={confirmingTask.title}
+          openCount={confirmingTask.step_progress.total - confirmingTask.step_progress.done}
+          onCancel={() => setConfirmingTask(null)}
+          onConfirm={() => {
+            setConfirmingTask(null);
+            void toggleTask(confirmingTask);
+          }}
         />
       ) : null}
     </AppLayout>

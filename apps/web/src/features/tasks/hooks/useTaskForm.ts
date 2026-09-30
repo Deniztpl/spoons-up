@@ -26,6 +26,8 @@ export type EditableTask = {
   start_time: string | null;
   duration_minutes: number | null;
   block_count: number | null;
+  // A Journal item's steps, which go with it when it is deleted.
+  step_progress?: { done: number; total: number } | null;
 };
 
 export type TaskDraft = {
@@ -237,6 +239,7 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
                     start_time: data.start_time,
                     duration_minutes: data.duration_minutes,
                     block_count: data.block_count,
+                    step_progress: current.task.step_progress,
                   },
                   title: data.title,
                   scheduledDate,
