@@ -22,6 +22,8 @@ type AreaView = "active" | "archived" | "growth";
 
 const addButtonClassName =
   "flex items-center justify-center gap-2 rounded-[9px] border border-dashed border-ink/20 p-2.5 text-[12.5px] font-medium text-ink transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const groupHeadingClassName =
+  "text-[10px] font-semibold uppercase tracking-[0.09em] text-ink-soft";
 
 export function AreasPage({
   onLogout,
@@ -227,20 +229,26 @@ export function AreasPage({
               ) : null}
 
               {hasItems ? (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-3.5">
                   {areaGoals.goals.length > 0 ? (
-                    <AreaGoalList
-                      goals={areaGoals.goals}
-                      weekResults={weekResults(selectedResult, "GOAL")}
-                      onEdit={areaGoals.openEdit}
-                    />
+                    <div className="flex flex-col gap-1">
+                      <h3 className={groupHeadingClassName}>Goals</h3>
+                      <AreaGoalList
+                        goals={areaGoals.goals}
+                        weekResults={weekResults(selectedResult, "GOAL")}
+                        onEdit={areaGoals.openEdit}
+                      />
+                    </div>
                   ) : null}
                   {areaHabits.habits.length > 0 ? (
-                    <AreaHabitList
-                      habits={areaHabits.habits}
-                      weekResults={weekResults(selectedResult, "HABIT")}
-                      onEdit={areaHabits.openEdit}
-                    />
+                    <div className="flex flex-col gap-1">
+                      <h3 className={groupHeadingClassName}>Habits</h3>
+                      <AreaHabitList
+                        habits={areaHabits.habits}
+                        weekResults={weekResults(selectedResult, "HABIT")}
+                        onEdit={areaHabits.openEdit}
+                      />
+                    </div>
                   ) : null}
                 </div>
               ) : null}

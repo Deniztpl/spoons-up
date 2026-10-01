@@ -14,7 +14,7 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Areas** — user-defined top-level buckets (SWE, Finance, Social). Habits and goals belong to one; Journal tasks sit outside them. An area's weekly progress is derived from the requirements under it; see **Weekly progress**.
 
-**Area colours** — each area gets a colour from an eight-colour palette when it is created, at random among the colours the user's areas use least, so areas stay apart until the palette runs out. Its goals, habits and tasks are drawn in that colour; Journal tasks keep the accent. Goals and habits tell apart by shape and weight instead: a goal is a square with a solid fill, a habit a circle with a light fill and an outline. Progress bars and day squares keep the accent.
+**Area colours** — each area gets a colour from an eight-colour palette when it is created, at random among the colours the user's areas use least, so areas stay apart until the palette runs out. Its goals, habits and tasks are drawn in that colour; Journal tasks keep the accent. Goals and habits tell apart by shape and weight instead: a goal is a square with a solid fill, a habit a circle with a light fill and an outline. On Today a habit row is outlined and lightly striped in its area colour, where a goal task card has a flat tint. Progress bars and day squares keep the accent.
 
 **Habits** — behaviours you check off. No scheduling, no duration, no moving. `DAILY` is one checkbox per day, `WEEKLY` one per week on any day. No quota, no fixed weekdays.
 
