@@ -23,6 +23,8 @@ class _TestDatabaseSettings(BaseSettings):
 TEST_DATABASE_URL = _TestDatabaseSettings().test_database_url
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ.setdefault("JWT_SECRET", "test-only-secret-that-is-at-least-32-characters")
+os.environ.setdefault("CRON_SECRET", "test-only-cron-secret-at-least-32-characters")
+os.environ.setdefault("REFRESH_COOKIE_SECURE", "false")
 
 
 @pytest.fixture(scope="session", autouse=True)

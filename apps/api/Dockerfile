@@ -22,4 +22,4 @@ RUN chmod 0644 /etc/cron.d/spoons-up
 
 EXPOSE 8000
 
-CMD ["fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec fastapi run app/main.py --host 0.0.0.0 --port \"${PORT:-8000}\""]

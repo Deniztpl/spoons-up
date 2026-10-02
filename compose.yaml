@@ -6,11 +6,13 @@ x-api-service: &api-service
   environment:
     DATABASE_URL: postgresql+psycopg://spoons:spoons@db:5432/spoons
     JWT_SECRET: ${JWT_SECRET:-local-compose-jwt-secret-change-before-production}
+    CRON_SECRET: ${CRON_SECRET:-local-compose-cron-secret-change-before-production}
     ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
     REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-30}
     REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
     CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     ACTIVE_USER_DAYS: ${ACTIVE_USER_DAYS:-30}
+    REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
 
 services:
   db:
@@ -44,6 +46,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    command: ["fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -68,7 +71,9 @@ services:
     pull_policy: never
     environment:
       DATABASE_URL: postgresql+psycopg://spoons:spoons@db:5432/spoons
+      CRON_SECRET: ${CRON_SECRET:-local-compose-cron-secret-change-before-production}
       ACTIVE_USER_DAYS: ${ACTIVE_USER_DAYS:-30}
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
     command: ["cron", "-f"]
     depends_on:
       migrate:
