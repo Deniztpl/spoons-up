@@ -240,7 +240,7 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Return `created_at` on Journal items and let the active list be sorted by due date (default), date added (newest first) or priority (High to Low, then none); Completed stays newest-completed first
 - **Done when:** an item created with a priority shows its tag, changing or clearing it in the detail holds after a reload, and the active list reorders by date added or priority on demand
 
-## Slice 7 — Deployment ($0)
+## Slice 7 — Deployment ($0) — DONE
 
 Deploy the existing web application before adding notifications. Production is a
 Vercel-hosted static web build that reaches a Render-hosted API through a same-origin
@@ -295,7 +295,7 @@ maintenance job. Local Compose, including its scheduler, keeps working as it doe
     - Document Vercel's root directory, outside-root workspace access, install command, build command and output directory
     - Regenerate OpenAPI and the shared client for the auth contract changes, and test relative requests, refresh and the production build
 
-### Block 6 — Provider rollout and first user
+### Block 6 — Provider rollout and first user — DONE
 
 44. Provision in the order Supabase → Render → Vercel → cron-job.org:
     - Use only Supabase Postgres through the SSL Session pooler; do not enable Supabase Auth, API or Storage
@@ -304,11 +304,11 @@ maintenance job. Local Compose, including its scheduler, keeps working as it doe
     - Register the owner, set `REGISTRATION_ENABLED=false`, and confirm the `users` table contains exactly one row
     - Configure cron-job.org to call Render directly: `GET /health` every 10 minutes and authenticated `POST /internal/jobs/hourly` every hour
 
-### Block 7 — Verification
+### Block 7 — Verification — DONE
 
 45. Run API pytest and Ruff; run web lint, typecheck, Vitest and build; verify OpenAPI/client sync, local Compose and that tracked files contain no production secrets.
     - **Local verification complete (2026-10-02):** 147 API tests passed against PostgreSQL; 88 web tests, Ruff, ESLint, both TypeScript workspaces, production build and OpenAPI/client sync passed. API/web Docker images built and the local Compose stack started successfully. The production Docker command applied migrations and served on a custom `PORT`; health, closed registration and authenticated repeated hourly calls passed.
-    - **Remaining:** deploy the providers in Block 6 and complete the phone/PC, cookie reload, persisted task, one-owner and cron-job.org checks on the real production URLs.
+    - **Live verification complete:** Supabase, Render, Vercel and cron-job.org are configured. Registration returns `registration_closed` and the `users` table contains exactly one row. cron-job.org health and hourly requests return 200 and 204. Phone over mobile data and PC over the home network can log in, and checked tasks survive a reload on both.
     - **Done when:** phone and PC can open the Vercel URL from different networks, login and a checked task survive a reload, registration is closed after the one owner account, and cron-job.org runs the hourly job successfully and idempotently
 
 ## Slice 8 — Notifications
