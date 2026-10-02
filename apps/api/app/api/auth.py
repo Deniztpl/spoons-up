@@ -21,13 +21,15 @@ AUTH_RESPONSES = {
     409: {"model": ErrorResponse},
     422: {"model": ValidationErrorResponse},
 }
+REGISTER_RESPONSES = AUTH_RESPONSES | {403: {"model": ErrorResponse}}
+LOGIN_RESPONSES = AUTH_RESPONSES | {429: {"model": ErrorResponse}}
 
 
 @router.post(
     "/register",
     response_model=TokenResponse,
     status_code=status.HTTP_201_CREATED,
-    responses=AUTH_RESPONSES,
+    responses=REGISTER_RESPONSES,
 )
 def register(
     payload: RegisterRequest,
@@ -42,7 +44,7 @@ def register(
 @router.post(
     "/login",
     response_model=TokenResponse,
-    responses=AUTH_RESPONSES,
+    responses=LOGIN_RESPONSES,
 )
 def login(
     payload: LoginRequest,

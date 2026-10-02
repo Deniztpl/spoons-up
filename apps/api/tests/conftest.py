@@ -27,6 +27,17 @@ os.environ.setdefault("CRON_SECRET", "test-only-cron-secret-at-least-32-characte
 os.environ.setdefault("REFRESH_COOKIE_SECURE", "false")
 
 
+@pytest.fixture(autouse=True)
+def reset_login_attempt_limiter() -> Generator[None, None, None]:
+    from app.services.login_attempts import login_attempt_limiter
+
+    login_attempt_limiter.clear_all()
+    try:
+        yield
+    finally:
+        login_attempt_limiter.clear_all()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def migrated_database() -> Generator[Engine, None, None]:
     alembic_config = Config(str(API_ROOT / "alembic.ini"))

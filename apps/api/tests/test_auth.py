@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config.app import settings
 from app.core.security import hash_refresh_token, verify_password
 from app.models import RefreshToken, User
 
@@ -89,6 +90,23 @@ def test_duplicate_email_returns_conflict(client: TestClient) -> None:
     }
 
 
+def test_register_rejects_new_users_when_registration_is_disabled(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "registration_enabled", False)
+
+    response = client.post("/api/v1/auth/register", json=REGISTER_PAYLOAD)
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "code": "registration_closed",
+        "message": "Registration is closed",
+    }
+    assert db_session.scalar(select(User).where(User.email == "deniz@example.com")) is None
+
+
 def test_login_uses_same_error_for_unknown_email_and_wrong_password(
     client: TestClient,
 ) -> None:
@@ -123,6 +141,70 @@ def test_login_returns_tokens_in_body_and_cookie(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["access_token"]
     assert response.cookies["refresh_token"] == response.json()["refresh_token"]
+
+
+def test_login_locks_email_after_five_failures_even_with_correct_password(
+    client: TestClient,
+) -> None:
+    register(client, email="locked@example.com")
+
+    failures = [
+        client.post(
+            "/api/v1/auth/login",
+            json={"email": "LOCKED@example.com", "password": "wrong-password"},
+        )
+        for _ in range(5)
+    ]
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": "locked@example.com", "password": "password123"},
+    )
+
+    assert all(response.status_code == 401 for response in failures)
+    assert blocked.status_code == 429
+    assert blocked.json() == {
+        "code": "too_many_attempts",
+        "message": "Too many login attempts. Try again later",
+    }
+
+
+def test_successful_login_before_limit_clears_failures(client: TestClient) -> None:
+    register(client, email="reset-attempts@example.com")
+    payload = {"email": "reset-attempts@example.com", "password": "wrong-password"}
+    for _ in range(4):
+        assert client.post("/api/v1/auth/login", json=payload).status_code == 401
+
+    success = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset-attempts@example.com", "password": "password123"},
+    )
+    next_failure = client.post("/api/v1/auth/login", json=payload)
+    next_success = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset-attempts@example.com", "password": "password123"},
+    )
+
+    assert success.status_code == 200
+    assert next_failure.status_code == 401
+    assert next_success.status_code == 200
+
+
+def test_login_limit_does_not_affect_other_emails(client: TestClient) -> None:
+    register(client, email="limited@example.com")
+    register(client, email="unaffected@example.com")
+    for _ in range(5):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "limited@example.com", "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+
+    unaffected = client.post(
+        "/api/v1/auth/login",
+        json={"email": "unaffected@example.com", "password": "password123"},
+    )
+
+    assert unaffected.status_code == 200
 
 
 def test_refresh_prefers_body_and_replay_revokes_replacement(client: TestClient) -> None:

@@ -15,6 +15,7 @@ from app.services.auth import AuthService
 from app.services.goals import GoalService
 from app.services.habits import HabitService
 from app.services.journal import JournalService
+from app.services.login_attempts import login_attempt_limiter
 from app.services.results import ResultsService
 from app.services.tasks import TaskService
 from app.services.today import TodayService
@@ -27,6 +28,7 @@ def get_auth_service(session: DatabaseSession) -> AuthService:
         session,
         UserRepository(session),
         RefreshTokenRepository(session),
+        login_attempt_limiter,
     )
 
 

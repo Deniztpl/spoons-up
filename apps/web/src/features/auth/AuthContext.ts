@@ -8,7 +8,12 @@ export type RegisterRequest = components["schemas"]["RegisterRequest"];
 
 export type AuthActionResult =
   | { ok: true }
-  | { ok: false; message: string; fields?: Record<string, string> };
+  | {
+      ok: false;
+      code?: string;
+      message: string;
+      fields?: Record<string, string>;
+    };
 
 export type AuthContextValue = {
   status: AuthStatus;

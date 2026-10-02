@@ -37,6 +37,12 @@ class EmailTakenError(AppError):
     default_message = "Email already registered"
 
 
+class RegistrationClosedError(AppError):
+    status_code = 403
+    code = "registration_closed"
+    default_message = "Registration is closed"
+
+
 class AreaNameTakenError(AppError):
     status_code = 409
     code = "area_name_taken"
@@ -54,6 +60,12 @@ class InvalidCredentialsError(AppError):
     code = "invalid_credentials"
     default_message = "Invalid email or password"
     headers = {"WWW-Authenticate": "Bearer"}
+
+
+class TooManyAttemptsError(AppError):
+    status_code = 429
+    code = "too_many_attempts"
+    default_message = "Too many login attempts. Try again later"
 
 
 class InvalidTokenError(AppError):

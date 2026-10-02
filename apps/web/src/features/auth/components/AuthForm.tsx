@@ -32,7 +32,13 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       : await login({ email: email.trim(), password });
 
     if (!result.ok) {
-      setErrorMessage(result.message);
+      setErrorMessage(
+        result.code === "registration_closed"
+          ? "Registration is closed. Sign in with the existing account."
+          : result.code === "too_many_attempts"
+            ? "Too many attempts. Try again in 15 minutes."
+          : result.message,
+      );
       setFieldErrors(result.fields ?? {});
       setIsSubmitting(false);
     }

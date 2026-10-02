@@ -31,16 +31,18 @@ function failureResult(error: unknown, fallback: string): AuthActionResult {
   }
 
   const value = error as {
+    code?: unknown;
     message?: unknown;
     fields?: unknown;
   };
+  const code = typeof value.code === "string" ? value.code : undefined;
   const message = typeof value.message === "string" ? value.message : fallback;
   const fields =
     typeof value.fields === "object" && value.fields !== null
       ? (value.fields as Record<string, string>)
       : undefined;
 
-  return { ok: false, message, fields };
+  return { ok: false, code, message, fields };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

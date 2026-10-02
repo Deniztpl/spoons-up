@@ -197,6 +197,48 @@ describe("web authentication", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
   });
 
+  it("shows the registration-closed message from its stable error code", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === "/api/v1/auth/refresh") {
+        return authError("invalid_token", "Invalid or expired token");
+      }
+      return authError("registration_closed", "This message may change", 403);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderApp("/register");
+
+    await screen.findByLabelText("Email");
+    await user.type(screen.getByLabelText("Email"), "deniz@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Registration is closed. Sign in with the existing account.",
+    );
+  });
+
+  it("shows the login throttle message from its stable error code", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      if (new URL(request.url).pathname === "/api/v1/auth/refresh") {
+        return authError("invalid_token", "Invalid or expired token");
+      }
+      return authError("too_many_attempts", "This message may change", 429);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderApp("/login");
+
+    await screen.findByLabelText("Email");
+    await user.type(screen.getByLabelText("Email"), "deniz@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too many attempts. Try again in 15 minutes.",
+    );
+  });
+
   it("shows field validation and network errors", async () => {
     let loginAttempts = 0;
     const fetchMock = vi.fn(async (request: Request) => {

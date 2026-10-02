@@ -4,8 +4,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config.app import settings
 from app.core.config.auth import auth_settings
-from app.core.errors import EmailTakenError, InvalidCredentialsError, InvalidTokenError
+from app.core.errors import (
+    EmailTakenError,
+    InvalidCredentialsError,
+    InvalidTokenError,
+    RegistrationClosedError,
+)
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -17,6 +23,7 @@ from app.core.security import (
 from app.repositories.refresh_tokens import RefreshTokenRepository
 from app.repositories.users import UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest
+from app.services.login_attempts import LoginAttemptLimiter
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,12 +38,17 @@ class AuthService:
         session: Session,
         user_repository: UserRepository,
         refresh_token_repository: RefreshTokenRepository,
+        login_attempt_limiter: LoginAttemptLimiter,
     ) -> None:
         self.session = session
         self.user_repository = user_repository
         self.refresh_token_repository = refresh_token_repository
+        self.login_attempt_limiter = login_attempt_limiter
 
     def register(self, payload: RegisterRequest) -> TokenPair:
+        if not settings.registration_enabled:
+            raise RegistrationClosedError
+
         normalized_email = _normalize_email(str(payload.email))
         password_hash = hash_password(payload.password)
 
@@ -57,8 +69,11 @@ class AuthService:
         return tokens
 
     def login(self, payload: LoginRequest) -> TokenPair:
+        normalized_email = _normalize_email(str(payload.email))
+        self.login_attempt_limiter.begin_attempt(normalized_email)
+
         with self.session.begin():
-            user = self.user_repository.get_by_email(_normalize_email(str(payload.email)))
+            user = self.user_repository.get_by_email(normalized_email)
             if user is None:
                 verify_password_for_missing_user(payload.password)
                 raise InvalidCredentialsError
@@ -66,6 +81,8 @@ class AuthService:
                 raise InvalidCredentialsError
 
             tokens = self._issue_token_pair(user.id)
+
+        self.login_attempt_limiter.clear(normalized_email)
         return tokens
 
     def refresh(self, token: str | None) -> TokenPair:
