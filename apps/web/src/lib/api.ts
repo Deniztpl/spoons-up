@@ -6,7 +6,21 @@ import {
   setUnauthenticated,
 } from "../features/auth/session";
 
-const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const LOCAL_API_URL = "http://localhost:8000";
+
+export function resolveApiBaseUrl(
+  configuredUrl: string | undefined,
+  isDevelopment: boolean,
+) {
+  const configuredBaseUrl = configuredUrl?.trim();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  return isDevelopment ? LOCAL_API_URL : "";
+}
+
+const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
 
 const browserFetch = (request: Request) => globalThis.fetch(request);
 

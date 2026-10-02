@@ -6,7 +6,7 @@ import {
   setAuthenticated,
   setUnauthenticated,
 } from "../features/auth/session";
-import { authenticatedFetch } from "./api";
+import { authenticatedFetch, resolveApiBaseUrl } from "./api";
 
 function tokenResponse(accessToken: string) {
   return Response.json({
@@ -141,5 +141,19 @@ describe("authenticated API fetch", () => {
     expect(protectedCalls).toBe(1);
     expect(getAuthStatus()).toBe("unauthenticated");
     expect(getAccessToken()).toBeNull();
+  });
+});
+
+describe("API base URL", () => {
+  it("uses relative requests in production when no URL is configured", () => {
+    expect(resolveApiBaseUrl(undefined, false)).toBe("");
+    expect(resolveApiBaseUrl("  ", false)).toBe("");
+  });
+
+  it("uses localhost in development and honors an explicit URL", () => {
+    expect(resolveApiBaseUrl(undefined, true)).toBe("http://localhost:8000");
+    expect(resolveApiBaseUrl(" https://api.example.com ", false)).toBe(
+      "https://api.example.com",
+    );
   });
 });
