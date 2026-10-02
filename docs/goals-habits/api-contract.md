@@ -1,6 +1,8 @@
 ## API Contract
 
-Base path `/api/v1`. Every endpoint except `/auth/register`, `/auth/login` and `/auth/refresh` requires `Authorization: Bearer <access_token>`.
+Application endpoints use base path `/api/v1`. Every application endpoint except `/auth/register`, `/auth/login` and `/auth/refresh` requires `Authorization: Bearer <access_token>`.
+
+Two deployment endpoints sit outside that base path: `GET /health` and `POST /internal/jobs/hourly`. Both are excluded from OpenAPI so they do not appear in the generated client. Health is unauthenticated; the hourly endpoint authenticates with `X-Cron-Secret`, not a bearer token.
 
 ### Conventions
 
@@ -40,9 +42,43 @@ Two different things, don't mix them:
 | Status | When |
 |---|---|
 | 401 | missing, expired or invalid access token |
+| 403 | an authenticated or public operation is disabled by configuration |
 | 404 | resource does not exist, or belongs to another user |
 | 409 | uniqueness conflict |
+| 429 | an authentication attempt is temporarily rate limited |
 | 422 | request body fails validation |
+
+---
+
+### Operations
+
+These routes are operational controls, not part of the generated `/api/v1` client.
+
+#### GET /health
+
+Unauthenticated. It does not open a database session or perform a database query, so it can report that the API process is alive while Postgres is unavailable.
+
+**200**
+
+```json
+{ "status": "ok" }
+```
+
+#### POST /internal/jobs/hourly
+
+Called directly on the Render service by cron-job.org. The request has no body.
+
+```http
+X-Cron-Secret: <CRON_SECRET>
+```
+
+The supplied value is compared with the configured secret using `hmac.compare_digest`. A successful request calls the same idempotent hourly job function as the local Compose scheduler.
+
+**204** — the hourly job completed.
+
+| Error | When |
+|---|---|
+| 401 `invalid_cron_secret` | `X-Cron-Secret` is missing or does not match |
 
 ---
 
@@ -50,7 +86,7 @@ Two different things, don't mix them:
 
 The access token and refresh token are returned in the response body. The same refresh token is also set as an httpOnly cookie. Mobile stores the body value in SecureStore; web ignores the body value and uses the cookie. Returning the refresh token in both places weakens the benefit of httpOnly for web and is a deliberate temporary decision while both clients share one auth surface.
 
-Before the web client reaches production, the shared auth surface will be split into web and mobile HTTP contracts. Web endpoints will return refresh tokens only through httpOnly cookies; mobile endpoints will return them in the response body. Both contracts will continue using the same `AuthService` and business logic.
+Slice 7 keeps this shared response while deploying the web client: web still ignores the body value and uses the cookie. Splitting web and mobile HTTP contracts is deferred to Slice 8, when the mobile client is introduced. Both contracts will continue using the same `AuthService` and business logic after that split.
 
 #### POST /auth/register
 
@@ -68,6 +104,7 @@ Before the web client reaches production, the shared auth surface will be split 
 
 | Error | When |
 |---|---|
+| 403 `registration_closed` | registration is disabled by `REGISTRATION_ENABLED=false` |
 | 409 `email_taken` | that email already has an account |
 | 422 `validation_error` | bad email format, password too short, unknown timezone |
 
@@ -82,6 +119,9 @@ Before the web client reaches production, the shared auth surface will be split 
 | Error | When |
 |---|---|
 | 401 `invalid_credentials` | wrong email or password — the same code for both, so the response doesn't reveal which emails exist |
+| 429 `too_many_attempts` | five attempt slots for the normalised email were reserved within 15 minutes and its 15-minute lockout has not expired |
+
+The first five attempts reserve their slots before password verification, so concurrent requests cannot bypass the limit. Failed attempts retain `invalid_credentials`; the next attempt is rate limited, even if it carries the correct password. A successful login among the first five clears that email's count. Counts are isolated by normalised email, stored in process memory and cleared when their window expires or the process restarts.
 
 #### POST /auth/refresh
 

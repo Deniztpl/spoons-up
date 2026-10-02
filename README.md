@@ -77,7 +77,8 @@ Read [`docs/goals-habits/design.md`](docs/goals-habits/design.md) for product
 decisions, [`docs/goals-habits/api-contract.md`](docs/goals-habits/api-contract.md)
 for request and response shapes, and
 [`docs/goals-habits/project-structure.md`](docs/goals-habits/project-structure.md)
-for code placement rules.
+for code placement rules. The production provider settings and rollout order live in
+[`docs/goals-habits/deployment.md`](docs/goals-habits/deployment.md).
 
 ## License
 

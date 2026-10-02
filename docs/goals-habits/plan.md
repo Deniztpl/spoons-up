@@ -240,14 +240,85 @@ Goal tasks keep their existing rules and area progress. Every goal-less task is 
 - Return `created_at` on Journal items and let the active list be sorted by due date (default), date added (newest first) or priority (High to Low, then none); Completed stays newest-completed first
 - **Done when:** an item created with a priority shows its tag, changing or clearing it in the detail holds after a reload, and the active list reorders by date added or priority on demand
 
-## Slice 7 — Notifications
+## Slice 7 — Deployment ($0)
 
-38. `reminders` and `devices` migration, token registration
-39. Write a reminder on timed scheduled task create, update it when timing changes, and cancel it on time or schedule removal or delete
-40. Reminders for timed tasks the slice 3 job generated before this slice existed — backfill once, then generation writes them itself
-41. Scheduler — scan due reminders every minute, fan out to the user's tokens, prune invalid ones
-42. `apps/mobile`: Expo, the same generated client, push registration
-43. **Done when:** a task an hour out produces a notification on a real device
+Deploy the existing web application before adding notifications. Production is a
+Vercel-hosted static web build that reaches a Render-hosted API through a same-origin
+rewrite. Supabase supplies Postgres only, and cron-job.org invokes the existing hourly
+maintenance job. Local Compose, including its scheduler, keeps working as it does now.
+
+### Block 0 — Canonical documentation — DONE
+
+38. Make deployment part of the canonical domain documentation before application code:
+    - Record the Vercel, Render, Supabase and cron-job.org topology and the local/production job triggers in `design.md`
+    - Add the operational endpoints and new auth errors to `api-contract.md`
+    - Add `deployment.md` with provider settings, environment variable names, cron jobs and first-run order, and link it from the repository README
+    - Keep the shared web/mobile auth response for this slice and defer its split until Slice 8 introduces the mobile client
+    - Move Notifications to Slice 8 and renumber its work
+
+### Block 1 — Production configuration and container startup — DONE
+
+39. Make production startup environment-driven while preserving local Compose:
+    - Add `CRON_SECRET` and `REGISTRATION_ENABLED`; require production database and JWT values from the environment and enable the Secure refresh cookie in production
+    - Remove production localhost assumptions; local values stay explicit in Compose and the development env examples
+    - Add a root `.env.example` with names and placeholders only, and keep the existing app-specific examples aligned
+    - Start the Render container by applying Alembic migrations and then serving on `0.0.0.0:$PORT`; the local scheduler continues to run system cron
+    - Add configuration tests and commit no secret, password or connection string
+
+### Block 2 — Operational endpoints and shared hourly job — DONE
+
+40. Expose deployment health and the existing maintenance job without adding them to the public client:
+    - Add `GET /health`, unauthenticated and independent of the database
+    - Refactor the cron entrypoint and `POST /internal/jobs/hourly` to call the same hourly orchestration function
+    - Compare `X-Cron-Secret` with `CRON_SECRET` using `hmac.compare_digest`, return errors through the application error contract, and return 204 after a successful run
+    - Exclude both routes from OpenAPI; test an unavailable database for health, missing and wrong secrets, a correct secret, and a repeated idempotent run
+
+### Block 3 — Registration switch — DONE
+
+41. Keep first-run registration available but close it after the owner account exists:
+    - Default `REGISTRATION_ENABLED` to true; when false, `POST /auth/register` returns 403 `registration_closed`
+    - Preserve registration behaviour when enabled and show the closed-registration message in the web auth form
+    - Cover both settings in API tests and the error state in the web tests
+
+### Block 4 — Login throttling — DONE
+
+42. Limit password guessing per normalised email without a new dependency:
+    - After five failed logins within 15 minutes, reject later attempts for that email for 15 minutes with 429 `too_many_attempts`, including a correct password
+    - A successful login before the limit clears the count; other emails remain independent
+    - Keep the counters in process memory with concurrency-safe access and lazy expiry, and cover the limit, reset, isolation and expiry in tests
+
+### Block 5 — Production web build and Vercel routing — DONE
+
+43. Build the pnpm workspace on Vercel and keep the refresh cookie first-party:
+    - Use a relative API base URL in production while retaining the current localhost API for local development
+    - Add `apps/web/vercel.json`: rewrite `/api/:path*` to a placeholder Render URL and every other path to `/index.html`
+    - Document Vercel's root directory, outside-root workspace access, install command, build command and output directory
+    - Regenerate OpenAPI and the shared client for the auth contract changes, and test relative requests, refresh and the production build
+
+### Block 6 — Provider rollout and first user
+
+44. Provision in the order Supabase → Render → Vercel → cron-job.org:
+    - Use only Supabase Postgres through the SSL Session pooler; do not enable Supabase Auth, API or Storage
+    - Deploy Render from the API Dockerfile, set its environment in the dashboard and do not deploy the Compose scheduler
+    - Replace the Vercel rewrite placeholder with the real Render URL and deploy the static web app
+    - Register the owner, set `REGISTRATION_ENABLED=false`, and confirm the `users` table contains exactly one row
+    - Configure cron-job.org to call Render directly: `GET /health` every 10 minutes and authenticated `POST /internal/jobs/hourly` every hour
+
+### Block 7 — Verification
+
+45. Run API pytest and Ruff; run web lint, typecheck, Vitest and build; verify OpenAPI/client sync, local Compose and that tracked files contain no production secrets.
+    - **Local verification complete (2026-10-02):** 147 API tests passed against PostgreSQL; 88 web tests, Ruff, ESLint, both TypeScript workspaces, production build and OpenAPI/client sync passed. API/web Docker images built and the local Compose stack started successfully. The production Docker command applied migrations and served on a custom `PORT`; health, closed registration and authenticated repeated hourly calls passed.
+    - **Remaining:** deploy the providers in Block 6 and complete the phone/PC, cookie reload, persisted task, one-owner and cron-job.org checks on the real production URLs.
+    - **Done when:** phone and PC can open the Vercel URL from different networks, login and a checked task survive a reload, registration is closed after the one owner account, and cron-job.org runs the hourly job successfully and idempotently
+
+## Slice 8 — Notifications
+
+46. `reminders` and `devices` migration, token registration
+47. Write a reminder on timed scheduled task create, update it when timing changes, and cancel it on time or schedule removal or delete
+48. Reminders for timed tasks the slice 3 job generated before this slice existed — backfill once, then generation writes them itself
+49. Scheduler — scan due reminders every minute, fan out to the user's tokens, prune invalid ones
+50. `apps/mobile`: Expo, the same generated client, push registration
+51. **Done when:** a task an hour out produces a notification on a real device
 
 ---
 
