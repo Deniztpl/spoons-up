@@ -8,9 +8,9 @@ def main() -> None:
         if separator:
             os.environ[key.decode()] = value.decode()
 
-    from app.jobs.daily import main as run_daily_job
+    from app.jobs.daily import main as run_hourly_job_entrypoint
 
-    run_daily_job()
+    run_hourly_job_entrypoint()
 
 
 if __name__ == "__main__":

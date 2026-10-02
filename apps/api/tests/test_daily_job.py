@@ -3,10 +3,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config.app import settings
+from app.jobs import daily as daily_job_module
 from app.jobs.daily import run_daily_task_generation
 from app.models import Task, User
 from app.services import user_activity as user_activity_module
@@ -54,6 +55,42 @@ def test_daily_job_generates_tasks_only_for_recently_seen_users(
         days=TASK_GENERATION_DAYS - 1
     )
     assert dormant_tasks == []
+
+
+def test_hourly_endpoint_is_idempotent(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = bearer(register(client, "hourly-endpoint@example.com"))
+    goal = create_goal_with_daily_rule(client, headers, title="Hourly endpoint goal")
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[no-untyped-def]
+            return FIXED_NOW if tz is None else FIXED_NOW.astimezone(tz)
+
+    monkeypatch.setattr(daily_job_module, "datetime", FixedDateTime)
+    with db_session.begin():
+        user = get_user(db_session, "hourly-endpoint@example.com")
+        user.last_seen_at = FIXED_NOW - timedelta(days=1)
+        db_session.execute(delete(Task).where(Task.user_id == user.id))
+
+    cron_headers = {"X-Cron-Secret": settings.cron_secret.get_secret_value()}
+    first_response = client.post("/internal/jobs/hourly", headers=cron_headers)
+    first_count = db_session.scalar(
+        select(func.count()).select_from(Task).where(Task.goal_id == int(str(goal["id"])))
+    )
+    db_session.rollback()
+    second_response = client.post("/internal/jobs/hourly", headers=cron_headers)
+    second_count = db_session.scalar(
+        select(func.count()).select_from(Task).where(Task.goal_id == int(str(goal["id"])))
+    )
+
+    assert first_response.status_code == 204
+    assert second_response.status_code == 204
+    assert first_count == TASK_GENERATION_DAYS
+    assert second_count == first_count
 
 
 def test_first_request_after_dormancy_restores_the_current_window(

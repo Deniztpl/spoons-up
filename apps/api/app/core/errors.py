@@ -63,6 +63,12 @@ class InvalidTokenError(AppError):
     headers = {"WWW-Authenticate": "Bearer"}
 
 
+class InvalidCronSecretError(AppError):
+    status_code = 401
+    code = "invalid_cron_secret"
+    default_message = "Invalid cron secret"
+
+
 class ValidationAppError(AppError):
     status_code = 422
     code = "validation_error"

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -13,6 +14,12 @@ from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.services.results import ResultsService
 from app.services.tasks import TASK_GENERATION_DAYS, TaskService
+
+
+@dataclass(frozen=True, slots=True)
+class HourlyJobResult:
+    processed_users: int
+    frozen_users: int
 
 
 def run_daily_task_generation(
@@ -74,12 +81,23 @@ def run_results_freeze(
     return len(users)
 
 
+def run_hourly_job(
+    session: Session,
+    *,
+    now: datetime | None = None,
+) -> HourlyJobResult:
+    observed_at = now or datetime.now(UTC)
+    return HourlyJobResult(
+        processed_users=run_daily_task_generation(session, now=observed_at),
+        frozen_users=run_results_freeze(session, now=observed_at),
+    )
+
+
 def main() -> None:
     with SessionLocal() as session:
-        processed_users = run_daily_task_generation(session)
-        frozen_users = run_results_freeze(session)
-    print(f"Daily task generation processed {processed_users} users")
-    print(f"Results freeze processed {frozen_users} users")
+        result = run_hourly_job(session)
+    print(f"Daily task generation processed {result.processed_users} users")
+    print(f"Results freeze processed {result.frozen_users} users")
 
 
 if __name__ == "__main__":
