@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime, time
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -59,7 +58,6 @@ def test_journal_orders_items_nests_steps_and_scopes_every_row(
             start_time=time(10),
             duration_minutes=60,
             end_time=time(11),
-            block_count=Decimal("1.5"),
             created_at=datetime(2026, 9, 3, tzinfo=UTC),
         )
         dated_untimed = build_task(
@@ -125,6 +123,7 @@ def test_journal_orders_items_nests_steps_and_scopes_every_row(
             goal_id=int(str(goal["id"])),
             title="Deep work",
             scheduled_date=date(2026, 10, 1),
+            duration_minutes=60,
             created_at=datetime(2026, 9, 1, tzinfo=UTC),
         )
         db_session.add_all(
@@ -152,7 +151,6 @@ def test_journal_orders_items_nests_steps_and_scopes_every_row(
             start_time=time(14),
             duration_minutes=60,
             end_time=time(15),
-            block_count=Decimal("1.0"),
             status=TaskStatus.DONE,
             completed_at=datetime(2026, 9, 23, 12, tzinfo=UTC),
             created_at=datetime(2026, 9, 4, tzinfo=UTC),
@@ -227,7 +225,6 @@ def test_journal_orders_items_nests_steps_and_scopes_every_row(
         "start_time": "14:00",
         "duration_minutes": 60,
         "end_time": "15:00",
-        "block_count": 1.0,
         "status": "DONE",
         "completed_at": "2026-09-23T12:00:00Z",
     }
@@ -247,7 +244,6 @@ def build_task(
     start_time: time | None = None,
     duration_minutes: int | None = None,
     end_time: time | None = None,
-    block_count: Decimal | None = None,
     status: TaskStatus = TaskStatus.PENDING,
     completed_at: datetime | None = None,
     created_at: datetime,
@@ -264,7 +260,6 @@ def build_task(
         start_time=start_time,
         duration_minutes=duration_minutes,
         end_time=end_time,
-        block_count=block_count,
         period_start=date(2026, 9, 28) if scheduled_date is not None else None,
         status=status.value,
         completed_at=completed_at,

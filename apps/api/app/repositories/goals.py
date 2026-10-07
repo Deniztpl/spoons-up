@@ -1,5 +1,4 @@
 from datetime import time
-from decimal import Decimal
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, selectinload
@@ -85,15 +84,13 @@ class GoalRepository:
         goal_id: int,
         byweekday: list[int],
         start_time: time | None,
-        duration_minutes: int | None,
-        block_count: float | None,
+        duration_minutes: int,
     ) -> GoalRule:
         rule = GoalRule(
             goal_id=goal_id,
             byweekday=byweekday,
             start_time=start_time,
             duration_minutes=duration_minutes,
-            block_count=Decimal(str(block_count)) if block_count is not None else None,
         )
         self.session.add(rule)
         self.session.flush()
@@ -106,19 +103,14 @@ class GoalRepository:
         byweekday: list[int] | None,
         start_time: time | None,
         duration_minutes: int | None,
-        block_count: float | None,
         update_start_time: bool,
-        update_duration_minutes: bool,
-        update_block_count: bool,
     ) -> GoalRule:
         if byweekday is not None:
             rule.byweekday = byweekday
         if update_start_time:
             rule.start_time = start_time
-        if update_duration_minutes:
+        if duration_minutes is not None:
             rule.duration_minutes = duration_minutes
-        if update_block_count:
-            rule.block_count = Decimal(str(block_count)) if block_count is not None else None
         self.session.flush()
         return rule
 

@@ -107,7 +107,6 @@ class GoalService:
                 byweekday=payload.byweekday,
                 start_time=payload.start_time,
                 duration_minutes=payload.duration_minutes,
-                block_count=payload.block_count,
             )
             self._add_tasks_for_current_window(user_id=user_id)
             response = GoalRuleResponse.model_validate(rule)
@@ -136,10 +135,7 @@ class GoalService:
                     byweekday=payload.byweekday,
                     start_time=payload.start_time,
                     duration_minutes=payload.duration_minutes,
-                    block_count=payload.block_count,
                     update_start_time="start_time" in payload.model_fields_set,
-                    update_duration_minutes="duration_minutes" in payload.model_fields_set,
-                    update_block_count="block_count" in payload.model_fields_set,
                 )
                 self.task_service.add_tasks(
                     user_id=user_id,
@@ -192,7 +188,6 @@ class GoalService:
                 byweekday=payload.byweekday,
                 start_time=task.start_time,
                 duration_minutes=task.duration_minutes,
-                block_count=float(task.block_count) if task.block_count is not None else None,
             )
             # The task stands in for the rule's occurrence on its date, so generation skips it.
             self.task_service.attach_to_rule(task=task, rule=rule)

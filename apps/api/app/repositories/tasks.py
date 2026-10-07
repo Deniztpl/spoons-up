@@ -200,9 +200,9 @@ class TaskRepository:
             for task_id, title, done, total in self.session.execute(query)
         }
 
-    def sum_done_blocks_by_goal(self, *, user_id: int, period_start: date) -> dict[int, Decimal]:
+    def sum_done_hours_by_goal(self, *, user_id: int, period_start: date) -> dict[int, Decimal]:
         query = (
-            select(Task.goal_id, func.coalesce(func.sum(Task.block_count), 0))
+            select(Task.goal_id, func.coalesce(func.sum(Task.duration_minutes), 0))
             .where(
                 Task.user_id == user_id,
                 Task.goal_id.is_not(None),
@@ -211,7 +211,7 @@ class TaskRepository:
             )
             .group_by(Task.goal_id)
         )
-        return {goal_id: Decimal(done) for goal_id, done in self.session.execute(query)}
+        return {goal_id: Decimal(minutes) / 60 for goal_id, minutes in self.session.execute(query)}
 
     def get_task_and_lock(self, *, task_id: int, user_id: int) -> Task | None:
         return self.session.scalar(
@@ -233,7 +233,6 @@ class TaskRepository:
         start_time: time | None,
         duration_minutes: int | None,
         end_time: time | None,
-        block_count: float | None,
         period_start: date | None,
     ) -> Task:
         task = Task(
@@ -249,7 +248,6 @@ class TaskRepository:
             start_time=start_time,
             duration_minutes=duration_minutes,
             end_time=end_time,
-            block_count=Decimal(str(block_count)) if block_count is not None else None,
             period_start=period_start,
         )
         self.session.add(task)
@@ -267,7 +265,6 @@ class TaskRepository:
         start_time: time | None,
         duration_minutes: int | None,
         end_time: time | None,
-        block_count: float | None,
         period_start: date | None,
         update_title: bool,
         update_scheduled_date: bool,
@@ -276,7 +273,6 @@ class TaskRepository:
         update_start_time: bool,
         update_duration_minutes: bool,
         update_end_time: bool,
-        update_block_count: bool,
         update_period_start: bool,
     ) -> Task:
         if update_title:
@@ -293,8 +289,6 @@ class TaskRepository:
             task.duration_minutes = duration_minutes
         if update_end_time:
             task.end_time = end_time
-        if update_block_count:
-            task.block_count = Decimal(str(block_count)) if block_count is not None else None
         if update_period_start:
             task.period_start = period_start
         self.session.flush()
@@ -372,8 +366,7 @@ class TaskRepository:
         user_id: int,
         from_date: date,
         start_time: time | None,
-        duration_minutes: int | None,
-        block_count: Decimal | None,
+        duration_minutes: int,
     ) -> None:
         query = delete(Task).where(
             Task.rule_id == rule_id,
@@ -382,16 +375,7 @@ class TaskRepository:
             Task.status == TaskStatus.PENDING.value,
             Task.scheduled_date == Task.occurrence_date,
             Task.start_time.is_(None) if start_time is None else Task.start_time == start_time,
-            (
-                Task.duration_minutes.is_(None)
-                if duration_minutes is None
-                else Task.duration_minutes == duration_minutes
-            ),
-            (
-                Task.block_count.is_(None)
-                if block_count is None
-                else Task.block_count == block_count
-            ),
+            Task.duration_minutes == duration_minutes,
         )
         self.session.execute(query)
 

@@ -1,5 +1,4 @@
 from datetime import date, time
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -40,13 +39,12 @@ def test_generated_task_is_persisted_with_its_week_and_defaults(
         week_start_day=user.week_start_day,
     )
     assert task.duration_minutes == 60
-    assert task.block_count == Decimal("2.0")
     assert task.status == TaskStatus.PENDING.value
     assert task.completed_at is None
     assert task.created_at is not None
 
 
-def test_generated_task_occurrence_is_unique_and_block_count_uses_half_steps(
+def test_generated_task_occurrence_is_unique_and_duration_uses_quarter_hours(
     client: TestClient,
     db_session: Session,
 ) -> None:
@@ -78,32 +76,28 @@ def test_generated_task_occurrence_is_unique_and_block_count_uses_half_steps(
             )
             db_session.flush()
 
-    with pytest.raises(IntegrityError):
-        with db_session.begin_nested():
-            invalid_task = build_task(
-                user=user,
-                goal=goal,
-                rule=rule,
-                occurrence_date=date(2030, 10, 2),
-            )
-            invalid_task.block_count = Decimal("0.3")
-            db_session.add(invalid_task)
-            db_session.flush()
+    for invalid_duration in (0, 50, 1455):
+        with pytest.raises(IntegrityError):
+            with db_session.begin_nested():
+                invalid_task = build_task(
+                    user=user,
+                    goal=goal,
+                    rule=rule,
+                    occurrence_date=date(2030, 10, 2),
+                )
+                invalid_task.duration_minutes = invalid_duration
+                db_session.add(invalid_task)
+                db_session.flush()
 
-    with pytest.raises(IntegrityError):
-        with db_session.begin_nested():
-            invalid_task = build_task(
-                user=user,
-                goal=goal,
-                rule=rule,
-                occurrence_date=date(2030, 10, 3),
-            )
-            invalid_task.duration_minutes = 0
-            db_session.add(invalid_task)
-            db_session.flush()
+        with pytest.raises(IntegrityError):
+            with db_session.begin_nested():
+                db_session.add(
+                    GoalRule(goal_id=goal.id, byweekday=[2], duration_minutes=invalid_duration)
+                )
+                db_session.flush()
 
 
-def test_rule_and_task_schedule_values_can_be_null(
+def test_goal_work_needs_a_duration_but_not_a_time(
     client: TestClient,
     db_session: Session,
 ) -> None:
@@ -112,12 +106,16 @@ def test_rule_and_task_schedule_values_can_be_null(
         db_session,
         email="nullable-task-schedule@example.com",
     )
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            db_session.add(GoalRule(goal_id=goal.id, byweekday=[2], duration_minutes=None))
+            db_session.flush()
+
     rule = GoalRule(
         goal_id=goal.id,
         byweekday=[2],
         start_time=None,
-        duration_minutes=None,
-        block_count=None,
+        duration_minutes=240,
     )
     db_session.add(rule)
     db_session.flush()
@@ -131,9 +129,8 @@ def test_rule_and_task_schedule_values_can_be_null(
         occurrence_date=occurrence_date,
         scheduled_date=occurrence_date,
         start_time=None,
-        duration_minutes=None,
+        duration_minutes=rule.duration_minutes,
         end_time=None,
-        block_count=None,
         period_start=get_week_start(
             occurrence_date,
             week_start_day=user.week_start_day,
@@ -144,12 +141,9 @@ def test_rule_and_task_schedule_values_can_be_null(
     db_session.refresh(task)
 
     assert rule.start_time is None
-    assert rule.duration_minutes is None
-    assert rule.block_count is None
     assert task.start_time is None
-    assert task.duration_minutes is None
+    assert task.duration_minutes == 240
     assert task.end_time is None
-    assert task.block_count is None
 
 
 def test_journal_task_database_constraints(
@@ -167,7 +161,14 @@ def test_journal_task_database_constraints(
 
     invalid_tasks = [
         # Goal tasks must remain scheduled.
-        journal_task(user_id=user.id, goal_id=goal.id),
+        journal_task(user_id=user.id, goal_id=goal.id, duration_minutes=60),
+        # Goal tasks carry their hours; Journal work may go without.
+        journal_task(
+            user_id=user.id,
+            goal_id=goal.id,
+            scheduled_date=date(2030, 10, 1),
+            period_start=date(2030, 9, 30),
+        ),
         # Schedule and period identity are nullable only as a pair.
         journal_task(user_id=user.id, scheduled_date=date(2030, 10, 1)),
         # A start time cannot exist without a calendar date.
@@ -185,6 +186,7 @@ def test_journal_task_database_constraints(
             parent_id=parent.id,
             scheduled_date=date(2030, 10, 1),
             period_start=date(2030, 9, 30),
+            duration_minutes=60,
         ),
         # Priority is one of three levels, and only top-level Journal work has one.
         journal_task(user_id=user.id, priority="URGENT"),
@@ -195,6 +197,7 @@ def test_journal_task_database_constraints(
             scheduled_date=date(2030, 10, 1),
             period_start=date(2030, 9, 30),
             priority="HIGH",
+            duration_minutes=60,
         ),
     ]
 
@@ -271,7 +274,6 @@ def create_task_context(
             "byweekday": [1, 3, 5],
             "start_time": "09:00",
             "duration_minutes": 60,
-            "block_count": 2,
         },
         headers=headers,
     )
@@ -303,7 +305,6 @@ def build_task(
         start_time=time(9),
         duration_minutes=60,
         end_time=time(10),
-        block_count=rule.block_count,
         period_start=get_week_start(
             occurrence_date,
             week_start_day=user.week_start_day,
@@ -321,6 +322,7 @@ def journal_task(
     priority: str | None = None,
     start_time: time | None = None,
     period_start: date | None = None,
+    duration_minutes: int | None = None,
 ) -> Task:
     return Task(
         user_id=user_id,
@@ -333,9 +335,8 @@ def journal_task(
         due_date=due_date,
         priority=priority,
         start_time=start_time,
-        duration_minutes=None,
+        duration_minutes=duration_minutes,
         end_time=None,
-        block_count=None,
         period_start=period_start,
     )
 

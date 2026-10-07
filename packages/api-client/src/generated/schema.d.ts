@@ -481,12 +481,10 @@ export interface components {
         };
         /** CreateGoalRuleRequest */
         CreateGoalRuleRequest: {
-            /** Block Count */
-            block_count?: number | null;
             /** Byweekday */
             byweekday: number[];
             /** Duration Minutes */
-            duration_minutes?: number | null;
+            duration_minutes: number;
             /** Start Time */
             start_time?: string | null;
         };
@@ -500,8 +498,6 @@ export interface components {
         };
         /** CreateTaskRequest */
         CreateTaskRequest: {
-            /** Block Count */
-            block_count?: number | null;
             /** Due Date */
             due_date?: string | null;
             /** Duration Minutes */
@@ -551,12 +547,10 @@ export interface components {
         };
         /** GoalRuleResponse */
         GoalRuleResponse: {
-            /** Block Count */
-            block_count: number | null;
             /** Byweekday */
             byweekday: number[];
             /** Duration Minutes */
-            duration_minutes: number | null;
+            duration_minutes: number;
             /** Goal Id */
             goal_id: string;
             /** Id */
@@ -636,8 +630,6 @@ export interface components {
         };
         /** JournalItemResponse */
         JournalItemResponse: {
-            /** Block Count */
-            block_count: number | null;
             /** Completed At */
             completed_at: string | null;
             /**
@@ -691,8 +683,6 @@ export interface components {
         };
         /** JournalStepResponse */
         JournalStepResponse: {
-            /** Block Count */
-            block_count: number | null;
             /** Completed At */
             completed_at: string | null;
             /** Duration Minutes */
@@ -844,8 +834,6 @@ export interface components {
         };
         /** TaskResponse */
         TaskResponse: {
-            /** Block Count */
-            block_count: number | null;
             /** Completed At */
             completed_at: string | null;
             /** Due Date */
@@ -918,8 +906,6 @@ export interface components {
         };
         /** TodayTaskResponse */
         TodayTaskResponse: {
-            /** Block Count */
-            block_count: number | null;
             /** Duration Minutes */
             duration_minutes: number | null;
             /** End Time */
@@ -984,8 +970,6 @@ export interface components {
         };
         /** UpdateGoalRuleRequest */
         UpdateGoalRuleRequest: {
-            /** Block Count */
-            block_count?: number | null;
             /** Byweekday */
             byweekday?: number[] | null;
             /** Duration Minutes */
@@ -1003,8 +987,6 @@ export interface components {
         };
         /** UpdateTaskRequest */
         UpdateTaskRequest: {
-            /** Block Count */
-            block_count?: number | null;
             /** Due Date */
             due_date?: string | null;
             /** Duration Minutes */

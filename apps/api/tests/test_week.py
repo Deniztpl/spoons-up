@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime, time
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -99,7 +98,6 @@ def test_week_returns_seven_ordered_days_and_tasks(
         "start_time": "08:00",
         "duration_minutes": None,
         "end_time": None,
-        "block_count": 1.0,
         "status": "PENDING",
         "scheduled_date": "2026-09-21",
         "occurrence_date": None,
@@ -199,8 +197,7 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
             goal_id=int(str(goal["id"])),
             byweekday=[1],
             start_time=None,
-            duration_minutes=None,
-            block_count=None,
+            duration_minutes=60,
         )
         db_session.add(rule)
         db_session.flush()
@@ -383,9 +380,9 @@ def build_task(
         scheduled_date=scheduled_date,
         due_date=due_date,
         start_time=start_time,
-        duration_minutes=None,
+        # Goal work always carries its hours.
+        duration_minutes=60 if goal_id is not None else None,
         end_time=None,
-        block_count=Decimal("1.0"),
         period_start=get_week_start(quota_date, week_start_day=1) if quota_date else None,
         status=status.value,
     )

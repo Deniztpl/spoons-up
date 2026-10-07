@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -40,17 +39,17 @@ def test_progress_weights_every_requirement_equally(
         set_created_at(db_session, user_id=user.id, value=LONG_AGO)
         db_session.add_all(
             [
-                build_task(user_id=user.id, goal=deep_work, day=date(2026, 9, 21), blocks="1.0"),
-                build_task(user_id=user.id, goal=deep_work, day=date(2026, 9, 22), blocks="0.5"),
+                build_task(user_id=user.id, goal=deep_work, day=date(2026, 9, 21), minutes=60),
+                build_task(user_id=user.id, goal=deep_work, day=date(2026, 9, 22), minutes=30),
                 build_task(
                     user_id=user.id,
                     goal=deep_work,
                     day=date(2026, 9, 23),
-                    blocks="1.0",
+                    minutes=60,
                     status=TaskStatus.PENDING,
                 ),
-                build_task(user_id=user.id, goal=deep_work, day=date(2026, 9, 14), blocks="1.0"),
-                build_task(user_id=user.id, goal=ship, day=date(2026, 9, 22), blocks="2.0"),
+                build_task(user_id=user.id, goal=deep_work, day=date(2026, 9, 14), minutes=60),
+                build_task(user_id=user.id, goal=ship, day=date(2026, 9, 22), minutes=120),
             ]
         )
     for day in ("2026-09-21", "2026-09-22"):
@@ -175,7 +174,7 @@ def test_progress_counts_a_task_moved_to_next_week_toward_its_original_week(
     goal = create_goal(client, headers, area_id=area_id, title="Deep work", weekly_target=2)
     task = client.post(
         "/api/v1/tasks",
-        json={"goal_id": goal["id"], "scheduled_date": "2026-09-24", "block_count": 1},
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-24", "duration_minutes": 60},
         headers=headers,
     ).json()
     with db_session.begin():
@@ -341,7 +340,7 @@ def build_task(
     user_id: int,
     goal: dict[str, object],
     day: date,
-    blocks: str,
+    minutes: int,
     status: TaskStatus = TaskStatus.DONE,
 ) -> Task:
     return Task(
@@ -352,9 +351,8 @@ def build_task(
         occurrence_date=None,
         scheduled_date=day,
         start_time=None,
-        duration_minutes=None,
+        duration_minutes=minutes,
         end_time=None,
-        block_count=Decimal(blocks),
         period_start=get_week_start(day, week_start_day=1),
         status=status.value,
         completed_at=OBSERVED_AT if status == TaskStatus.DONE else None,

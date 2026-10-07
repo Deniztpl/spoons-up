@@ -37,7 +37,6 @@ class TodayTaskResponse(BaseModel):
     start_time: time | None
     duration_minutes: int | None
     end_time: time | None
-    block_count: float | None
     status: Literal["PENDING", "DONE"]
     scheduled_date: date
     occurrence_date: date | None

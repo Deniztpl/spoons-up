@@ -10,7 +10,7 @@ from pydantic import (
     field_validator,
 )
 
-from app.schemas.goals import Weekdays
+from app.schemas.goals import DurationMinutes, Weekdays
 
 
 def _strip_title(value: str) -> str:
@@ -29,9 +29,7 @@ TaskTitle = Annotated[
     Field(min_length=1),
 ]
 ResourceId = Annotated[str, Field(pattern=r"^[0-9]+$")]
-DurationMinutes = Annotated[int, Field(ge=1)]
 LocalTime = Annotated[time, AfterValidator(_reject_timezone)]
-BlockCount = Annotated[float, Field(gt=0, le=99.5, multiple_of=0.5)]
 TaskPriorityValue = Literal["HIGH", "MEDIUM", "LOW"]
 
 
@@ -44,7 +42,6 @@ class CreateTaskRequest(BaseModel):
     priority: TaskPriorityValue | None = None
     start_time: LocalTime | None = None
     duration_minutes: DurationMinutes | None = None
-    block_count: BlockCount | None = None
 
 
 class UpdateTaskRequest(BaseModel):
@@ -54,7 +51,6 @@ class UpdateTaskRequest(BaseModel):
     priority: TaskPriorityValue | None = None
     start_time: LocalTime | None = None
     duration_minutes: DurationMinutes | None = None
-    block_count: BlockCount | None = None
 
     @field_validator("title", "scheduled_date")
     @classmethod
@@ -86,7 +82,6 @@ class TaskResponse(BaseModel):
     start_time: time | None
     duration_minutes: int | None
     end_time: time | None
-    block_count: float | None
     period_start: date | None
     status: Literal["PENDING", "DONE", "DELETED"]
     completed_at: datetime | None

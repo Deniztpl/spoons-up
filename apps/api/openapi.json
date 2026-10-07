@@ -200,20 +200,6 @@
       },
       "CreateGoalRuleRequest": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "maximum": 99.5,
-                "multipleOf": 0.5,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "byweekday": {
             "items": {
               "maximum": 7.0,
@@ -226,16 +212,11 @@
             "type": "array"
           },
           "duration_minutes": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duration Minutes"
+            "maximum": 1440.0,
+            "minimum": 15.0,
+            "multipleOf": 15.0,
+            "title": "Duration Minutes",
+            "type": "integer"
           },
           "start_time": {
             "anyOf": [
@@ -251,7 +232,8 @@
           }
         },
         "required": [
-          "byweekday"
+          "byweekday",
+          "duration_minutes"
         ],
         "title": "CreateGoalRuleRequest",
         "type": "object"
@@ -282,20 +264,6 @@
       },
       "CreateTaskRequest": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "maximum": 99.5,
-                "multipleOf": 0.5,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "due_date": {
             "anyOf": [
               {
@@ -311,7 +279,9 @@
           "duration_minutes": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "maximum": 1440.0,
+                "minimum": 15.0,
+                "multipleOf": 15.0,
                 "type": "integer"
               },
               {
@@ -485,17 +455,6 @@
       },
       "GoalRuleResponse": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "byweekday": {
             "items": {
               "type": "integer"
@@ -504,15 +463,8 @@
             "type": "array"
           },
           "duration_minutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duration Minutes"
+            "title": "Duration Minutes",
+            "type": "integer"
           },
           "goal_id": {
             "title": "Goal Id",
@@ -539,8 +491,7 @@
           "goal_id",
           "byweekday",
           "start_time",
-          "duration_minutes",
-          "block_count"
+          "duration_minutes"
         ],
         "title": "GoalRuleResponse",
         "type": "object"
@@ -702,17 +653,6 @@
       },
       "JournalItemResponse": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "completed_at": {
             "anyOf": [
               {
@@ -839,7 +779,6 @@
           "start_time",
           "duration_minutes",
           "end_time",
-          "block_count",
           "status",
           "completed_at",
           "created_at",
@@ -899,17 +838,6 @@
       },
       "JournalStepResponse": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "completed_at": {
             "anyOf": [
               {
@@ -996,7 +924,6 @@
           "start_time",
           "duration_minutes",
           "end_time",
-          "block_count",
           "status",
           "completed_at"
         ],
@@ -1338,17 +1265,6 @@
       },
       "TaskResponse": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "completed_at": {
             "anyOf": [
               {
@@ -1522,7 +1438,6 @@
           "start_time",
           "duration_minutes",
           "end_time",
-          "block_count",
           "period_start",
           "status",
           "completed_at"
@@ -1614,17 +1529,6 @@
       },
       "TodayTaskResponse": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "duration_minutes": {
             "anyOf": [
               {
@@ -1759,7 +1663,6 @@
           "start_time",
           "duration_minutes",
           "end_time",
-          "block_count",
           "status",
           "scheduled_date",
           "occurrence_date",
@@ -1852,20 +1755,6 @@
       },
       "UpdateGoalRuleRequest": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "maximum": 99.5,
-                "multipleOf": 0.5,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "byweekday": {
             "anyOf": [
               {
@@ -1887,7 +1776,9 @@
           "duration_minutes": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "maximum": 1440.0,
+                "minimum": 15.0,
+                "multipleOf": 15.0,
                 "type": "integer"
               },
               {
@@ -1954,20 +1845,6 @@
       },
       "UpdateTaskRequest": {
         "properties": {
-          "block_count": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "maximum": 99.5,
-                "multipleOf": 0.5,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Block Count"
-          },
           "due_date": {
             "anyOf": [
               {
@@ -1983,7 +1860,9 @@
           "duration_minutes": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "maximum": 1440.0,
+                "minimum": 15.0,
+                "multipleOf": 15.0,
                 "type": "integer"
               },
               {

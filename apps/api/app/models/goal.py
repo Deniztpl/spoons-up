@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, time
-from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -11,7 +10,6 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
-    Numeric,
     SmallInteger,
     Text,
     Time,
@@ -67,10 +65,9 @@ class GoalRule(Base):
             "byweekday <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[]",
             name="byweekday_values",
         ),
-        CheckConstraint("duration_minutes >= 1", name="duration_minutes_positive"),
         CheckConstraint(
-            "block_count > 0 AND block_count * 2 = trunc(block_count * 2)",
-            name="block_count_increment",
+            "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0",
+            name="duration_minutes_steps",
         ),
     )
 
@@ -81,6 +78,5 @@ class GoalRule(Base):
     )
     byweekday: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))
     start_time: Mapped[time | None] = mapped_column(Time)
-    duration_minutes: Mapped[int | None] = mapped_column(Integer)
-    block_count: Mapped[Decimal | None] = mapped_column(Numeric(precision=3, scale=1))
+    duration_minutes: Mapped[int] = mapped_column(Integer)
     goal: Mapped[Goal] = relationship(back_populates="rules")

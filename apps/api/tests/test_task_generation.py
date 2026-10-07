@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime, time
-from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -42,7 +41,6 @@ def test_rule_creation_adds_the_current_window_idempotently(
         byweekday=[1, 3, 5],
         start_time="23:30",
         duration_minutes=90,
-        block_count=2,
     )
 
     expected_dates = [
@@ -63,7 +61,7 @@ def test_rule_creation_adds_the_current_window_idempotently(
     assert all(task.scheduled_date == task.occurrence_date for task in tasks)
     assert all(task.start_time == time(23, 30) for task in tasks)
     assert all(task.end_time == time(1) for task in tasks)
-    assert all(task.block_count == Decimal("2.0") for task in tasks)
+    assert all(task.duration_minutes == 90 for task in tasks)
     assert tasks[0].period_start == date(2026, 9, 20)
     assert tasks[-1].period_start == date(2026, 10, 4)
 
@@ -87,7 +85,7 @@ def test_rule_creation_adds_the_current_window_idempotently(
     assert len(repeated_tasks) == len(expected_dates)
 
 
-def test_rule_generation_copies_nullable_schedule_values(
+def test_rule_generation_copies_an_untimed_schedule(
     client: TestClient,
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
@@ -103,8 +101,7 @@ def test_rule_generation_copies_nullable_schedule_values(
         goal_id=str(goal["id"]),
         byweekday=[3],
         start_time=None,
-        duration_minutes=None,
-        block_count=None,
+        duration_minutes=240,
     )
 
     task = db_session.scalar(
@@ -112,9 +109,8 @@ def test_rule_generation_copies_nullable_schedule_values(
     )
     assert task is not None
     assert task.start_time is None
-    assert task.duration_minutes is None
+    assert task.duration_minutes == 240
     assert task.end_time is None
-    assert task.block_count is None
 
 
 def test_rule_update_clears_open_week_but_only_regenerates_from_today(
@@ -133,7 +129,6 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
         byweekday=[1, 2, 4, 5],
         start_time="09:00",
         duration_minutes=60,
-        block_count=1,
     )
     rule_id = int(str(rule["id"]))
 
@@ -169,7 +164,6 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
         customized_task.start_time = time(11)
         customized_task.duration_minutes = 45
         customized_task.end_time = time(11, 45)
-        customized_task.block_count = Decimal("2.0")
         db_session.add_all(
             [
                 build_task(
@@ -194,7 +188,6 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
             "byweekday": [1, 4, 6],
             "start_time": "10:00",
             "duration_minutes": 30,
-            "block_count": 0.5,
         },
         headers=headers,
     )
@@ -213,7 +206,6 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
     assert tasks_by_date[date(2026, 9, 24)].start_time == time(9)
     assert tasks_by_date[date(2026, 9, 25)].start_time == time(11)
     assert tasks_by_date[date(2026, 9, 25)].duration_minutes == 45
-    assert tasks_by_date[date(2026, 9, 25)].block_count == Decimal("2.0")
     assert tasks_by_date[date(2026, 10, 2)].status == TaskStatus.DELETED.value
 
     regenerated_dates = {
@@ -225,7 +217,7 @@ def test_rule_update_clears_open_week_but_only_regenerates_from_today(
     }
     assert regenerated_dates <= tasks_by_date.keys()
     assert all(tasks_by_date[value].start_time == time(10) for value in regenerated_dates)
-    assert all(tasks_by_date[value].block_count == Decimal("0.5") for value in regenerated_dates)
+    assert all(tasks_by_date[value].duration_minutes == 30 for value in regenerated_dates)
 
 
 def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
@@ -244,7 +236,6 @@ def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
         byweekday=[1, 3, 4, 5],
         start_time="09:00",
         duration_minutes=60,
-        block_count=1,
     )
     rule_id = int(str(rule["id"]))
 
@@ -281,7 +272,6 @@ def test_rule_delete_removes_only_untouched_pending_tasks_from_the_open_week(
         customized_task.start_time = time(11)
         customized_task.duration_minutes = 30
         customized_task.end_time = time(11, 30)
-        customized_task.block_count = Decimal("2.0")
         db_session.add(
             build_task(
                 user=user,
@@ -344,7 +334,6 @@ def test_repeat_from_a_task_makes_it_the_new_rule_occurrence(
     assert rule.byweekday == [4, 6]
     assert rule.start_time == time(19)
     assert rule.duration_minutes == 45
-    assert rule.block_count == Decimal("2.0")
     rule_tasks = list(
         db_session.scalars(
             select(Task).where(Task.rule_id == rule.id).order_by(Task.occurrence_date)
@@ -376,8 +365,7 @@ def test_repeat_from_a_task_needs_a_goal_its_weekday_and_no_schedule_yet(
         goal_id=str(goal["id"]),
         byweekday=[4],
         start_time=None,
-        duration_minutes=None,
-        block_count=None,
+        duration_minutes=60,
     )
 
     with db_session.begin():
@@ -446,7 +434,6 @@ def test_stop_repeating_keeps_the_task_and_removes_its_rule(
         byweekday=[1, 3, 4, 5],
         start_time="09:00",
         duration_minutes=60,
-        block_count=1,
     )
     rule_id = int(str(rule["id"]))
 
@@ -504,7 +491,6 @@ def test_area_archive_hard_deletes_only_future_pending_tasks(
         byweekday=[1, 2, 3, 4, 5, 6, 7],
         start_time="09:00",
         duration_minutes=60,
-        block_count=1,
     )
     other_area = create_area(client, headers, name="Personal")
     other_goal = create_goal(client, headers, area_id=str(other_area["id"]))
@@ -515,7 +501,6 @@ def test_area_archive_hard_deletes_only_future_pending_tasks(
         byweekday=[1, 2, 3, 4, 5, 6, 7],
         start_time="18:00",
         duration_minutes=30,
-        block_count=1,
     )
     goal_id = int(str(goal["id"]))
     rule_id = int(str(rule["id"]))
@@ -606,7 +591,6 @@ def build_task(
         start_time=time(9),
         duration_minutes=60,
         end_time=time(10),
-        block_count=Decimal("1.0"),
         period_start=date(2026, 9, 21),
         status=status.value,
     )
@@ -623,7 +607,6 @@ def build_ad_hoc_task(*, user: User, goal: Goal | None, scheduled_date: date) ->
         start_time=time(19),
         duration_minutes=45,
         end_time=time(19, 45),
-        block_count=Decimal("2.0"),
         period_start=date(2026, 9, 21),
     )
 
@@ -696,8 +679,7 @@ def create_rule(
     goal_id: str,
     byweekday: list[int],
     start_time: str | None,
-    duration_minutes: int | None,
-    block_count: float | None,
+    duration_minutes: int,
 ) -> dict[str, object]:
     response = client.post(
         f"/api/v1/goals/{goal_id}/rules",
@@ -705,7 +687,6 @@ def create_rule(
             "byweekday": byweekday,
             "start_time": start_time,
             "duration_minutes": duration_minutes,
-            "block_count": block_count,
         },
         headers=headers,
     )

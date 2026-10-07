@@ -22,7 +22,6 @@ class JournalStepResponse(BaseModel):
     start_time: time | None
     duration_minutes: int | None
     end_time: time | None
-    block_count: float | None
     status: Literal["PENDING", "DONE"]
     completed_at: datetime | None
 
@@ -40,7 +39,6 @@ class JournalItemResponse(BaseModel):
     start_time: time | None
     duration_minutes: int | None
     end_time: time | None
-    block_count: float | None
     status: Literal["PENDING", "DONE"]
     completed_at: datetime | None
     created_at: datetime

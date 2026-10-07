@@ -321,7 +321,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Update `api-contract.md`: durations replace `block_count`, goal targets and progress in hours, `goals` on `GET /week`, `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`
 - Move Notifications to Slice 9
 
-### Block 1 — Hours model API
+### Block 1 — Hours model API — DONE
 
 - Migration: give goal tasks and rules without a duration `block_count × 60` minutes, or 60 when that is null too; round every other duration up to the next 15 minutes; drop `block_count` from `tasks` and `goal_rules`; require a duration on goal tasks and rules; check durations are 15-minute steps from 15 to 1440; widen `period_results.done` to `numeric(6,2)`. Goal targets and closed weeks keep their numbers, read as hours
 - Goal `done` becomes completed hours by `period_start` in `/progress` and the week freeze

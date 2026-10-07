@@ -68,7 +68,6 @@ class TaskService:
                 priority = None
                 start_time = None
                 duration_minutes = None
-                block_count = None
             elif goal_id is not None:
                 if payload.scheduled_date is None:
                     raise ValidationAppError(
@@ -86,6 +85,10 @@ class TaskService:
                     )
                 if "parent_id" in fields:
                     raise ValidationAppError({"parent_id": "A goal task cannot have a parent"})
+                if payload.duration_minutes is None:
+                    raise ValidationAppError(
+                        {"duration_minutes": "Duration is required for a goal task"}
+                    )
                 goal = self.goal_repository.get_for_user(goal_id=goal_id, user_id=user_id)
                 if goal is None:
                     raise NotFoundError
@@ -95,7 +98,6 @@ class TaskService:
                 priority = None
                 start_time = payload.start_time
                 duration_minutes = payload.duration_minutes
-                block_count = payload.block_count
             else:
                 if payload.title is None:
                     raise ValidationAppError({"title": "Title is required without a goal"})
@@ -105,7 +107,6 @@ class TaskService:
                 scheduled_date = due_date or payload.scheduled_date
                 start_time = payload.start_time
                 duration_minutes = payload.duration_minutes
-                block_count = payload.block_count
 
             self._validate_scheduled_date(
                 scheduled_date=scheduled_date,
@@ -132,7 +133,6 @@ class TaskService:
                 start_time=start_time,
                 duration_minutes=duration_minutes,
                 end_time=_add_minutes(start_time, duration_minutes),
-                block_count=block_count,
                 period_start=period_start,
             )
             response = TaskResponse.model_validate(task)
@@ -159,6 +159,12 @@ class TaskService:
                 )
             if task.goal_id is not None and "title" in fields:
                 raise ValidationAppError({"title": "A goal-linked task uses its goal title"})
+            if (
+                task.goal_id is not None
+                and "duration_minutes" in fields
+                and payload.duration_minutes is None
+            ):
+                raise ValidationAppError({"duration_minutes": "A goal task keeps its duration"})
 
             due_date = payload.due_date if due_date_supplied else task.due_date
             if due_date_supplied:
@@ -221,7 +227,6 @@ class TaskService:
                 start_time=start_time,
                 duration_minutes=payload.duration_minutes,
                 end_time=_add_minutes(start_time, duration_minutes),
-                block_count=payload.block_count,
                 period_start=period_start,
                 update_title="title" in fields,
                 update_scheduled_date=update_scheduled_date,
@@ -230,7 +235,6 @@ class TaskService:
                 update_start_time=update_start_time,
                 update_duration_minutes="duration_minutes" in fields,
                 update_end_time=update_end_time,
-                update_block_count="block_count" in fields,
                 update_period_start=update_period_start,
             )
             response = TaskResponse.model_validate(task)
@@ -337,7 +341,6 @@ class TaskService:
             from_date=from_date,
             start_time=rule.start_time,
             duration_minutes=rule.duration_minutes,
-            block_count=rule.block_count,
         )
 
     def delete_pending_tasks_for_area(
@@ -380,7 +383,6 @@ class TaskService:
                         "start_time": rule.start_time,
                         "duration_minutes": rule.duration_minutes,
                         "end_time": end_time,
-                        "block_count": rule.block_count,
                         "period_start": get_week_start(
                             occurrence_date,
                             week_start_day=week_start_day,

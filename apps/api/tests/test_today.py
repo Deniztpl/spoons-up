@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime, time
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -259,7 +258,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             scheduled_date=target_date,
             start_time=time(8),
             end_time=time(8, 30),
-            block_count=Decimal("0.5"),
+            duration_minutes=30,
             status=TaskStatus.DONE,
             occurrence_date=target_date,
         )
@@ -270,7 +269,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             scheduled_date=target_date,
             start_time=time(9),
             end_time=time(10),
-            block_count=Decimal("1.0"),
+            duration_minutes=60,
         )
         evening = build_today_task(
             user_id=user.id,
@@ -279,7 +278,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             scheduled_date=target_date,
             start_time=time(18),
             end_time=time(20),
-            block_count=Decimal("2.0"),
+            duration_minutes=120,
             occurrence_date=date(2026, 9, 23),
         )
         untimed = build_today_task(
@@ -289,7 +288,6 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             scheduled_date=target_date,
             start_time=None,
             end_time=None,
-            block_count=None,
         )
         db_session.add_all(
             [
@@ -304,7 +302,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
                     scheduled_date=target_date,
                     start_time=time(7),
                     end_time=time(8),
-                    block_count=Decimal("1.0"),
+                    duration_minutes=60,
                     status=TaskStatus.DELETED,
                 ),
                 build_today_task(
@@ -314,7 +312,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
                     scheduled_date=date(2026, 9, 25),
                     start_time=time(6),
                     end_time=time(7),
-                    block_count=Decimal("1.0"),
+                    duration_minutes=60,
                 ),
                 build_today_task(
                     user_id=user.id,
@@ -323,7 +321,7 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
                     scheduled_date=target_date,
                     start_time=time(6),
                     end_time=time(7),
-                    block_count=Decimal("1.0"),
+                    duration_minutes=60,
                     status=TaskStatus.DONE,
                 ),
             ]
@@ -360,9 +358,8 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "parent_id": None,
             "title": "Morning block",
             "start_time": "08:00",
-            "duration_minutes": None,
+            "duration_minutes": 30,
             "end_time": "08:30",
-            "block_count": 0.5,
             "status": "DONE",
             "scheduled_date": "2026-09-24",
             "occurrence_date": "2026-09-24",
@@ -377,9 +374,8 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "parent_id": None,
             "title": "Standalone task",
             "start_time": "09:00",
-            "duration_minutes": None,
+            "duration_minutes": 60,
             "end_time": "10:00",
-            "block_count": 1.0,
             "status": "PENDING",
             "scheduled_date": "2026-09-24",
             "occurrence_date": None,
@@ -394,9 +390,8 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "parent_id": None,
             "title": "Evening block",
             "start_time": "18:00",
-            "duration_minutes": None,
+            "duration_minutes": 120,
             "end_time": "20:00",
-            "block_count": 2.0,
             "status": "PENDING",
             "scheduled_date": "2026-09-24",
             "occurrence_date": "2026-09-23",
@@ -413,7 +408,6 @@ def test_today_returns_the_days_visible_tasks_in_start_time_order(
             "start_time": None,
             "duration_minutes": None,
             "end_time": None,
-            "block_count": None,
             "status": "PENDING",
             "scheduled_date": "2026-09-24",
             "occurrence_date": None,
@@ -491,7 +485,9 @@ def test_scheduled_journal_work_carries_its_item_and_step_progress(client: TestC
         {"parent_id": item["id"], "title": "Prepare the slides"},
     )
     create_task(client, headers, {"parent_id": item["id"], "title": "Rehearse"})
-    create_task(client, headers, {"goal_id": goal["id"], "scheduled_date": day})
+    create_task(
+        client, headers, {"goal_id": goal["id"], "scheduled_date": day, "duration_minutes": 60}
+    )
     create_task(client, headers, {"title": "Pay the invoice", "scheduled_date": day})
     checked = client.post(f"/api/v1/tasks/{done_step['id']}/check", headers=headers)
     planned = client.patch(
@@ -774,7 +770,7 @@ def build_today_task(
     scheduled_date: date | None,
     start_time: time | None = None,
     end_time: time | None = None,
-    block_count: Decimal | None = None,
+    duration_minutes: int | None = None,
     status: TaskStatus = TaskStatus.PENDING,
     occurrence_date: date | None = None,
     period_start: date = date(2026, 9, 21),
@@ -791,8 +787,9 @@ def build_today_task(
         scheduled_date=scheduled_date,
         due_date=due_date,
         start_time=start_time,
+        # Goal work always carries its hours.
+        duration_minutes=duration_minutes or (60 if goal_id is not None else None),
         end_time=end_time,
-        block_count=block_count,
         period_start=period_start if scheduled_date is not None else None,
         status=status.value,
         completed_at=(datetime(2026, 9, 24, 8, tzinfo=UTC) if status == TaskStatus.DONE else None),

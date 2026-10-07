@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime, time
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -51,9 +50,8 @@ def test_task_completion_is_idempotent_and_reversible(
         "due_date": None,
         "priority": None,
         "start_time": "09:00",
-        "duration_minutes": None,
+        "duration_minutes": 60,
         "end_time": "10:00",
-        "block_count": 2.0,
         "period_start": "2026-09-14",
         "status": "DONE",
         "completed_at": "2026-09-27T12:00:00Z",
@@ -150,7 +148,6 @@ def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
             "scheduled_date": "2026-09-27",
             "start_time": "09:30",
             "duration_minutes": 60,
-            "block_count": 1.5,
         },
         headers=headers,
     )
@@ -170,7 +167,7 @@ def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
     )
     foreign_goal = client.post(
         "/api/v1/tasks",
-        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "duration_minutes": 60},
         headers=stranger_headers,
     )
 
@@ -188,7 +185,6 @@ def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
         "start_time": None,
         "duration_minutes": None,
         "end_time": None,
-        "block_count": None,
         "period_start": "2026-09-21",
         "status": "PENDING",
         "completed_at": None,
@@ -197,7 +193,7 @@ def test_create_standalone_and_goal_linked_tasks(client: TestClient) -> None:
     assert linked.json()["title"] == "Deep work"
     assert linked.json()["goal_id"] == goal["id"]
     assert linked.json()["end_time"] == "10:30"
-    assert linked.json()["block_count"] == 1.5
+    assert linked.json()["duration_minutes"] == 60
     assert missing_title.status_code == 422
     assert missing_title.json()["fields"] == {"title": "Title is required without a goal"}
     assert linked_title.status_code == 422
@@ -257,7 +253,7 @@ def test_create_journal_items_can_be_undated_or_driven_by_due_date(
     assert past_due.json()["fields"] == {"due_date": "Scheduled date cannot be before today"}
 
 
-def test_goal_tasks_still_require_a_schedule_and_reject_journal_fields(
+def test_goal_tasks_require_a_schedule_and_a_duration_and_reject_journal_fields(
     client: TestClient,
 ) -> None:
     headers = bearer(register(client, "goal-task-fields@example.com"))
@@ -278,7 +274,40 @@ def test_goal_tasks_still_require_a_schedule_and_reject_journal_fields(
         },
         headers=headers,
     )
+    missing_duration = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        headers=headers,
+    )
+    off_step = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "duration_minutes": 50},
+        headers=headers,
+    )
+    planned = client.post(
+        "/api/v1/tasks",
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "duration_minutes": 240},
+        headers=headers,
+    )
+    duration_cleared = client.patch(
+        f"/api/v1/tasks/{planned.json()['id']}",
+        json={"duration_minutes": None},
+        headers=headers,
+    )
 
+    assert missing_duration.status_code == 422
+    assert missing_duration.json()["fields"] == {
+        "duration_minutes": "Duration is required for a goal task"
+    }
+    assert off_step.status_code == 422
+    assert "duration_minutes" in off_step.json()["fields"]
+    assert planned.status_code == 201
+    assert planned.json()["start_time"] is None
+    assert planned.json()["duration_minutes"] == 240
+    assert duration_cleared.status_code == 422
+    assert duration_cleared.json()["fields"] == {
+        "duration_minutes": "A goal task keeps its duration"
+    }
     assert missing_schedule.status_code == 422
     assert missing_schedule.json()["fields"] == {
         "scheduled_date": "Scheduled date is required for a goal task"
@@ -374,7 +403,7 @@ def test_create_step_requires_an_owned_top_level_journal_parent_and_title_only(
     goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
     goal_task = client.post(
         "/api/v1/tasks",
-        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "duration_minutes": 60},
         headers=headers,
     ).json()
     parent = client.post(
@@ -474,7 +503,7 @@ def test_update_task_changes_only_editable_task_values(client: TestClient) -> No
     ).json()
     linked = client.post(
         "/api/v1/tasks",
-        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "duration_minutes": 60},
         headers=headers,
     ).json()
 
@@ -485,13 +514,12 @@ def test_update_task_changes_only_editable_task_values(client: TestClient) -> No
             "scheduled_date": "2026-10-01",
             "start_time": "23:30",
             "duration_minutes": 90,
-            "block_count": 2,
         },
         headers=headers,
     )
     cleared = client.patch(
         f"/api/v1/tasks/{standalone['id']}",
-        json={"start_time": None, "duration_minutes": None, "block_count": None},
+        json={"start_time": None, "duration_minutes": None},
         headers=headers,
     )
     linked_title = client.patch(
@@ -504,13 +532,11 @@ def test_update_task_changes_only_editable_task_values(client: TestClient) -> No
     assert updated.json()["title"] == "Appointment"
     assert updated.json()["scheduled_date"] == "2026-10-01"
     assert updated.json()["end_time"] == "01:00"
-    assert updated.json()["block_count"] == 2
     assert updated.json()["period_start"] == "2026-09-21"
     assert cleared.status_code == 200
     assert cleared.json()["start_time"] is None
     assert cleared.json()["duration_minutes"] is None
     assert cleared.json()["end_time"] is None
-    assert cleared.json()["block_count"] is None
     assert linked_title.status_code == 422
     assert linked_title.json()["fields"] == {"title": "A goal-linked task uses its goal title"}
 
@@ -554,7 +580,7 @@ def test_due_date_controls_the_schedule_and_clearing_it_keeps_size_values(
     headers = bearer(register(client, "update-journal-due@example.com"))
     task = client.post(
         "/api/v1/tasks",
-        json={"title": "Conference", "duration_minutes": 60, "block_count": 2},
+        json={"title": "Conference", "duration_minutes": 60},
         headers=headers,
     ).json()
 
@@ -612,7 +638,6 @@ def test_due_date_controls_the_schedule_and_clearing_it_keeps_size_values(
     assert cleared.json()["start_time"] is None
     assert cleared.json()["end_time"] is None
     assert cleared.json()["duration_minutes"] == 60
-    assert cleared.json()["block_count"] == 2
 
     assert rescheduled.status_code == 200
     assert rescheduled.json()["due_date"] is None
@@ -629,7 +654,7 @@ def test_update_rejects_time_without_a_schedule_and_due_date_on_a_step_or_goal(
     goal = create_goal(client, headers, area_id=str(area["id"]), title="Deep work")
     goal_task = client.post(
         "/api/v1/tasks",
-        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27"},
+        json={"goal_id": goal["id"], "scheduled_date": "2026-09-27", "duration_minutes": 60},
         headers=headers,
     ).json()
     parent = client.post(
@@ -685,8 +710,7 @@ def test_moving_a_generated_task_keeps_its_occurrence_and_period(
             goal_id=int(str(goal["id"])),
             byweekday=[7],
             start_time=None,
-            duration_minutes=None,
-            block_count=None,
+            duration_minutes=60,
         )
         db_session.add(rule)
         db_session.flush()
@@ -739,7 +763,6 @@ def test_completing_a_journal_parent_clears_only_pending_step_plans(
             "scheduled_date": "2026-10-01",
             "start_time": "09:00",
             "duration_minutes": 60,
-            "block_count": 2,
         },
         headers=headers,
     )
@@ -749,7 +772,6 @@ def test_completing_a_journal_parent_clears_only_pending_step_plans(
             "scheduled_date": "2026-10-02",
             "start_time": "11:00",
             "duration_minutes": 30,
-            "block_count": 1,
         },
         headers=headers,
     )
@@ -786,7 +808,6 @@ def test_completing_a_journal_parent_clears_only_pending_step_plans(
         assert stored_pending.start_time is None
         assert stored_pending.end_time is None
         assert stored_pending.duration_minutes == 60
-        assert stored_pending.block_count == Decimal("2.0")
 
         assert stored_completed.status == TaskStatus.DONE.value
         assert stored_completed.scheduled_date == date(2026, 10, 2)
@@ -845,8 +866,7 @@ def test_delete_is_hard_for_ad_hoc_and_soft_for_generated_tasks(
             goal_id=int(str(goal["id"])),
             byweekday=[7],
             start_time=None,
-            duration_minutes=None,
-            block_count=None,
+            duration_minutes=60,
         )
         db_session.add(rule)
         db_session.flush()
@@ -953,8 +973,8 @@ def build_task(
         occurrence_date=occurrence_date,
         scheduled_date=date(2026, 9, 20),
         start_time=time(9),
+        duration_minutes=60,
         end_time=time(10),
-        block_count=Decimal("2.0"),
         period_start=date(2026, 9, 14),
         status=status.value,
     )

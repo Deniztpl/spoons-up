@@ -209,7 +209,6 @@ def create_goal_with_daily_rule(
             "byweekday": [1, 2, 3, 4, 5, 6, 7],
             "start_time": "09:00",
             "duration_minutes": 60,
-            "block_count": 1,
         },
         headers=headers,
     )

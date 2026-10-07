@@ -41,8 +41,8 @@ def test_freeze_writes_each_closed_week_once_and_growth_reads_it(
         start_in_closed_week(db_session, user=user)
         db_session.add_all(
             [
-                build_task(user_id=user.id, goal=goal, day=date(2026, 9, 14), blocks="1.0"),
-                build_task(user_id=user.id, goal=goal, day=date(2026, 9, 15), blocks="0.5"),
+                build_task(user_id=user.id, goal=goal, day=date(2026, 9, 14), minutes=60),
+                build_task(user_id=user.id, goal=goal, day=date(2026, 9, 15), minutes=45),
             ]
         )
 
@@ -51,7 +51,7 @@ def test_freeze_writes_each_closed_week_once_and_growth_reads_it(
     run_results_freeze(db_session, now=FIXED_NOW)
 
     assert frozen_rows(db_session) == [
-        (date(2026, 9, 14), int(area_id), "GOAL", "Deep work", 2, Decimal("1.5")),
+        (date(2026, 9, 14), int(area_id), "GOAL", "Deep work", 2, Decimal("1.75")),
         (date(2026, 9, 14), int(area_id), "HABIT", "Practice", 7, Decimal("2")),
         (date(2026, 9, 14), int(area_id), "HABIT", "Review", 1, Decimal("1")),
     ]
@@ -65,7 +65,7 @@ def test_freeze_writes_each_closed_week_once_and_growth_reads_it(
     )
     assert retargeted.status_code == 200
     with db_session.begin():
-        db_session.add(build_task(user_id=user.id, goal=goal, day=date(2026, 9, 16), blocks="1.0"))
+        db_session.add(build_task(user_id=user.id, goal=goal, day=date(2026, 9, 16), minutes=60))
     run_results_freeze(db_session, now=FIXED_NOW)
 
     response = client.get("/api/v1/growth?weeks=2", headers=headers)
@@ -75,16 +75,16 @@ def test_freeze_writes_each_closed_week_once_and_growth_reads_it(
     closed_week, earlier_week = response.json()["weeks"]
     assert closed_week["period_start"] == "2026-09-14"
     assert closed_week["period_end"] == "2026-09-20"
-    # (1.5/2 + 2/7 + 1/1) / 3 = 67.9%, judged against the target the week closed with
-    assert closed_week["percent"] == 68
+    # (1.75/2 + 2/7 + 1/1) / 3 = 72.0%, judged against the target the week closed with
+    assert closed_week["percent"] == 72
     [coding] = closed_week["areas"]
     assert coding["name"] == "Coding"
-    assert coding["percent"] == 68
+    assert coding["percent"] == 72
     assert [
         (item["ref_type"], item["title"], item["target"], item["done"])
         for item in coding["requirements"]
     ] == [
-        ("GOAL", "Deep work", 2, 1.5),
+        ("GOAL", "Deep work", 2, 1.75),
         ("HABIT", "Practice", 7, 2),
         ("HABIT", "Review", 1, 1),
     ]
@@ -148,7 +148,7 @@ def test_a_week_reads_the_same_on_progress_while_open_and_on_growth_once_closed(
     with db_session.begin():
         user = get_user(db_session, "growth-same@example.com")
         start_in_closed_week(db_session, user=user)
-        db_session.add(build_task(user_id=user.id, goal=goal, day=date(2026, 9, 22), blocks="1.5"))
+        db_session.add(build_task(user_id=user.id, goal=goal, day=date(2026, 9, 22), minutes=90))
 
     open_week = client.get("/api/v1/progress", headers=headers).json()
 
@@ -396,7 +396,7 @@ def build_task(
     user_id: int,
     goal: dict[str, object],
     day: date,
-    blocks: str,
+    minutes: int,
 ) -> Task:
     return Task(
         user_id=user_id,
@@ -406,9 +406,8 @@ def build_task(
         occurrence_date=None,
         scheduled_date=day,
         start_time=None,
-        duration_minutes=None,
+        duration_minutes=minutes,
         end_time=None,
-        block_count=Decimal(blocks),
         period_start=get_week_start(day, week_start_day=1),
         status=TaskStatus.DONE.value,
         completed_at=datetime.combine(day, datetime.min.time(), tzinfo=UTC),

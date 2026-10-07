@@ -56,15 +56,13 @@ def create_rule(
     headers: dict[str, str],
     *,
     goal_id: str,
-    block_count: float | None = None,
+    duration_minutes: int = 60,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "byweekday": [5, 1, 3],
         "start_time": "19:00",
-        "duration_minutes": 60,
+        "duration_minutes": duration_minutes,
     }
-    if block_count is not None:
-        payload["block_count"] = block_count
     response = client.post(
         f"/api/v1/goals/{goal_id}/rules",
         json=payload,
@@ -153,11 +151,19 @@ def test_renaming_a_goal_renames_its_tasks(client: TestClient) -> None:
     other = create_goal(client, headers, area_id=area_id, title="Reading", weekly_target=None)
     everyday = client.post(
         f"/api/v1/goals/{goal['id']}/rules",
-        json={"byweekday": [1, 2, 3, 4, 5, 6, 7]},
+        json={"byweekday": [1, 2, 3, 4, 5, 6, 7], "duration_minutes": 60},
         headers=headers,
     )
-    placed = create_task(client, headers, {"goal_id": goal["id"], "scheduled_date": "2030-01-07"})
-    create_task(client, headers, {"goal_id": other["id"], "scheduled_date": "2030-01-07"})
+    placed = create_task(
+        client,
+        headers,
+        {"goal_id": goal["id"], "scheduled_date": "2030-01-07", "duration_minutes": 60},
+    )
+    create_task(
+        client,
+        headers,
+        {"goal_id": other["id"], "scheduled_date": "2030-01-07", "duration_minutes": 60},
+    )
     create_task(client, headers, {"title": "Dentist", "scheduled_date": "2030-01-07"})
     completed = client.post(f"/api/v1/tasks/{placed['id']}/check", headers=headers)
 
@@ -192,13 +198,14 @@ def test_goal_rule_crud_and_nested_response(client: TestClient) -> None:
     )
 
     default_rule = create_rule(client, headers, goal_id=str(goal["id"]))
-    second_rule = create_rule(client, headers, goal_id=str(goal["id"]), block_count=2)
+    second_rule = create_rule(client, headers, goal_id=str(goal["id"]), duration_minutes=240)
 
     assert default_rule["goal_id"] == goal["id"]
     assert default_rule["byweekday"] == [1, 3, 5]
     assert default_rule["start_time"] == "19:00"
     assert default_rule["duration_minutes"] == 60
-    assert default_rule["block_count"] is None
+    assert "block_count" not in default_rule
+    assert second_rule["duration_minutes"] == 240
 
     updated = client.patch(
         f"/api/v1/rules/{default_rule['id']}",
@@ -206,8 +213,12 @@ def test_goal_rule_crud_and_nested_response(client: TestClient) -> None:
             "byweekday": [4, 1],
             "start_time": "20:30",
             "duration_minutes": 90,
-            "block_count": 0.5,
         },
+        headers=headers,
+    )
+    untimed = client.patch(
+        f"/api/v1/rules/{default_rule['id']}",
+        json={"start_time": None},
         headers=headers,
     )
     goal_with_rules = client.get(f"/api/v1/goals/{goal['id']}", headers=headers)
@@ -216,7 +227,8 @@ def test_goal_rule_crud_and_nested_response(client: TestClient) -> None:
     assert updated.json()["byweekday"] == [1, 4]
     assert updated.json()["start_time"] == "20:30"
     assert updated.json()["duration_minutes"] == 90
-    assert updated.json()["block_count"] == 0.5
+    assert untimed.json()["start_time"] is None
+    assert untimed.json()["duration_minutes"] == 90
     assert [rule["id"] for rule in goal_with_rules.json()["rules"]] == [
         default_rule["id"],
         second_rule["id"],
@@ -278,12 +290,7 @@ def test_goal_and_rule_payloads_are_validated(client: TestClient) -> None:
         ),
         client.post(
             f"/api/v1/goals/{goal['id']}/rules",
-            json={
-                "byweekday": [1],
-                "start_time": "19:00",
-                "duration_minutes": 60,
-                "block_count": 0.25,
-            },
+            json={"byweekday": [1], "start_time": "19:00", "duration_minutes": 50},
             headers=headers,
         ),
         client.post(
@@ -297,12 +304,17 @@ def test_goal_and_rule_payloads_are_validated(client: TestClient) -> None:
         ),
         client.post(
             f"/api/v1/goals/{goal['id']}/rules",
-            json={
-                "byweekday": [1],
-                "start_time": "19:00",
-                "duration_minutes": 60,
-                "block_count": 100,
-            },
+            json={"byweekday": [1], "start_time": "19:00", "duration_minutes": 1455},
+            headers=headers,
+        ),
+        client.post(
+            f"/api/v1/goals/{goal['id']}/rules",
+            json={"byweekday": [1], "start_time": "19:00"},
+            headers=headers,
+        ),
+        client.patch(
+            f"/api/v1/rules/{create_rule(client, headers, goal_id=str(goal['id']))['id']}",
+            json={"duration_minutes": None},
             headers=headers,
         ),
     ]

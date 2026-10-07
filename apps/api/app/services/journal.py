@@ -66,7 +66,6 @@ class JournalService:
             start_time=task.start_time,
             duration_minutes=task.duration_minutes,
             end_time=task.end_time,
-            block_count=float(task.block_count) if task.block_count is not None else None,
             status=task.status,
             completed_at=task.completed_at,
             created_at=task.created_at,

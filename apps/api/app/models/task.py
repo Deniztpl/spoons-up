@@ -1,5 +1,4 @@
 from datetime import date, datetime, time
-from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import (
@@ -11,7 +10,6 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
-    Numeric,
     Text,
     Time,
     func,
@@ -42,10 +40,9 @@ class Task(Base):
             name="status_values",
         ),
         CheckConstraint(
-            "block_count > 0 AND block_count * 2 = trunc(block_count * 2)",
-            name="block_count_increment",
+            "duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0",
+            name="duration_minutes_steps",
         ),
-        CheckConstraint("duration_minutes >= 1", name="duration_minutes_positive"),
         CheckConstraint(
             "goal_id IS NULL OR scheduled_date IS NOT NULL",
             name="goal_requires_schedule",
@@ -73,6 +70,10 @@ class Task(Base):
         CheckConstraint(
             "priority IS NULL OR (goal_id IS NULL AND parent_id IS NULL)",
             name="priority_top_level_journal",
+        ),
+        CheckConstraint(
+            "goal_id IS NULL OR duration_minutes IS NOT NULL",
+            name="goal_requires_duration",
         ),
         Index("ix_tasks_user_id_scheduled_date", "user_id", "scheduled_date"),
         Index(
@@ -115,7 +116,6 @@ class Task(Base):
     start_time: Mapped[time | None] = mapped_column(Time)
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
     end_time: Mapped[time | None] = mapped_column(Time)
-    block_count: Mapped[Decimal | None] = mapped_column(Numeric(precision=3, scale=1))
     period_start: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(
         Text,

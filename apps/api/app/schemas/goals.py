@@ -33,9 +33,9 @@ Weekdays = Annotated[
     Field(min_length=1, max_length=7),
     AfterValidator(_normalize_weekdays),
 ]
-DurationMinutes = Annotated[int, Field(ge=1)]
+# Hours are the unit of work, entered in 15-minute steps up to a day.
+DurationMinutes = Annotated[int, Field(ge=15, le=1440, multiple_of=15)]
 LocalTime = Annotated[time, AfterValidator(_reject_timezone)]
-BlockCount = Annotated[float, Field(gt=0, le=99.5, multiple_of=0.5)]
 
 
 class CreateGoalRequest(BaseModel):
@@ -60,17 +60,15 @@ class UpdateGoalRequest(BaseModel):
 class CreateGoalRuleRequest(BaseModel):
     byweekday: Weekdays
     start_time: LocalTime | None = None
-    duration_minutes: DurationMinutes | None = None
-    block_count: BlockCount | None = None
+    duration_minutes: DurationMinutes
 
 
 class UpdateGoalRuleRequest(BaseModel):
     byweekday: Weekdays | None = None
     start_time: LocalTime | None = None
     duration_minutes: DurationMinutes | None = None
-    block_count: BlockCount | None = None
 
-    @field_validator("byweekday")
+    @field_validator("byweekday", "duration_minutes")
     @classmethod
     def reject_explicit_null(cls, value: object) -> object:
         if value is None:
@@ -88,8 +86,7 @@ class GoalRuleResponse(BaseModel):
     goal_id: str
     byweekday: list[int]
     start_time: time | None
-    duration_minutes: int | None
-    block_count: float | None
+    duration_minutes: int
 
     @field_serializer("start_time")
     def serialize_start_time(self, value: time | None) -> str | None:

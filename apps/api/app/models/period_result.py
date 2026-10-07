@@ -48,4 +48,4 @@ class PeriodResult(Base):
     ref_id: Mapped[int] = mapped_column(BigInteger)
     title: Mapped[str] = mapped_column(Text)
     target: Mapped[int] = mapped_column(Integer)
-    done: Mapped[Decimal] = mapped_column(Numeric(precision=5, scale=1))
+    done: Mapped[Decimal] = mapped_column(Numeric(precision=6, scale=2))

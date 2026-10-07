@@ -70,7 +70,7 @@ class ResultsService:
             timezone = ZoneInfo(user.timezone)
             today = datetime.now(timezone).date()
             days = _week_days(get_week_start(today, week_start_day=user.week_start_day))
-            done_blocks = self.task_repository.sum_done_blocks_by_goal(
+            done_hours = self.task_repository.sum_done_hours_by_goal(
                 user_id=user_id,
                 period_start=days[0],
             )
@@ -94,7 +94,7 @@ class ResultsService:
                     habits=habits,
                     days=days,
                     timezone=timezone,
-                    done_blocks=done_blocks,
+                    done_hours=done_hours,
                     checked_days=checked_days,
                     checked_weeks=checked_weeks,
                 )
@@ -220,7 +220,7 @@ class ResultsService:
         habits_by_area = _group_by_area(self.habit_repository.list_all_for_user(user_id=user.id))
         values: list[dict[str, object]] = []
         while week_start <= last_closed:
-            done_blocks = self.task_repository.sum_done_blocks_by_goal(
+            done_hours = self.task_repository.sum_done_hours_by_goal(
                 user_id=user.id,
                 period_start=week_start,
             )
@@ -232,7 +232,7 @@ class ResultsService:
                     habits=habits_by_area[area.id],
                     days=_week_days(week_start),
                     timezone=timezone,
-                    done_blocks=done_blocks,
+                    done_hours=done_hours,
                     checked_days=checked_days,
                     checked_weeks=checked_weeks,
                 ):
@@ -287,7 +287,7 @@ def _requirements(
     habits: list[Habit],
     days: list[date],
     timezone: ZoneInfo,
-    done_blocks: dict[int, Decimal],
+    done_hours: dict[int, Decimal],
     checked_days: defaultdict[int, set[date]],
     checked_weeks: set[int],
 ) -> list[_Requirement]:
@@ -303,7 +303,7 @@ def _requirements(
                 ref_id=goal.id,
                 title=goal.title,
                 target=goal.weekly_target,
-                done=done_blocks.get(goal.id, Decimal(0)),
+                done=done_hours.get(goal.id, Decimal(0)),
             )
         )
 
