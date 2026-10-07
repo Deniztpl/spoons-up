@@ -136,8 +136,11 @@ apps/web/src/
   that rule's untouched pending tasks.
 - Task API calls belong to `features/tasks`, for the today screen now and the
   calendar later. `useTaskForm` owns task create, edit and delete flows; the
-  today screen's view state, check-off flow, task blocks and their progress
+  today screen's view state, check-off flow, task cards and their progress
   rail belong to `features/today`.
+- Week's pointer editing, selection, copy and paste, keyboard shortcuts, the
+  Only this / All repeating question and the hours panel belong to
+  `features/week`. They use no drag-and-drop or state library.
 - `ModalDialog` in `components/ui/` is the shared modal shell: backdrop, focus
   trap, Escape and focus return. Form content stays in its feature.
 - The Journal read, its list, the item detail and their hooks belong to

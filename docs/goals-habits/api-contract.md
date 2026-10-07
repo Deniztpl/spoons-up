@@ -37,6 +37,10 @@ Two different things, don't mix them:
 - Instants (`created_at`, `completed_at`, `scheduled_at`) — UTC, ISO-8601 with `Z`: `"2026-09-19T07:30:00Z"`
 - Local dates and times (`scheduled_date`, `due_date`, `occurrence_date`, `period_start`, `start_time`, `end_time`) — no timezone, they mean what the user's calendar says: `"2026-09-19"`, `"19:00"`
 
+**Durations**
+
+Hours are the one measure of work. `duration_minutes` on tasks and rules is a whole number of minutes in 15-minute steps from 15 to 1440; any other value is a 422 `validation_error`. Goal targets are whole hours, and hours returned by progress and week reads are numbers in quarter hours, such as `12.25`.
+
 **Common errors**
 
 | Status | When |
@@ -369,16 +373,16 @@ A goal object, with its rules embedded:
 {
   "id": "7",
   "area_id": "3",
-  "title": "CS Block",
-  "weekly_target": 3,
+  "title": "Music",
+  "weekly_target": 20,
   "created_at": "2026-09-01T09:00:00Z",
   "rules": [
-    { "id": "21", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
+    { "id": "21", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 240 }
   ]
 }
 ```
 
-`weekly_target` is measured in whole blocks. It is null for goals the user schedules ad hoc — those have no quota, so they never fail a week. Completed blocks can include halves (see `block_count`), so a week's `done` can be 2.5 against a target of 3.
+`weekly_target` is measured in whole hours. It is null for goals the user schedules ad hoc — those have no quota, so they never fail a week. A week's `done` is the hours of the goal's completed tasks, in quarter hours, so it can be 12.25 against a target of 20.
 
 `byweekday` is 1 (Monday) to 7 (Sunday), independent of the user's `week_start_day`.
 
@@ -401,7 +405,7 @@ Rules are included on each goal. An empty list means the goal has no repeating s
 #### POST /goals
 
 ```json
-{ "area_id": "3", "title": "CS Block", "weekly_target": 3 }
+{ "area_id": "3", "title": "Music", "weekly_target": 20 }
 ```
 
 **201** — the created goal, `rules` empty. Rules are added separately; a goal without rules generates nothing.
@@ -418,7 +422,7 @@ Rules are included on each goal. An empty list means the goal has no repeating s
 #### PATCH /goals/{id}
 
 ```json
-{ "title": "CS Block", "weekly_target": 2, "area_id": "4" }
+{ "title": "Music", "weekly_target": 16, "area_id": "4" }
 ```
 
 All fields optional. Send `weekly_target: null` to drop the quota.
@@ -431,7 +435,7 @@ A new `title` also renames every task of the goal, done ones included, since a g
 
 #### DELETE /goals/{id}
 
-**204** — the goal, its rules, all its tasks and their reminders. Its `period_results` rows stay, so past weeks keep reading correctly. Old calendars lose the goal's blocks.
+**204** — the goal, its rules, all its tasks and their reminders. Its `period_results` rows stay, so past weeks keep reading correctly. Old calendars lose the goal's tasks.
 
 Goals do not archive. Dropping one is a delete.
 
@@ -439,44 +443,44 @@ Goals do not archive. Dropping one is a delete.
 
 ### Goal rules
 
-A rule is a pre-fill for generation, not a contract. `byweekday` is required; `start_time`, `duration_minutes` and `block_count` are nullable templates. Editing a rule can replace untouched `PENDING` tasks, but never rewrites tasks the user completed or moved.
+A rule is a pre-fill for generation, not a contract. `byweekday` and `duration_minutes` are required; `start_time` is a nullable template. Editing a rule can replace untouched `PENDING` tasks, but never rewrites tasks the user completed, moved or retimed.
 
 #### POST /goals/{id}/rules
 
 ```json
-{ "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
+{ "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 240 }
 ```
 
 **201**
 
 ```json
-{ "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 60, "block_count": 2 }
+{ "id": "21", "goal_id": "7", "byweekday": [1, 3, 5], "start_time": "19:00", "duration_minutes": 240 }
 ```
 
-The rule adds its tasks from today through the current window in the same request, copying its nullable time, duration and block values. A reminder is written only for a timed task. A non-null `block_count` is independent of `duration_minutes` and must be a positive multiple of 0.5.
+The rule adds its tasks from today through the current window in the same request, copying its time and duration. A reminder is written only for a timed task. Without a `start_time` the tasks are untimed: on their day, with their hours, at no set time.
 
-A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. `block_count: 2` still generates one task per occurrence; two different times on the same day still use two rules.
+A goal can hold several rules at once — `{Mon, Wed, Fri} 19:00` alongside `{Mon, Tue} 07:00`. A four-hour rule still generates one task per occurrence; two different times on the same day still use two rules.
 
 In the shared Today/Week task form, Repeat requires a goal. With Repeat off the client calls `POST /tasks`; with it on the client calls this endpoint instead and includes the form date's weekday, so the rule supplies the occurrence rather than creating a duplicate ad-hoc task. The task form shows only weekdays in its schedule section; full schedule values remain editable from the goal. When editing an existing task, the form turns Repeat on and off through `POST` and `DELETE /tasks/{id}/repeat`.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal |
-| 422 `validation_error` | empty or out-of-range `byweekday`, a non-null `duration_minutes` below 1, or a non-null `block_count` that is not a positive multiple of 0.5 |
+| 422 `validation_error` | empty or out-of-range `byweekday`, or a missing or invalid `duration_minutes` (see **Durations**) |
 
 #### PATCH /rules/{id}
 
 ```json
-{ "byweekday": [1, 4], "start_time": "20:00", "duration_minutes": 90, "block_count": 2 }
+{ "byweekday": [1, 4], "start_time": "20:00", "duration_minutes": 90 }
 ```
 
-All fields optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it; `byweekday` cannot be null or empty.
+All fields optional. Send null for `start_time` to clear it; `byweekday` and `duration_minutes` cannot be null, and `byweekday` cannot be empty.
 
-**200** — the updated rule. Its untouched `PENDING` tasks are removed from the open week forward, including days before today. New tasks are added from today forward only and carry the updated `block_count`, so a newly selected weekday earlier in the open week stays empty. `DONE` tasks and tasks the user moved are kept unchanged; closed weeks are untouched.
+**200** — the updated rule. Its untouched `PENDING` tasks — still on their occurrence date with the rule's previous time and duration — are removed from the open week forward, including days before today. New tasks are added from today forward only and carry the updated values, so a newly selected weekday earlier in the open week stays empty. `DONE` tasks and tasks the user moved or retimed are kept unchanged; closed weeks are untouched.
 
 #### DELETE /rules/{id}
 
-**204** — the rule, and its untouched pending tasks from the open week forward. Tasks already done, tasks the user moved, and everything in closed weeks stay and keep counting toward their weeks.
+**204** — the rule, and its untouched pending tasks from the open week forward. Tasks already done, tasks the user moved or retimed, and everything in closed weeks stay and keep counting toward their weeks.
 
 ---
 
@@ -490,15 +494,14 @@ A task object:
   "goal_id": "7",
   "rule_id": "21",
   "parent_id": null,
-  "title": "CS Block",
+  "title": "Music",
   "occurrence_date": "2026-09-16",
   "scheduled_date": "2026-09-17",
   "due_date": null,
   "priority": null,
   "start_time": "19:00",
-  "duration_minutes": 60,
-  "end_time": "20:00",
-  "block_count": 2,
+  "duration_minutes": 240,
+  "end_time": "23:00",
   "period_start": "2026-09-14",
   "status": "PENDING",
   "completed_at": null
@@ -507,13 +510,13 @@ A task object:
 
 The task's identity and calendar fields mean different things:
 
-- `occurrence_date` — the date the rule produced. Never changes while the task belongs to its rule. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it.
+- `occurrence_date` — the date the rule produced. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it, and only `PATCH /tasks/{id}/repeat` moves it, by the same number of days as the rule's weekdays.
 - `scheduled_date` — where the task sits now. This is what Today and Week draw. It may be null only on Journal work.
 - `due_date` — the optional deadline or event date of a top-level Journal item. Steps and goal tasks never have one.
 - `priority` — the optional `HIGH`, `MEDIUM` or `LOW` of a top-level Journal item. Steps and goal tasks never have one.
 - `period_start` — the week identity fixed when the task is first scheduled. It is null exactly while `scheduled_date` is null. Moving a scheduled task does not change it; scheduling it again after it was cleared derives a new value.
 - `parent_id` — the top-level Journal item that owns this step. Null on goal tasks and top-level Journal items. Nesting stops at one level.
-- `start_time`, `duration_minutes` and `block_count` — independent and nullable. `end_time` is present only when both time and duration exist. A null block value contributes zero when completed; otherwise it must be a positive multiple of 0.5.
+- `start_time` and `duration_minutes` — independent. `start_time` is nullable. `duration_minutes` is the task's size (see **Durations**): required on goal tasks, where a completed task adds it to its goal's week, and nullable on Journal work. `end_time` is present only when both time and duration exist.
 
 There is no `GET /tasks`. Scheduled tasks are read through `/today` and `/week`; the Journal aggregate is read through `/journal`.
 
@@ -527,14 +530,13 @@ Ad-hoc goal work, a top-level Journal item, or a Journal step created by the use
   "scheduled_date": "2026-09-22",
   "start_time": "14:00",
   "duration_minutes": 45,
-  "block_count": null,
   "goal_id": null
 }
 ```
 
-`goal_id` is optional. When present, `title` must be omitted; the server verifies the goal through its active area and copies its title. Without a goal, `title` is required and the task is standalone. `start_time`, `duration_minutes` and `block_count` are independently optional.
+`goal_id` is optional. When present, `title` must be omitted; the server verifies the goal through its active area and copies its title. Without a goal, `title` is required and the task is standalone. `start_time` is optional.
 
-For a goal task, `scheduled_date` is required and `due_date` and `parent_id` must be omitted.
+For a goal task, `scheduled_date` and `duration_minutes` are required and `due_date` and `parent_id` must be omitted. For Journal work `duration_minutes` is optional.
 
 For a top-level Journal item, `goal_id` and `parent_id` are null and `scheduled_date` is optional. `due_date` and `priority` are accepted only here. When it is supplied, the server sets `scheduled_date` to the same date regardless of whether the client also supplied a schedule. Journal creates from Today and Week instead supply `scheduled_date` with no `due_date`.
 
@@ -544,7 +546,7 @@ A step create supplies only `parent_id` and `title`:
 { "parent_id": "490", "title": "Prepare the slides" }
 ```
 
-The parent must belong to the user and be a goal-less top-level task. A step cannot have a goal, parent of its own, due date, schedule, time, duration or blocks at creation. Those plan fields, except `due_date`, may be added later with `PATCH /tasks/{id}`.
+The parent must belong to the user and be a goal-less top-level task. A step cannot have a goal, parent of its own, due date, schedule, time or duration at creation. Those plan fields, except `due_date`, may be added later with `PATCH /tasks/{id}`.
 
 A non-null `scheduled_date`, including one derived from `due_date`, cannot be earlier than today in the user's timezone. There is no upper bound. `start_time` requires a scheduled date.
 
@@ -553,7 +555,7 @@ A non-null `scheduled_date`, including one derived from `due_date`, cannot be ea
 | Error | When |
 |---|---|
 | 404 `not_found` | no such goal or parent, including one owned by another user |
-| 422 `validation_error` | an invalid goal/Journal/step field combination; a non-null schedule before today; a time without a schedule; missing Journal title; a title supplied for a goal task; nested steps; a non-null `duration_minutes` below 1; or a non-null `block_count` that is not a positive multiple of 0.5 |
+| 422 `validation_error` | an invalid goal/Journal/step field combination; a non-null schedule before today; a time without a schedule; missing Journal title; a title supplied for a goal task; a goal task without `duration_minutes`; nested steps; or an invalid `duration_minutes` |
 
 #### PATCH /tasks/{id}
 
@@ -563,18 +565,17 @@ A non-null `scheduled_date`, including one derived from `due_date`, cannot be ea
   "scheduled_date": "2026-09-24",
   "due_date": "2026-10-18",
   "start_time": "20:00",
-  "duration_minutes": 30,
-  "block_count": 2
+  "duration_minutes": 30
 }
 ```
 
-All fields are optional. Send null for `start_time`, `duration_minutes` or `block_count` to clear it. `title` is editable only on Journal work. `goal_id`, `parent_id`, `rule_id` and `occurrence_date` are never editable here.
+All fields are optional. Send null for `start_time` or `duration_minutes` to clear it; a goal task's duration cannot be cleared. `title` is editable only on Journal work. `goal_id`, `parent_id`, `rule_id` and `occurrence_date` are never editable here.
 
 `priority` is editable only on a top-level Journal item; send null to remove it.
 
-`due_date` is editable only on a top-level Journal item and may be null. Supplying a date also sets `scheduled_date` to it. Supplying `due_date: null` clears `scheduled_date`, `period_start`, `start_time` and `end_time` so the item leaves Today and Week; duration and blocks remain as optional size information. If `due_date` is absent, planning and moving through `scheduled_date` never changes the saved due date.
+`due_date` is editable only on a top-level Journal item and may be null. Supplying a date also sets `scheduled_date` to it. Supplying `due_date: null` clears `scheduled_date`, `period_start`, `start_time` and `end_time` so the item leaves Today and Week; its duration remains as optional size information. If `due_date` is absent, planning and moving through `scheduled_date` never changes the saved due date.
 
-Supplying a date for a previously unscheduled Journal item or step derives `period_start`. Further moves keep that identity fixed. A goal task always remains scheduled. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited.
+Supplying a date for a previously unscheduled Journal item or step derives `period_start`. Further moves keep that identity fixed. A goal task always remains scheduled. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited, or uses `PATCH /tasks/{id}/repeat` for Week's All repeating.
 
 When supplied, `scheduled_date` cannot be earlier than today in the user's timezone. There is no upper bound.
 
@@ -584,15 +585,26 @@ Changing a timed task updates its reminder. Clearing its time cancels the remind
 
 | Error | When |
 |---|---|
-| 422 `validation_error` | a supplied or due-derived schedule is before today; a time would remain without a schedule; `due_date` or `priority` is used on a goal task or step; `priority` is not `HIGH`, `MEDIUM` or `LOW`; a goal task would become unscheduled; a non-null `duration_minutes` is below 1; or a non-null `block_count` is not a positive multiple of 0.5 |
+| 422 `validation_error` | a supplied or due-derived schedule is before today; a time would remain without a schedule; `due_date` or `priority` is used on a goal task or step; `priority` is not `HIGH`, `MEDIUM` or `LOW`; a goal task would become unscheduled or lose its duration; or an invalid `duration_minutes` |
 
 #### DELETE /tasks/{id}
 
+| Query | Default |
+|---|---|
+| `scope` | `task` |
+
 **204**
 
-Rule-generated (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc goal tasks and Journal tasks (`occurrence_date` null) are hard-deleted, since nothing would recreate them. Deleting a top-level Journal item cascades to every step.
+With `scope=task`, a rule-generated task (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc goal tasks and Journal tasks (`occurrence_date` null) are hard-deleted, since nothing would recreate them. Deleting a top-level Journal item cascades to every step.
 
-Either way its reminder, if any, is cancelled.
+`scope=repeat` is Week's All repeating. The task's rule is deleted as `DELETE /rules/{id}` does — its untouched pending tasks from the open week forward go, while done tasks, tasks the user moved or retimed and closed weeks stay — and the task itself is hard-deleted, since no rule is left to recreate it. One transaction.
+
+Either way the reminders of deleted tasks are cancelled.
+
+| Error | When |
+|---|---|
+| 404 `not_found` | no such task, or it sits under an archived area |
+| 422 `validation_error` | `scope` is not `task` or `repeat`, or `scope=repeat` on a task that does not repeat (`rule_id`) |
 
 #### POST /tasks/{id}/check
 
@@ -602,7 +614,7 @@ No body.
 
 Completing a task already done is a no-op and returns the task unchanged.
 
-When the task is a top-level Journal item with pending steps, the client confirms first. In the same completion transaction the server leaves those steps `PENDING` but clears their `scheduled_date`, `period_start`, `start_time` and `end_time`, so they leave Today, Week and Left behind. Completed steps and every step's duration and block value are untouched. Completing all steps never completes their parent automatically.
+When the task is a top-level Journal item with pending steps, the client confirms first. In the same completion transaction the server leaves those steps `PENDING` but clears their `scheduled_date`, `period_start`, `start_time` and `end_time`, so they leave Today, Week and Left behind. Completed steps and every step's duration are untouched. Completing all steps never completes their parent automatically.
 
 #### DELETE /tasks/{id}/check
 
@@ -616,12 +628,36 @@ Repeat on, from the edit form of a goal task that has no schedule.
 { "byweekday": [4, 6] }
 ```
 
-**200** — the task, now with `rule_id` set and `occurrence_date` equal to its current `scheduled_date`. A new rule on the task's goal copies the task's `start_time`, `duration_minutes` and `block_count`, then adds its tasks from today through the current window like `POST /goals/{id}/rules`. The task stands in for the rule's occurrence on its own date, so no duplicate is generated there.
+**200** — the task, now with `rule_id` set and `occurrence_date` equal to its current `scheduled_date`. A new rule on the task's goal copies the task's `start_time` and `duration_minutes`, then adds its tasks from today through the current window like `POST /goals/{id}/rules`. The task stands in for the rule's occurrence on its own date, so no duplicate is generated there.
 
 | Error | When |
 |---|---|
 | 404 `not_found` | no such task, or it sits under an archived area |
 | 422 `validation_error` | the task is standalone (`goal_id`), already repeats (`rule_id`), or `byweekday` is empty, out of range or misses the task's own weekday |
+
+#### PATCH /tasks/{id}/repeat
+
+All repeating, after a task that belongs to a rule is moved or resized on Week.
+
+```json
+{ "scheduled_date": "2026-10-09", "start_time": "10:00", "duration_minutes": 240 }
+```
+
+All three fields are required; `start_time` is null for the untimed row. `scheduled_date` is where the task was dropped and cannot be before today.
+
+**200** — the task at its new place. In one transaction:
+
+1. The gap is the number of days from the task's current `scheduled_date` to the new one. The rule takes the new `start_time` and `duration_minutes`, and every weekday in its `byweekday` moves by the gap, wrapping round the week: with a gap of 2, `[1, 3, 5]` becomes `[3, 5, 7]` and `[7]` becomes `[2]`.
+2. The rule's untouched pending tasks are removed from the open week forward, as `PATCH /rules/{id}` does, apart from this task.
+3. The task takes the new date, time and duration. Its `occurrence_date` moves by the gap, so it keeps standing in for the rule's occurrence and generation does not add a second one; if another task of the rule already holds that date, its `occurrence_date` stays. `period_start` does not change, as with any move, and its reminder follows the new time.
+4. Tasks are added from today through the current window, as a rule write does.
+
+Done tasks, tasks the user moved or retimed and closed weeks keep what they had.
+
+| Error | When |
+|---|---|
+| 404 `not_found` | no such task, or it sits under an archived area |
+| 422 `validation_error` | the task does not repeat (`rule_id`), a field is missing, `scheduled_date` is before today, or an invalid `duration_minutes` |
 
 #### DELETE /tasks/{id}/repeat
 
@@ -661,7 +697,6 @@ The Journal page: every non-deleted, goal-less, top-level task, split into `acti
       "start_time": "10:00",
       "duration_minutes": null,
       "end_time": null,
-      "block_count": null,
       "status": "PENDING",
       "completed_at": null,
       "created_at": "2026-09-20T09:15:00Z",
@@ -675,7 +710,6 @@ The Journal page: every non-deleted, goal-less, top-level task, split into `acti
           "start_time": "14:00",
           "duration_minutes": 60,
           "end_time": "15:00",
-          "block_count": 1,
           "status": "DONE",
           "completed_at": "2026-09-29T12:00:00Z"
         }
@@ -719,11 +753,10 @@ The Today screen: a daily view with habits and the day's tasks, a weekly view wi
       "goal_id": "7",
       "rule_id": "21",
       "parent_id": null,
-      "title": "CS Block",
+      "title": "Music",
       "start_time": "19:00",
-      "duration_minutes": 60,
-      "end_time": "20:00",
-      "block_count": 2,
+      "duration_minutes": 240,
+      "end_time": "23:00",
       "status": "PENDING",
       "scheduled_date": "2026-09-19",
       "occurrence_date": "2026-09-16",
@@ -797,17 +830,30 @@ Any date inside the current or following week works — the server resolves it t
   "later_tasks": {
     "count": 2,
     "items": [ ... ]
-  }
+  },
+  "goals": [
+    { "goal_id": "7", "area_id": "3", "title": "Music", "target": 20, "planned": 16, "done": 8 }
+  ]
 }
 ```
 
 `days` always holds seven entries in order, so the client draws columns without knowing `week_start_day`. Task objects are the same shape as in `/today`.
 
+`goals` feeds the hours panel for the shown week: one entry per goal with a `weekly_target` in an active area, ordered by area and then goal creation, as on the Areas screen. All three values are hours (see **Durations**):
+
+- `target` — the goal's `weekly_target`.
+- `done` — the hours of its `DONE` tasks whose `period_start` is the shown week, as in `/progress`.
+- `planned` — `done` plus the hours of its `PENDING` tasks whose `period_start` is the shown week and whose `scheduled_date` is today or later. Pending work left on an elapsed day is not planned, so its hours are free to plan again.
+
+Both `planned` and `done` can pass `target`. Because they follow `period_start`, a task moved into the following week still counts for the week it came from.
+
 `later_tasks` makes tasks after the following week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They are full task objects, the same shape as in `days`, so the client can open one in the task form to edit or delete it.
 
 The list includes non-deleted ad-hoc tasks (`occurrence_date` is null) and rule-generated tasks the user moved there (`scheduled_date != occurrence_date`). Untouched occurrences generated automatically by rules are excluded. The normal visibility rule still applies: tasks under an archived area are excluded.
 
-Today and Week have separate Goal and Journal task components. On Today the date is today and disabled. On Week it is editable with today as its minimum and no maximum. Clicking a today-or-future calendar slot or the header add action first asks which kind, then opens that component with the proposed date and time. Elapsed slots in the current week remain visible and pending tasks on them may be dragged or edited to today or later, but a past slot never accepts creation or a drop.
+Today and Week have separate Goal and Journal task components. On Today the date is today and disabled. On Week it is editable with today as its minimum and no maximum. Drawing a range on a today-or-future slot, double-clicking one or the header add action first asks which kind, then opens that component with the proposed date, time and duration. Elapsed slots in the current week remain visible and pending tasks on them may be dragged or edited to today or later, but a past slot never accepts creation, a paste or a drop.
+
+Week's direct edits use the task endpoints: a move or resize is `PATCH /tasks/{id}` with `scheduled_date`, `start_time` and `duration_minutes` (only `duration_minutes` for a resize on an elapsed day), or `PATCH /tasks/{id}/repeat` for All repeating; a paste and a block from the hours panel are `POST /tasks`; a delete is `DELETE /tasks/{id}`, with `scope=repeat` for All repeating. The client shows each change before the response arrives and reads the week again afterwards, since a rule change redraws other tasks.
 
 Tasks with a null `scheduled_date` are absent. A Journal item put after the following week by its due date or a planning action participates in `later_tasks` like any other manually placed task. A top-level item with steps is not selectable from the Journal planning component; its open steps are selected individually.
 
@@ -835,13 +881,13 @@ An area object:
     { "date": "2026-09-29", "done": false }
   ],
   "requirements": [
-    { "ref_type": "GOAL", "ref_id": "7", "title": "Finish auth flow", "target": 2, "done": 1 },
+    { "ref_type": "GOAL", "ref_id": "7", "title": "Music", "target": 20, "done": 12.25 },
     { "ref_type": "HABIT", "ref_id": "12", "title": "Read", "target": 7, "done": 6 }
   ]
 }
 ```
 
-- `requirements` — the area's goals and habits that were active on at least one day of the week. Active days run from `max(period_start, created_at, area.unarchived_at)` to `min(week_end, area.archived_at)`. A `DAILY` habit's `target` is that day count and its `done` the checked days; a `WEEKLY` habit's `target` is 1. A goal's `target` is its full `weekly_target`, even when it was active for only part of the week, and its `done` is `COALESCE(SUM(block_count), 0)` across its completed tasks whose `period_start` is the week, so `done` can be fractional. Goals with no `weekly_target` are left out. A requirement counts as met when `done >= target`.
+- `requirements` — the area's goals and habits that were active on at least one day of the week. Active days run from `max(period_start, created_at, area.unarchived_at)` to `min(week_end, area.archived_at)`. A `DAILY` habit's `target` is that day count and its `done` the checked days; a `WEEKLY` habit's `target` is 1. A goal's `target` is its full `weekly_target` in hours, even when it was active for only part of the week, and its `done` is `COALESCE(SUM(duration_minutes), 0) / 60` across its completed tasks whose `period_start` is the week, so `done` can be fractional. Weeks frozen while goals were measured in blocks return their block numbers unchanged, read as hours. Goals with no `weekly_target` are left out. A requirement counts as met when `done >= target`.
 - `percent` — every requirement counts equally: each contributes `min(done / target, 1)`, and the area's percent is their average, from 0 to 100, rounded to a whole number.
 - `days` — always seven entries in week order, with dates resolved on the server. A day is `done` when the area had at least one `DAILY` habit active that day and every one of them was checked. Goals and `WEEKLY` habits do not affect it, and later days of the open week are not done yet.
 

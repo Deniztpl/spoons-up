@@ -32,34 +32,36 @@ Personal task and habit tracking app. Areas group what you're trying to be consi
 
 **Daily, weekly and left-behind views** — the today screen holds all three. Daily shows the day's timed tasks ordered by start time, then untimed tasks, above the `DAILY` habits; weekly shows `WEEKLY` habits alone. Left behind shows unfinished scheduled work from earlier days and is hidden when empty. One endpoint returns all three views' data. Quota progress lives in the area view.
 
-**Goals** — weekly quotas ("3 CS Blocks a week"), user-entered. `weekly_target` is a whole number of blocks and is nullable for goals scheduled ad hoc. A goal's weekly `done` is `COALESCE(SUM(block_count), 0)` across its completed tasks, not the number of task rows. A null block value contributes zero; non-null blocks can be halved, so `done` can be 2.5 against a target of 3.
+**Hours are the unit** — time is the only measure of work. A task's duration is its size, a goal's weekly target is a number of hours, and its progress is the hours of its completed tasks; there is no separate block value. Hours are a plan to aim for, not a time sheet: a checked task counts its duration, and a week can go past its target.
 
-**Goal rules** — schedules shown under a goal. A goal starts without one and can hold several. Weekdays are required; start time, duration and `block_count` are optional templates copied to generated tasks. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
+**Goals** — weekly quotas ("20 hours of music a week"), user-entered. `weekly_target` is a whole number of hours and is nullable for goals scheduled ad hoc. A goal's weekly `done` is `COALESCE(SUM(duration_minutes), 0) / 60` across its completed tasks, not the number of task rows. Durations move in 15-minute steps, so `done` can be 12.25 against a target of 20.
 
-**Changing a rule redraws unfinished work** — untouched `PENDING` tasks that rule produced are removed from the open week forward, including days before today. `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`), because those were the user's decisions. New tasks are generated from today forward only, so newly selected weekdays earlier in the open week stay empty. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
+**Goal rules** — schedules shown under a goal. A goal starts without one and can hold several. Weekdays and duration are required; start time is an optional template. All three are copied to generated tasks. Weekdays are pre-fill, not a contract — once a task exists the rule stops binding it.
 
-**Tasks** — concrete work that may or may not currently sit on a local date. Start time, duration and `block_count` are independent and optional; `end_time` exists only when both time and duration exist. A non-null block value moves in steps of 0.5 and is not derived from duration. Changing one task changes only that task, not its rule. Goal tasks have `goal_id` set, always have a `scheduled_date`, and take their title from the goal. Journal tasks have no goal and keep their user-entered title. Renaming a goal renames all of its tasks, done ones included; closed weeks keep the old title in `period_results`.
+**Changing a rule redraws unfinished work** — untouched `PENDING` tasks that rule produced, still on their occurrence date with the rule's time and duration, are removed from the open week forward, including days before today. `DONE` tasks stay, and so do tasks the user moved (`scheduled_date` differs from `occurrence_date`) or retimed, because those were the user's decisions. New tasks are generated from today forward only, so newly selected weekdays earlier in the open week stay empty. Closed weeks are never touched. The week's quota is a count, not a set of days, so a task done on Monday still counts after the rule moves the rest to Sunday.
+
+**Tasks** — concrete work that may or may not currently sit on a local date. Start time is optional. Duration is required on goal tasks and optional on Journal work; it moves in 15-minute steps from 15 minutes to 24 hours. `end_time` exists only when both time and duration exist. Changing one task changes only that task, not its rule, unless Week's All repeating is chosen. Goal tasks have `goal_id` set, always have a `scheduled_date`, and take their title from the goal. Journal tasks have no goal and keep their user-entered title. Renaming a goal renames all of its tasks, done ones included; closed weeks keep the old title in `period_results`.
 
 **Journal** — every goal-less task is a Journal task, wherever it was created. Journal uses the existing `tasks` table; there is no Journal entity, `in_journal` flag or second task table. The Journal page shows open top-level Journal items and completed top-level items with their steps. It is one ungrouped list: active items with a due date come first by date, time and creation order, followed by undated items in creation order. That due-date order is the default; the active list can instead be sorted by date added, newest first, or by priority — High, Medium, Low, then none — with ties kept in the default order. The choice is not remembered between visits. Completed items are always newest-completed first. A row has a checkbox, title, due date and time when present, and a progress bar and fraction when it has steps. The displayed date is `due_date`, never the possibly different `scheduled_date`; an overdue due date is red but does not otherwise change the item. Completed rows show their completion date instead. A top-level item can carry an optional priority — High, Medium or Low — shown as a red, amber or green tag in its own column at the end of the row, after the due date; the column appears only while a row in the list has a priority, and steps and goal tasks never have one. The page has Active and Completed counts, a new-item action, and one detail component for viewing, editing and creating an item. The detail owns title, optional due date and time, optional priority, the step checklist with inline add and remove actions, Complete or Reopen, and Delete. Title, due date, time and priority are saved together with Save, or discarded; steps, completion and deletion are written as they happen, and a step that fails to save stays in the detail to retry. Areas, area progress and Growth do not include Journal work.
 
-**Journal dates** — `due_date` is an optional deadline or event date set only from the Journal. Setting or changing it also puts the item on that same `scheduled_date`; clearing it removes the item from its day. Planning actions in Today and Week change only `scheduled_date` and never change `due_date`. The time shown beside a due date is the task's `start_time`, not a separate due time, and is available in the Journal only while a due date is set. A task can therefore be due later but planned for today. `period_start` is derived when an unscheduled task is first put on a day, stays fixed while it is moved, and becomes null again when it is unscheduled. Journal blocks remain optional and count toward no quota.
+**Journal dates** — `due_date` is an optional deadline or event date set only from the Journal. Setting or changing it also puts the item on that same `scheduled_date`; clearing it removes the item from its day. Planning actions in Today and Week change only `scheduled_date` and never change `due_date`. The time shown beside a due date is the task's `start_time`, not a separate due time, and is available in the Journal only while a due date is set. A task can therefore be due later but planned for today. `period_start` is derived when an unscheduled task is first put on a day, stays fixed while it is moved, and becomes null again when it is unscheduled. Journal durations remain optional and count toward no quota.
 
-**Journal steps** — a step is a Journal task whose `parent_id` points to a goal-less top-level task. Nesting is one level only. Steps are created in the Journal with a title and no date, time, duration or blocks; they receive planning values only when put on a day. They never have a `due_date`. Progress is completed steps over all steps. A top-level item with steps is not selectable for ad-hoc planning from the Journal picker; its open steps are selected individually. Its own calendar day, when any, comes from its due date.
+**Journal steps** — a step is a Journal task whose `parent_id` points to a goal-less top-level task. Nesting is one level only. Steps are created in the Journal with a title and no date, time or duration; they receive planning values only when put on a day. They never have a `due_date`. Progress is completed steps over all steps. A top-level item with steps is not selectable for ad-hoc planning from the Journal picker; its open steps are selected individually. Its own calendar day, when any, comes from its due date.
 
 **Completing Journal work** — checking a Journal task anywhere marks the same task `DONE`. A completed top-level item leaves the active Journal list but stays checked on any day where it is scheduled. Completing every step does not complete its item. Completing a top-level item with open steps first asks, with the actual count, “2 steps are not complete. Finish anyway?” Confirmation leaves those steps pending but clears their schedule, period and time so they leave Today, Week and Left behind. Reopening the item does not restore the cleared plans. Deleting a top-level item hard-deletes it and cascades to its steps.
 
-**Goal and Journal entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today and Week use two separate task components rather than a shared `No goal` choice. `+ Goal` requires an `Area - Goal`, takes its title from that goal and retains Repeat. `+ Journal` can create a titled Journal task or select an existing open item without steps; an item with steps drills into only its open steps. There is no search and no `New / Journal` tab. Time, duration and blocks belong to the plan section. Today fixes the date to today; Week allows today or later with no upper bound. A task already on a day is edited in one form for both kinds, the way goal tasks always were: a goal task shows its goal and Repeat, a Journal task its title, and both change date, time, duration and blocks or delete the task.
+**Goal and Journal entry** — goals are created under areas and start without a schedule. Repeat reveals one or more schedules. Today and Week use two separate task components rather than a shared `No goal` choice. `+ Goal` requires an `Area - Goal`, takes its title from that goal and retains Repeat. `+ Journal` can create a titled Journal task or select an existing open item without steps; an item with steps drills into only its open steps. There is no search and no `New / Journal` tab. Time and duration belong to the plan section. Today fixes the date to today; Week allows today or later with no upper bound. A task already on a day is edited in one form for both kinds, the way goal tasks always were: a goal task shows its goal and Repeat, a Journal task its title, and both change date, time and duration or delete the task.
 
 Task fields follow the screen that owns the decision:
 
-| Screen | Date | Time | Duration | Blocks |
-|---|---|---|---|---|
-| Journal, new item or item detail | optional due date | optional only with a due date | no | no |
-| Journal, new step | no | no | no | no |
-| Today, Goal or Journal plan | today, fixed | optional | optional | optional |
-| Week, Goal or Journal plan | today or later | optional | optional | optional |
+| Screen | Date | Time | Duration |
+|---|---|---|---|
+| Journal, new item or item detail | optional due date | optional only with a due date | no |
+| Journal, new step | no | no | no |
+| Today, Goal or Journal plan | today, fixed | optional | goal: required, one hour to start; Journal: optional |
+| Week, Goal or Journal plan | today or later | optional | goal: required, one hour to start; Journal: optional |
 
-Duration and blocks are assigned only while planning work onto a day. A Journal block is a size indicator and never contributes to an area quota. There is no progress slider, continue-tomorrow action or remove-from-plan action in this slice.
+Duration is assigned only while planning work onto a day. One duration control serves the task, Journal and schedule forms: a stepper in 15-minute steps up to 24 hours, with 30 min, 1 h, 2 h and 4 h shortcuts. A Journal duration is a size indicator and never contributes to an area quota. There is no progress slider, continue-tomorrow action or remove-from-plan action in this slice.
 
 **Today Journal entry** — the Today header has separate `+ Goal` and `+ Journal` actions. The Journal picker starts with `+ New task`, then shows the first five rows ordered overdue, dated and undated, with `Show all (N)` when more exist. Choosing an existing item or step updates that task instead of creating another row. Steps render as normal full-width task cards ordered with everything else; a step card carries its parent's title and step progress as secondary text.
 
@@ -67,13 +69,21 @@ Duration and blocks are assigned only while planning work onto a day. A Journal 
 
 **Left behind** — Today adds a third view after Daily and Weekly, visible only when it has rows. It contains every pending goal-less task whose `scheduled_date` is before today, with no age limit, plus pending goal tasks from earlier days of the current open week whose `period_start` is that open week. Rows are oldest first and show their original date and time, `Journal` or the goal's area as their source, and only `Move to today`. Moving changes `scheduled_date` alone; a goal task keeps its original `period_start`. Journal work can appear both here and in the Journal picker.
 
-**Week scope and task entry** — Week has only two destinations: the user's current week and the following week. It never navigates into a past week or beyond the following week. Clicking a today-or-future calendar slot or the header add action first asks for Goal or Journal, then opens the corresponding component with the proposed date and time. Elapsed slots remain visible and their pending tasks can be moved to today or later, but they are not creation or drop targets. A task with no `scheduled_date` never appears.
+**Week scope and task entry** — Week has only two destinations: the user's current week and the following week. It never navigates into a past week or beyond the following week. The header add action, drawing a range on an empty today-or-future slot and double-clicking one first ask for Goal or Journal, then open the corresponding component with the proposed date, start time and duration; the header action proposes today only. Elapsed slots remain visible and their pending tasks can be moved to today or later, but they are not creation, paste or drop targets. A task with no `scheduled_date` never appears.
+
+**Editing on Week** — the seven-column calendar is edited in place, in 15-minute steps; the phone's day list keeps opening a task's form on tap. A task is dragged to another day or time, or between the untimed row and the timeline, and its bottom edge drags its duration, never below 15 minutes; while dragging it shows its new time range and duration. Pressing on an empty today-or-future slot and dragging draws a new task's range; double-clicking one proposes an hour. A change shows at once and saves in the background; a failed save puts the task back with the error. Pending work on an elapsed day can still move to today or later, and a done task there can change its duration but not move.
+
+**Week selection and shortcuts** — a click selects a task, a double-click or Enter opens its form, and Escape clears the selection. A click on an empty today-or-future slot sets the paste spot: that 15-minute slot, or untimed work on that day in the untimed row. Ctrl/Cmd+C copies the selected task inside the page, not to the system clipboard, and Ctrl/Cmd+V creates the copy at the paste spot with the same duration: a goal task becomes a new ad-hoc task of its goal even when it repeats, a Journal task a new top-level item with only its title and duration. Steps are not copied, alone or with their item. Delete or Backspace asks to confirm; Enter deletes and Escape cancels. Shortcuts are ignored while a dialog or text field has focus, and a checkbox still checks with one click.
+
+**Repeating tasks on Week** — moving, resizing or deleting a rule's task asks Only this or All repeating, as Notion Calendar does; Enter picks Only this and Escape puts the task back. A resize on an elapsed day changes only that task, without asking. All repeating gives the rule the new start time and duration and moves every weekday by the drag's gap, wrapping round the week: Mon, Wed, Fri two days later is Wed, Fri, Sun, and Sunday plus two is Tuesday. The usual redraw then runs (see **Changing a rule redraws unfinished work**). The task lands where it was dropped, and its `occurrence_date` moves with the weekdays so no second task is generated beside it, unless another task of the rule already holds that date. All repeating on delete deletes the rule, as a schedule delete does, and the task with it.
+
+**Week hours panel** — a right-hand panel, toggled from a top-right button and remembered on the device, shows each goal with a weekly target as Planned and Done bars against that target for the shown week, grouped by area in its colour; on a phone the button opens the same rows above the day list. Done is the hours of its completed tasks in that week (`period_start`). Planned adds its pending tasks of that week scheduled today or later, so undone work on an elapsed day drops out and its hours are free to plan again. Both can pass the target. Each row can also hand out a block of chosen hours to drag onto a today-or-future slot, creating an ad-hoc task of that goal there without a form.
 
 **Tasks beyond Week** — manually placed tasks after the end of next week remain visible even though the calendar cannot navigate there. `GET /week` returns their count and complete task list. A Journal item whose due date schedules it after next week is included. Choosing a later task opens it in that edit form; creating work no longer offers the shared `No goal` choice from earlier slices. Ad-hoc tasks and moved rule occurrences are included; untouched generated occurrences are not.
 
-**Repeat from a task** — Repeat is available only in the Goal component. With Repeat off it creates an ad-hoc goal task; with it on it creates a rule and lets that rule generate the occurrences. The form shows only the rule's weekdays because time, duration and blocks already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
+**Repeat from a task** — Repeat is available only in the Goal component. With Repeat off it creates an ad-hoc goal task; with it on it creates a rule and lets that rule generate the occurrences. The form shows only the rule's weekdays because time and duration already sit in the task fields. Editing the task never edits the rule; editing its schedule patches the linked rule and uses the existing regeneration behaviour.
 
-**Repeat on and off while editing** — turning Repeat on for an ad-hoc goal task creates a rule from the task's time, duration and blocks, and the task becomes that rule's occurrence on its current date, so generation never adds a second task there. The chosen weekdays must include the task's own weekday. Turning Repeat off on a repeating task ends its schedule: the task is kept as an ad-hoc task, and the rule is deleted exactly as a rule delete does, taking its untouched pending tasks from the open week forward. These two conversions are the only writes that change a task's `occurrence_date`; while a task belongs to a rule it never changes.
+**Repeat on and off while editing** — turning Repeat on for an ad-hoc goal task creates a rule from the task's time and duration, and the task becomes that rule's occurrence on its current date, so generation never adds a second task there. The chosen weekdays must include the task's own weekday. Turning Repeat off on a repeating task ends its schedule: the task is kept as an ad-hoc task, and the rule is deleted exactly as a rule delete does, taking its untouched pending tasks from the open week forward. These two conversions set or clear a task's `occurrence_date`; the only other write that changes it is Week's All repeating, which moves it by the same number of days as the rule's weekdays.
 
 **Task generation** — `add_tasks(user_id, from, to)` expands a user's rules into task rows for a date range, copying nullable schedule values, and writes a reminder only for a timed task. Reads never generate; a task is on screen because a write or the daily job put it there. Idempotent through `INSERT ... ON CONFLICT DO NOTHING` on `(goal_id, rule_id, occurrence_date)`, so no bookkeeping table is needed.
 
@@ -83,25 +93,25 @@ Duration and blocks are assigned only while planning work onto a day. A Journal 
 
 **Generated window** — rule occurrences are generated 14 days ahead; rules do not populate dates beyond that window until it advances. Manually created tasks and tasks the user moves have no upper date limit, so they can exist later and appear in Week's `later_tasks` summary.
 
-**Occurrence identity** — `occurrence_date` records the date a rule produced and never changes while the task belongs to that rule; only Repeat on and off while editing set or clear it. `scheduled_date` is where the user actually put it.
+**Occurrence identity** — `occurrence_date` records the date a rule produced. Only Repeat on and off while editing set or clear it, and only Week's All repeating moves it, together with the rule's weekdays. `scheduled_date` is where the user actually put it.
 
 **Postpone** — `scheduled_date` moves; `occurrence_date` and `period_start` stay fixed, so a task dragged to next Monday still counts toward the week it belonged to.
 
 **No scheduling in the past** — a non-null `scheduled_date` is compared with today in the user's timezone. `POST /tasks`, a `PATCH /tasks/{id}` that supplies it, and a due-date write that derives it reject an earlier date with `422 validation_error`; future dates have no upper bound. An existing item becomes overdue naturally as time passes.
 
-**Delete** — when the user deletes a task, a rule-generated one soft deletes (`status = DELETED`) so generation doesn't bring it back, and an ad-hoc goal task or Journal task hard deletes. Deleting a top-level Journal item cascades to its steps. Removals the system does itself — a rule change, an area archive — are hard deletes, so the same occurrence can be generated again later.
+**Delete** — when the user deletes a task, a rule-generated one soft deletes (`status = DELETED`) so generation doesn't bring it back, and an ad-hoc goal task or Journal task hard deletes. Deleting a top-level Journal item cascades to its steps. Deleting with Week's All repeating deletes the rule and hard deletes the task, since nothing would generate it again. Removals the system does itself — a rule change, an area archive — are hard deletes, so the same occurrence can be generated again later.
 
-**Extra tasks** — the user can add goal work beyond a rule (`rule_id` and `occurrence_date` NULL), and can add unlimited Journal work outside goals. Both sit outside the generated-task unique index. An ad-hoc goal task contributes its non-null `block_count` through `period_start`; Journal work has no goal quota.
+**Extra tasks** — the user can add goal work beyond a rule (`rule_id` and `occurrence_date` NULL), and can add unlimited Journal work outside goals. Both sit outside the generated-task unique index. An ad-hoc goal task contributes its duration through `period_start`; Journal work has no goal quota.
 
 **Catch-up on return** — past dormant time is not generated. The first authenticated request after more than 30 days restores only the current 14-day window; older empty dates stay empty.
 
-**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; a user's first run reaches back to their signup week. Each week is frozen once, tracked by `users.last_frozen_week`; reads never write.
+**Frozen history** — when a week closes, each requirement's `target` and `done` are snapshotted to `period_results`. The scheduled job writes it at the week turn in the user's own timezone, and a closed week it missed is written on its next run; a user's first run reaches back to their signup week. Each week is frozen once, tracked by `users.last_frozen_week`; reads never write. Weeks frozen while goals were measured in blocks keep their numbers and read them as hours, one block to one hour.
 
 **Weekly target follows active days** — a requirement is judged only on the days it was actually active that week. A `DAILY` habit's target is the number of days between `max(week_start, created_at, area.unarchived_at)` and `min(week_end, area.archived_at)`, so a habit added on Wednesday needs 5 of 5, not 7 of 7. `WEEKLY` habits stay 1 as long as one day was active. Goals keep their full `weekly_target` even when active for only part of a week, and goals with no `weekly_target` are not requirements. A requirement with no active day in a week gets no `period_results` row and the week reads empty for it. The area's two timestamps cannot express more than one archive cycle inside a week; the last one wins.
 
 **Live current week** — the open week is computed from raw rows, so changing a quota mid-week takes effect immediately.
 
-**Weekly progress** — every requirement in an area counts equally toward the area's percent. A goal contributes its done blocks over `weekly_target`, a `DAILY` habit its checked days over its active days, and a `WEEKLY` habit 1 or 0; each is capped at 100%. The area's percent is the average of its requirements, and a week's percent is the average of its areas. There is no pass or fail: requirements that reach their target are shown as met counts, such as goals 2/3.
+**Weekly progress** — every requirement in an area counts equally toward the area's percent. A goal contributes its done hours over `weekly_target`, a `DAILY` habit its checked days over its active days, and a `WEEKLY` habit 1 or 0; each is capped at 100%. The area's percent is the average of its requirements, and a week's percent is the average of its areas. There is no pass or fail: requirements that reach their target are shown as met counts, such as goals 2/3.
 
 **Day squares** — each area shows its week as seven squares. A day is done when the area had at least one `DAILY` habit active that day and every one of them was checked. Goals and `WEEKLY` habits do not affect the squares. Squares are read from habit entries, for closed weeks too, so a deleted habit's squares go with it.
 
@@ -111,7 +121,7 @@ Duration and blocks are assigned only while planning work onto a day. A Journal 
 
 **Archiving an area touches only the area row** — its habits, goals and rules are untouched; they simply stop being reachable while the area is archived, so restoring brings them all back as they were. Archiving removes the area's future pending tasks and their reminders; restoring does not bring them back, and generation resumes from today forward.
 
-**Delete is hard everywhere** — deleting a habit removes its entries, deleting a goal removes its rules, tasks and reminders, deleting an area removes everything under it. `period_results` rows are never deleted, not even with their area, whose deletion only clears the row's `area_id`: they carry a snapshotted `title` and a `ref_id` that is not a foreign key, so past weeks keep reading after the thing they describe is gone. What is lost is the detail below the week — a deleted habit's day squares, a deleted goal's blocks on old calendars.
+**Delete is hard everywhere** — deleting a habit removes its entries, deleting a goal removes its rules, tasks and reminders, deleting an area removes everything under it. `period_results` rows are never deleted, not even with their area, whose deletion only clears the row's `area_id`: they carry a snapshotted `title` and a `ref_id` that is not a foreign key, so past weeks keep reading after the thing they describe is gone. What is lost is the detail below the week — a deleted habit's day squares, a deleted goal's tasks on old calendars.
 
 **Areas delete from either state** — an active area can be deleted without archiving it first. The client confirms with a strong warning that the area's habits and goals go with it, along with their tasks and check-off history, and points to archive as the reversible way to put an area down.
 
@@ -219,7 +229,6 @@ erDiagram
         smallint_array byweekday
         time start_time
         int duration_minutes
-        numeric block_count
     }
 
     tasks {
@@ -236,7 +245,6 @@ erDiagram
         time start_time
         int duration_minutes
         time end_time
-        numeric block_count
         date period_start
         text status
         timestamptz completed_at
@@ -350,7 +358,7 @@ UNIQUE (habit_id, period_type, period_start)
 | user_id | bigint | FK -> users |
 | area_id | bigint | FK -> areas |
 | title | text | |
-| weekly_target | int | nullable, number of blocks |
+| weekly_target | int | nullable, whole hours |
 | created_at | timestamptz | |
 
 #### goal_rules
@@ -361,8 +369,7 @@ UNIQUE (habit_id, period_type, period_start)
 | goal_id | bigint | FK -> goals |
 | byweekday | smallint[] | e.g. {1,3,5} |
 | start_time | time | nullable |
-| duration_minutes | int | nullable |
-| block_count | numeric(3,1) | nullable, positive multiple of 0.5 when set; copied to each generated task |
+| duration_minutes | int | 15-minute steps up to 1440; copied to each generated task |
 
 #### tasks
 
@@ -379,9 +386,8 @@ UNIQUE (habit_id, period_type, period_start)
 | due_date | date | nullable, only on a top-level Journal item; setting it also sets `scheduled_date` |
 | priority | text | nullable, HIGH \| MEDIUM \| LOW, only on a top-level Journal item |
 | start_time | time | nullable |
-| duration_minutes | int | nullable |
+| duration_minutes | int | 15-minute steps up to 1440; required on goal tasks, where it is the contribution to the goal's weekly target; nullable on Journal work |
 | end_time | time | nullable, start_time + duration_minutes when both exist |
-| block_count | numeric(3,1) | nullable, positive multiple of 0.5 when set; contribution to the goal's weekly target |
 | period_start | date | nullable exactly when `scheduled_date` is null; the week identity fixed when first scheduled |
 | status | text | PENDING \| DONE \| DELETED |
 | completed_at | timestamptz | nullable |
@@ -405,16 +411,17 @@ CHECK (due_date IS NULL OR (goal_id IS NULL AND parent_id IS NULL))
 CHECK (parent_id IS NULL OR goal_id IS NULL)
 CHECK (priority IS NULL OR priority IN ('HIGH', 'MEDIUM', 'LOW'))
 CHECK (priority IS NULL OR (goal_id IS NULL AND parent_id IS NULL))
+CHECK (goal_id IS NULL OR duration_minutes IS NOT NULL)
 ```
 
 The service additionally verifies that a parent belongs to the same user, is goal-less and top-level, and never lets a step receive another step. A step has only a title when created; a later planning write may give it schedule fields.
 
-`block_count` does not change occurrence identity: a two-block occurrence is still one task row. Separate times on the same day still require separate rules.
+Duration does not change occurrence identity: a four-hour occurrence is still one task row. Separate times on the same day still require separate rules.
 
-`goal_rules.block_count` and `tasks.block_count` are nullable and carry the same check when set, so half blocks are allowed and anything finer is rejected:
+`goal_rules.duration_minutes` is `NOT NULL`, and both tables carry the same check, so a goal's hours always come in whole quarters:
 
 ```sql
-CHECK (block_count > 0 AND block_count * 2 = trunc(block_count * 2))
+CHECK (duration_minutes BETWEEN 15 AND 1440 AND duration_minutes % 15 = 0)
 ```
 
 #### period_results
@@ -428,8 +435,8 @@ CHECK (block_count > 0 AND block_count * 2 = trunc(block_count * 2))
 | ref_type | text | HABIT \| GOAL |
 | ref_id | bigint | habits.id or goals.id — not a foreign key |
 | title | text | snapshot of the habit or goal title |
-| target | int | |
-| done | numeric(5,1) | goal rows snapshot `COALESCE(SUM(tasks.block_count), 0)` for completed tasks, so it can be fractional |
+| target | int | days or weeks for habits, hours for goals |
+| done | numeric(6,2) | goal rows snapshot `COALESCE(SUM(tasks.duration_minutes), 0) / 60` for completed tasks, so it can be fractional; rows frozen before hours hold blocks, read as hours |
 
 ```sql
 UNIQUE (ref_type, ref_id, period_start)

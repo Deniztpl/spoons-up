@@ -311,7 +311,66 @@ maintenance job. Local Compose, including its scheduler, keeps working as it doe
     - **Live verification complete:** Supabase, Render, Vercel and cron-job.org are configured. Registration returns `registration_closed` and the `users` table contains exactly one row. cron-job.org health and hourly requests return 200 and 204. Phone over mobile data and PC over the home network can log in, and checked tasks survive a reload on both.
     - **Done when:** phone and PC can open the Vercel URL from different networks, login and a checked task survive a reload, registration is closed after the one owner account, and cron-job.org runs the hourly job successfully and idempotently
 
-## Slice 8 — Notifications
+## Slice 8 — Hours and a faster Week
+
+Hours replace blocks as the one measure of work: a task's duration is its size, a goal's weekly target is hours, and progress is the hours of completed tasks. Week becomes a calendar edited in place — drag, resize, draw, copy, paste and delete without opening a form — with a panel showing what each goal has planned and done for the shown week. Notifications move to Slice 9.
+
+### Block 0 — Canonical documentation — DONE
+
+- Record hours as the unit, Week editing, selection and shortcuts, Only this / All repeating and the hours panel in `design.md`
+- Update `api-contract.md`: durations replace `block_count`, goal targets and progress in hours, `goals` on `GET /week`, `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`
+- Move Notifications to Slice 9
+
+### Block 1 — Hours model API
+
+- Migration: give goal tasks and rules without a duration `block_count × 60` minutes, or 60 when that is null too; round every other duration up to the next 15 minutes; drop `block_count` from `tasks` and `goal_rules`; require a duration on goal tasks and rules; check durations are 15-minute steps from 15 to 1440; widen `period_results.done` to `numeric(6,2)`. Goal targets and closed weeks keep their numbers, read as hours
+- Goal `done` becomes completed hours by `period_start` in `/progress` and the week freeze
+- Remove `block_count` from requests and responses, validate durations, and drop blocks from the redraw's untouched match
+- Regenerate `apps/api/openapi.json` and `packages/api-client/src/generated/schema.d.ts`; update the API tests
+
+### Block 2 — Hours in the web client
+
+- One duration control for the task, Journal and schedule forms: a 15-minute stepper up to 24 hours with 30 min, 1 h, 2 h and 4 h shortcuts; a new goal task starts at one hour; the block picker goes
+- Goal form: weekly target in hours / week; goal rows read `20h / week`
+- Today: cards as tall as their duration, one unit per hour from half a unit to four, a Journal task without duration taking one unit; the rail counts hours; the block-label `TODO(slice-4)` goes
+- Week: the `×N` badge becomes the duration (`4h`, `1h 30m`) beside the repeat mark
+- Areas and Growth: goal amounts in hours (`12h 15m / 20h`)
+
+### Block 3 — Week hours panel
+
+- API: `goals` on `GET /week` with `target`, `planned` and `done` hours for the shown week; tests cover elapsed pending work leaving `planned`, a task moved into the following week, the following week and goals without a target
+- Web: a right-hand panel toggled from a top-right button, open state remembered on the device; Planned and Done bars against the target per goal, grouped by area in its colour; refreshed after every Week write; on a phone the button opens the rows above the day list
+
+### Block 4 — Editing on the calendar
+
+- Replace HTML drag-and-drop with one pointer interaction for moving, resizing and drawing, snapped to 15 minutes, with a live time-range and duration label
+- Move across days, times and the untimed row; resize from the bottom edge; draw a range on an empty slot → Goal or Journal → the component with date, time and duration; double-click an empty slot for one hour
+- Show each change at once and save it in the background; put the task back and show the error on failure
+- Keep the elapsed-slot rules; a done task on an elapsed day can still change its duration
+
+### Block 5 — Selection, copy, paste and delete
+
+- A click selects, a double-click or Enter opens the form, Escape clears; a click on an empty slot places the paste cursor
+- Ctrl/Cmd+C and Ctrl/Cmd+V through `POST /tasks`: a goal task copies as an ad-hoc task of its goal, a Journal task as a new item with its title and duration; steps are not copied
+- Delete or Backspace opens a new confirmation component: Enter deletes, Escape cancels
+- Shortcuts stay quiet while a dialog or text field has focus
+
+### Block 6 — Only this or All repeating
+
+- API: `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`, each one transaction; tests cover the weekday wrap, gaps in both directions, a time-only change, the dragged task's `occurrence_date`, no duplicate generation, a date another task of the rule holds, done and retimed tasks staying, and closed weeks
+- Web: the question after moving, resizing or deleting a task that repeats; Enter picks Only this; the task shows at its new place while the question is open and Escape puts it back; a resize on an elapsed day skips the question
+
+### Block 7 — Hours panel shortcut (optional)
+
+- Each panel row hands out a block: pick its hours from the row's menu and drag it onto a today-or-future slot to create an ad-hoc task of that goal there, without a form
+
+### Block 8 — Verification
+
+- Run API migration up and down, pytest and Ruff; run web lint, typecheck, Vitest and build; verify OpenAPI and client sync
+- Manually plan a 20h goal as 4h × 5 with timed and untimed tasks, leave one undone on a past day and watch it leave Planned, copy a task onto two days, delete one with the key, and move a repeating task two days later with All repeating so a Sunday lands on Tuesday
+- **Done when:** a goal's target and progress read in hours on Week, Areas and Growth; a task is moved, resized, drawn, copied, pasted and deleted on Week without opening its form; and All repeating shifts every weekday of the schedule by the drag's gap
+
+## Slice 9 — Notifications
 
 46. `reminders` and `devices` migration, token registration
 47. Write a reminder on timed scheduled task create, update it when timing changes, and cancel it on time or schedule removal or delete

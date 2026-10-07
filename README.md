@@ -7,7 +7,7 @@ nutrition.
 
 - **Areas** organize the parts of life you want to improve.
 - **Habits** track daily or weekly consistency.
-- **Goals** define weekly progress in blocks.
+- **Goals** define weekly progress in hours.
 - **Tasks** turn goals into concrete scheduled work.
 
 The current implementation focuses on the Goals & Habits domain. Development status
