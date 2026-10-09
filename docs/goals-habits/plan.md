@@ -338,8 +338,8 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 
 ### Block 3 — Week hours panel
 
-- API: `goals` on `GET /week` with `target`, `planned` and `done` hours for the shown week; tests cover elapsed pending work leaving `planned`, a task moved into the following week, the following week and goals without a target
-- Web: a right-hand panel toggled from a top-right button, open state remembered on the device; Planned and Done bars against the target per goal, grouped by area in its colour; refreshed after every Week write; on a phone the button opens the rows above the day list
+- API: `goals` on `GET /week` with `target`, `done` and `planned` hours for the shown week, where `planned` is pending work on today or later and never includes `done`; tests cover elapsed pending work leaving `planned`, work still open earlier today staying in it, a task moved into the following week, the following week and goals without a target
+- Web: a right-hand panel toggled from a top-right button, open by default where the sidebar shows and closed below, the choice remembered on the device; one bar per goal split into done, planned and not planned (`target − done − planned`, never below zero), with extra hours past the target shown as +Nh; grouped by area in its colour; refreshed after every Week write; on a phone the button opens the rows above the day list
 
 ### Block 4 — Editing on the calendar
 
@@ -367,7 +367,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 ### Block 8 — Verification
 
 - Run API migration up and down, pytest and Ruff; run web lint, typecheck, Vitest and build; verify OpenAPI and client sync
-- Manually plan a 20h goal as 4h × 5 with timed and untimed tasks, leave one undone on a past day and watch it leave Planned, copy a task onto two days, delete one with the key, and move a repeating task two days later with All repeating so a Sunday lands on Tuesday
+- Manually plan a 20h goal as 4h × 5 with timed and untimed tasks, leave one undone on a past day and watch its hours move from planned to not planned, copy a task onto two days, delete one with the key, and move a repeating task two days later with All repeating so a Sunday lands on Tuesday
 - **Done when:** a goal's target and progress read in hours on Week, Areas and Growth; a task is moved, resized, drawn, copied, pasted and deleted on Week without opening its form; and All repeating shifts every weekday of the schedule by the drag's gap
 
 ## Slice 9 — Notifications

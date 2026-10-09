@@ -832,7 +832,7 @@ Any date inside the current or following week works — the server resolves it t
     "items": [ ... ]
   },
   "goals": [
-    { "goal_id": "7", "area_id": "3", "title": "Music", "target": 20, "planned": 16, "done": 8 }
+    { "goal_id": "7", "area_id": "3", "title": "Music", "target": 20, "done": 8, "planned": 8 }
   ]
 }
 ```
@@ -843,9 +843,9 @@ Any date inside the current or following week works — the server resolves it t
 
 - `target` — the goal's `weekly_target`.
 - `done` — the hours of its `DONE` tasks whose `period_start` is the shown week, as in `/progress`.
-- `planned` — `done` plus the hours of its `PENDING` tasks whose `period_start` is the shown week and whose `scheduled_date` is today or later. Pending work left on an elapsed day is not planned, so its hours are free to plan again.
+- `planned` — the hours of its `PENDING` tasks whose `period_start` is the shown week and whose `scheduled_date` is today or later, by day rather than by time, so work still open earlier today counts. Pending work left on an elapsed day is not planned, so its hours are free to plan again.
 
-Both `planned` and `done` can pass `target`. Because they follow `period_start`, a task moved into the following week still counts for the week it came from.
+`done` and `planned` never overlap. The client derives the hours not planned as `max(target - done - planned, 0)` and shows anything past the target as extra. Because both follow `period_start`, a task moved into the following week still counts for the week it came from.
 
 `later_tasks` makes tasks after the following week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They are full task objects, the same shape as in `days`, so the client can open one in the task form to edit or delete it.
 
