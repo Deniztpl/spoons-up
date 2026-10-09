@@ -213,6 +213,39 @@ class TaskRepository:
         )
         return {goal_id: Decimal(minutes) / 60 for goal_id, minutes in self.session.execute(query)}
 
+    def sum_week_hours_by_goal(
+        self,
+        *,
+        user_id: int,
+        period_start: date,
+        today: date,
+    ) -> dict[int, tuple[Decimal, Decimal]]:
+        """Each goal's done hours in a week, and its pending hours on today or a later day."""
+        done_minutes = func.coalesce(
+            func.sum(Task.duration_minutes).filter(Task.status == TaskStatus.DONE.value),
+            0,
+        )
+        planned_minutes = func.coalesce(
+            func.sum(Task.duration_minutes).filter(
+                Task.status == TaskStatus.PENDING.value,
+                Task.scheduled_date >= today,
+            ),
+            0,
+        )
+        query = (
+            select(Task.goal_id, done_minutes, planned_minutes)
+            .where(
+                Task.user_id == user_id,
+                Task.goal_id.is_not(None),
+                Task.period_start == period_start,
+            )
+            .group_by(Task.goal_id)
+        )
+        return {
+            goal_id: (Decimal(done) / 60, Decimal(planned) / 60)
+            for goal_id, done, planned in self.session.execute(query)
+        }
+
     def get_task_and_lock(self, *, task_id: int, user_id: int) -> Task | None:
         return self.session.scalar(
             self._select_visible_tasks_for_user(user_id=user_id)

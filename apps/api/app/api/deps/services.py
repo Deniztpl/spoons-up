@@ -136,6 +136,8 @@ def get_week_service(session: DatabaseSession) -> WeekService:
         session,
         TaskRepository(session),
         UserRepository(session),
+        GoalRepository(session),
+        AreaRepository(session),
     )
 
 

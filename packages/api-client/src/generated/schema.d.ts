@@ -1021,10 +1021,27 @@ export interface components {
             /** Tasks */
             tasks: components["schemas"]["TodayTaskResponse"][];
         };
+        /** WeekGoalHoursResponse */
+        WeekGoalHoursResponse: {
+            /** Area Id */
+            area_id: string;
+            /** Done */
+            done: number;
+            /** Goal Id */
+            goal_id: string;
+            /** Planned */
+            planned: number;
+            /** Target */
+            target: number;
+            /** Title */
+            title: string;
+        };
         /** WeekResponse */
         WeekResponse: {
             /** Days */
             days: components["schemas"]["WeekDayResponse"][];
+            /** Goals */
+            goals: components["schemas"]["WeekGoalHoursResponse"][];
             later_tasks: components["schemas"]["LaterTasksResponse"];
             /**
              * Period Start

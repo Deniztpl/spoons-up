@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { AppLayout } from "../../components/layout/AppLayout";
 import { useAreaLookup } from "../../features/areas/hooks/useAreaLookup";
@@ -15,9 +15,11 @@ import {
   NewTaskKindDialog,
 } from "../../features/week/components/NewTaskKindDialog";
 import { WeekCalendar } from "../../features/week/components/WeekCalendar";
+import { WeekHoursPanel } from "../../features/week/components/WeekHoursPanel";
 import { useWeek } from "../../features/week/hooks/useWeek";
 
 const weekFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+const hoursPanelKey = "spoons-up:week-hours-panel";
 
 export function WeekPage({
   onLogout,
@@ -35,7 +37,19 @@ export function WeekPage({
   // A slot or the add button first asks which kind of task it is for.
   const [newTask, setNewTask] = useState<NewTaskDefaults | null>(null);
   const [confirmingTask, setConfirmingTask] = useState<WeekTask | null>(null);
+  const [isHoursOpen, setIsHoursOpen] = useState(initialHoursOpen);
+  const hoursPanelId = useId();
   const { week, todayDate } = weekState;
+
+  const toggleHours = () => {
+    const next = !isHoursOpen;
+    setIsHoursOpen(next);
+    try {
+      localStorage.setItem(hoursPanelKey, next ? "open" : "closed");
+    } catch {
+      // The panel still toggles; it just will not be remembered.
+    }
+  };
 
   const openNewTask = (kind: NewTaskKind) => {
     if (!newTask) return;
@@ -47,13 +61,11 @@ export function WeekPage({
     }
   };
 
-  // A step and its item show each other's progress, and finishing an item takes its open steps
-  // off the calendar, so checking either reads the week again.
+  // Checking work moves hours between done and planned, a step and its item show each other's
+  // progress, and finishing an item takes its open steps off the calendar: read the week again.
   const toggleTask = async (task: WeekTask) => {
     await weekState.toggleTask(task);
-    if (task.parent || task.step_progress) {
-      weekState.reload();
-    }
+    weekState.reload();
   };
 
   // Finishing an item with open steps asks first.
@@ -137,6 +149,20 @@ export function WeekPage({
             <span aria-hidden="true">+</span>
             Add task
           </button>
+
+          <button
+            type="button"
+            aria-expanded={isHoursOpen}
+            aria-controls={isHoursOpen ? hoursPanelId : undefined}
+            className={`h-8 rounded-lg border px-3 text-[12.5px] font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              isHoursOpen
+                ? "border-ink/20 bg-well text-ink"
+                : "border-ink/14 bg-card text-ink-soft hover:bg-well hover:text-ink"
+            }`}
+            onClick={toggleHours}
+          >
+            Hours
+          </button>
         </header>
 
         {weekState.loadError ? (
@@ -152,18 +178,28 @@ export function WeekPage({
         ) : null}
 
         {week && todayDate ? (
-          <WeekCalendar
-            week={week}
-            todayDate={todayDate}
-            areaByGoalId={areaLookup.areaByGoalId}
-            pendingTaskIds={weekState.pendingTaskIds}
-            onCreate={setNewTask}
-            onEdit={taskForm.openEdit}
-            onToggle={requestToggle}
-            onMove={(task, scheduledDate, startTime) =>
-              void weekState.moveTask(task, scheduledDate, startTime)
-            }
-          />
+          // On a phone the panel sits above the day list; from md up it is a column on the right.
+          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+            <WeekCalendar
+              week={week}
+              todayDate={todayDate}
+              areaByGoalId={areaLookup.areaByGoalId}
+              pendingTaskIds={weekState.pendingTaskIds}
+              onCreate={setNewTask}
+              onEdit={taskForm.openEdit}
+              onToggle={requestToggle}
+              onMove={(task, scheduledDate, startTime) =>
+                void weekState.moveTask(task, scheduledDate, startTime)
+              }
+            />
+            {isHoursOpen ? (
+              <WeekHoursPanel
+                id={hoursPanelId}
+                goals={week.goals}
+                areaById={areaLookup.areaById}
+              />
+            ) : null}
+          </div>
         ) : weekState.isLoading ? (
           <div role="status" className="grid flex-1 place-items-center text-ink-soft">
             Loading week…
@@ -249,6 +285,19 @@ export function WeekPage({
       ) : null}
     </AppLayout>
   );
+}
+
+// A remembered choice wins; otherwise the panel is open where the sidebar shows (Tailwind lg).
+function initialHoursOpen() {
+  try {
+    const saved = localStorage.getItem(hoursPanelKey);
+    if (saved === "open" || saved === "closed") {
+      return saved === "open";
+    }
+  } catch {
+    // Without storage the width decides.
+  }
+  return window.innerWidth >= 1024;
 }
 
 function weekLabel(dates: string[]) {

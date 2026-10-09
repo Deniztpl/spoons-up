@@ -116,7 +116,7 @@ export function WeekCalendar({
 
   return (
     <>
-      <div ref={scrollRef} className="hidden min-h-0 flex-1 overflow-y-auto pb-6 md:block">
+      <div ref={scrollRef} className="hidden min-h-0 min-w-0 flex-1 overflow-y-auto pb-6 md:block">
         <div className="min-w-[700px]">
           <div className="sticky top-0 z-[6] border-b border-ink/12 bg-canvas">
             <div className={`${calendarColumns} pb-2.5 pt-0.5`}>

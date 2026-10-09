@@ -336,7 +336,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Week: the `×N` badge becomes the duration (`4h`, `1h 30m`) beside the repeat mark
 - Areas and Growth: goal amounts in hours (`12h 15m / 20h`)
 
-### Block 3 — Week hours panel
+### Block 3 — Week hours panel — DONE
 
 - API: `goals` on `GET /week` with `target`, `done` and `planned` hours for the shown week, where `planned` is pending work on today or later and never includes `done`; tests cover elapsed pending work leaving `planned`, work still open earlier today staying in it, a task moved into the following week, the following week and goals without a target
 - Web: a right-hand panel toggled from a top-right button, open by default where the sidebar shows and closed below, the choice remembered on the device; one bar per goal split into done, planned and not planned (`target − done − planned`, never below zero), with extra hours past the target shown as +Nh; grouped by area in its colour; refreshed after every Week write; on a phone the button opens the rows above the day list

@@ -75,6 +75,7 @@ function weekResponse(start = "2026-09-21") {
         task("52", "Renew passport", "2026-10-12", null),
       ],
     },
+    goals: [] as Array<Record<string, unknown>>,
   };
 }
 
@@ -124,6 +125,81 @@ function renderPage() {
 describe("Week page", () => {
   beforeEach(() => {
     onLogout.mockClear();
+    localStorage.clear();
+  });
+
+  it("splits each goal's hours into done, planned and not planned, and remembers a closed panel", async () => {
+    let checked = false;
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json({
+          ...weekResponse(),
+          goals: [
+            { goal_id: "7", area_id: "3", title: "Beats", target: 20, done: checked ? 9 : 8, planned: 4.5 },
+            { goal_id: "8", area_id: "3", title: "Mixing", target: 2, done: 1.5, planned: 2 },
+          ],
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+        return Response.json({
+          areas: [
+            {
+              id: "3",
+              name: "Music",
+              color: "GREEN",
+              archived_at: null,
+              unarchived_at: null,
+              created_at: "2026-09-22T09:00:00Z",
+            },
+          ],
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+        return Response.json({ goals: [] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/tasks/41/check") {
+        checked = true;
+        return Response.json({ ...task("41", "Plan sprint", "2026-09-24"), status: "DONE" });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const { unmount } = renderPage();
+
+    const panel = await screen.findByRole("complementary", { name: "Hours" });
+    const music = await within(panel).findByRole("region", { name: "Music" });
+    expect(music).toHaveClass("area-green");
+    const [beats, mixing] = within(music).getAllByRole("listitem");
+    expect(beats).toHaveTextContent("Beats20h");
+    expect(beats).toHaveTextContent("8h done · 4h 30m planned · 7h 30m not planned");
+    // Placing more than the target leaves nothing unplanned and shows the extra.
+    expect(mixing).toHaveTextContent("+1h 30m");
+    expect(mixing).toHaveTextContent("1h 30m done · 2h planned · 0h not planned");
+
+    // Checking work reads the week again, so the hours follow.
+    await user.click(screen.getAllByRole("checkbox", { name: "Plan sprint" })[0]!);
+    await waitFor(() =>
+      expect(within(panel).getAllByRole("listitem")[0]).toHaveTextContent(
+        "9h done · 4h 30m planned · 6h 30m not planned",
+      ),
+    );
+
+    const toggle = screen.getByRole("button", { name: "Hours" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("complementary", { name: "Hours" })).not.toBeInTheDocument();
+
+    unmount();
+    renderPage();
+    await screen.findByText("Sep 21 – 27");
+    expect(screen.getByRole("button", { name: "Hours" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("complementary", { name: "Hours" })).not.toBeInTheDocument();
   });
 
   it("renders the server-ordered week and only navigates between the allowed weeks", async () => {

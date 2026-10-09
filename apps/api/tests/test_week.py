@@ -296,6 +296,87 @@ def test_week_leaves_unscheduled_journal_work_out_and_lists_far_due_items_later(
     assert [item["title"] for item in body["later_tasks"]["items"]] == ["Passport"]
 
 
+def test_week_splits_each_targeted_goal_into_done_and_planned_hours(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    # Today is Thursday 2026-09-24, in the week of 2026-09-21.
+    headers = bearer(register(client, "week-hours@example.com"))
+    coding_id = str(create_area(client, headers, "Coding")["id"])
+    music_id = str(create_area(client, headers, "Music")["id"])
+    music = create_goal(client, headers, area_id=music_id, title="Beats", weekly_target=20)
+    deep_work = create_goal(client, headers, area_id=coding_id, title="Deep work")
+    create_goal(client, headers, area_id=coding_id, title="Someday", weekly_target=None)
+    beats_id = int(str(music["id"]))
+
+    with db_session.begin():
+        user = get_user(db_session, "week-hours@example.com")
+
+        def beats(day: date, minutes: int, status: TaskStatus = TaskStatus.PENDING) -> Task:
+            return build_task(
+                user_id=user.id,
+                title="Beats",
+                scheduled_date=day,
+                goal_id=beats_id,
+                minutes=minutes,
+                status=status,
+            )
+
+        # Moved into the following week, it still belongs to this one.
+        moved = beats(date(2026, 9, 29), 60)
+        moved.period_start = date(2026, 9, 21)
+        db_session.add_all(
+            [
+                beats(date(2026, 9, 21), 240, TaskStatus.DONE),
+                beats(date(2026, 9, 24), 45, TaskStatus.DONE),
+                # Left undone on an elapsed day, so its hours are free again.
+                beats(date(2026, 9, 22), 240),
+                # Still open earlier today: planned counts by day, not by time.
+                build_task(
+                    user_id=user.id,
+                    title="Beats",
+                    scheduled_date=date(2026, 9, 24),
+                    goal_id=beats_id,
+                    minutes=120,
+                    start_time=time(9),
+                ),
+                beats(date(2026, 9, 26), 90),
+                beats(date(2026, 9, 25), 240, TaskStatus.DELETED),
+                moved,
+                beats(date(2026, 9, 28), 120),
+            ]
+        )
+
+    current = client.get("/api/v1/week", headers=headers)
+    following = client.get("/api/v1/week", params={"start": "2026-09-28"}, headers=headers)
+
+    assert current.status_code == 200
+    assert current.json()["goals"] == [
+        {
+            "goal_id": deep_work["id"],
+            "area_id": coding_id,
+            "title": "Deep work",
+            "target": 4,
+            "done": 0,
+            "planned": 0,
+        },
+        {
+            "goal_id": music["id"],
+            "area_id": music_id,
+            "title": "Beats",
+            "target": 20,
+            "done": 4.75,
+            "planned": 4.5,
+        },
+    ]
+    assert [
+        (goal["title"], goal["done"], goal["planned"]) for goal in following.json()["goals"]
+    ] == [
+        ("Deep work", 0, 0),
+        ("Beats", 0, 2),
+    ]
+
+
 def freeze_week_service_time(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -342,10 +423,11 @@ def create_goal(
     *,
     area_id: str,
     title: str,
+    weekly_target: int | None = 4,
 ) -> dict[str, object]:
     response = client.post(
         "/api/v1/goals",
-        json={"area_id": area_id, "title": title, "weekly_target": 4},
+        json={"area_id": area_id, "title": title, "weekly_target": weekly_target},
         headers=headers,
     )
     assert response.status_code == 201
@@ -369,6 +451,7 @@ def build_task(
     due_date: date | None = None,
     start_time: time | None = None,
     status: TaskStatus = TaskStatus.PENDING,
+    minutes: int = 60,
 ) -> Task:
     quota_date = occurrence_date or scheduled_date
     return Task(
@@ -381,7 +464,7 @@ def build_task(
         due_date=due_date,
         start_time=start_time,
         # Goal work always carries its hours.
-        duration_minutes=60 if goal_id is not None else None,
+        duration_minutes=minutes if goal_id is not None else None,
         end_time=None,
         period_start=get_week_start(quota_date, week_start_day=1) if quota_date else None,
         status=status.value,

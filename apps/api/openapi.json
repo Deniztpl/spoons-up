@@ -1975,6 +1975,44 @@
         "title": "WeekDayResponse",
         "type": "object"
       },
+      "WeekGoalHoursResponse": {
+        "properties": {
+          "area_id": {
+            "title": "Area Id",
+            "type": "string"
+          },
+          "done": {
+            "title": "Done",
+            "type": "number"
+          },
+          "goal_id": {
+            "title": "Goal Id",
+            "type": "string"
+          },
+          "planned": {
+            "title": "Planned",
+            "type": "number"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "goal_id",
+          "area_id",
+          "title",
+          "target",
+          "done",
+          "planned"
+        ],
+        "title": "WeekGoalHoursResponse",
+        "type": "object"
+      },
       "WeekResponse": {
         "properties": {
           "days": {
@@ -1982,6 +2020,13 @@
               "$ref": "#/components/schemas/WeekDayResponse"
             },
             "title": "Days",
+            "type": "array"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/WeekGoalHoursResponse"
+            },
+            "title": "Goals",
             "type": "array"
           },
           "later_tasks": {
@@ -1996,7 +2041,8 @@
         "required": [
           "period_start",
           "days",
-          "later_tasks"
+          "later_tasks",
+          "goals"
         ],
         "title": "WeekResponse",
         "type": "object"
