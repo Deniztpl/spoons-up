@@ -1,9 +1,12 @@
+import type { RefObject } from "react";
+
 type TaskDeleteConfirmationProps = {
   taskTitle: string;
   isGoalLinked: boolean;
   // The steps a Journal item takes with it.
   stepCount?: number;
   isSaving: boolean;
+  deleteButtonRef?: RefObject<HTMLButtonElement | null>;
   onCancel: () => void;
   onDelete: () => void;
 };
@@ -13,6 +16,7 @@ export function TaskDeleteConfirmation({
   isGoalLinked,
   stepCount = 0,
   isSaving,
+  deleteButtonRef,
   onCancel,
   onDelete,
 }: TaskDeleteConfirmationProps) {
@@ -32,6 +36,7 @@ export function TaskDeleteConfirmation({
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
+          ref={deleteButtonRef}
           type="button"
           disabled={isSaving}
           className="rounded-[9px] bg-danger px-3.5 py-2 text-[13px] font-medium text-white transition hover:bg-danger/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:cursor-wait disabled:opacity-60"

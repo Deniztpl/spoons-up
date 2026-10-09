@@ -57,7 +57,12 @@ type WeekCalendarProps = {
   onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
   onPlace: (task: WeekTask, placement: TaskPlacement) => void;
+  onPaste: (task: WeekTask, spot: { date: string; startTime: string | null }) => void;
+  onRequestDelete: (task: WeekTask) => void;
 };
+
+// Where Ctrl or Cmd+V puts a copy: a quarter hour on a day, or the day's untimed row.
+type PasteSpot = { date: string; startMinutes: number | null };
 
 type BlockPlacement = {
   top: number;
@@ -66,11 +71,16 @@ type BlockPlacement = {
   width: string;
 };
 
-// What a task block needs to take part in pressing, dragging and resizing.
+// What the calendar's tasks and slots need for selecting, pressing, dragging and resizing.
 type TaskInteraction = {
   interaction: CalendarInteraction | null;
+  selectedId: string | null;
+  pasteSpot: PasteSpot | null;
   pressTask: (event: PointerEvent<HTMLElement>, task: WeekTask, mode: "move" | "resize") => void;
+  isClickIgnored: () => boolean;
+  onSelect: (task: WeekTask) => void;
   onEdit: (task: WeekTask) => void;
+  onSetPasteSpot: (spot: PasteSpot) => void;
 };
 
 export function WeekCalendar({
@@ -82,8 +92,17 @@ export function WeekCalendar({
   onEdit,
   onToggle,
   onPlace,
+  onPaste,
+  onRequestDelete,
 }: WeekCalendarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pasteSpot, setPasteSpot] = useState<PasteSpot | null>(null);
+  const copiedRef = useRef<WeekTask | null>(null);
+  const selectedTask =
+    selectedId === null
+      ? null
+      : (week.days.flatMap((day) => day.tasks).find((task) => task.id === selectedId) ?? null);
   const { interaction, pressTask, pressSlot, moveOver, isClickIgnored } = useCalendarInteraction(
     { onPlace, onDraw: onCreate },
     HOUR_HEIGHT,
@@ -112,16 +131,66 @@ export function WeekCalendar({
     return () => observer.disconnect();
   }, []);
 
+  // Shortcuts act on the calendar, not on a dialog or a field being typed in.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')
+      ) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      const withModifier = event.ctrlKey || event.metaKey;
+      if (withModifier && key === "c") {
+        // A step is planned only from its item, so it is not copied.
+        if (selectedTask && selectedTask.parent_id === null) copiedRef.current = selectedTask;
+      } else if (withModifier && key === "v") {
+        const copied = copiedRef.current;
+        if (copied && pasteSpot) {
+          event.preventDefault();
+          onPaste(copied, {
+            date: pasteSpot.date,
+            startTime:
+              pasteSpot.startMinutes === null ? null : minutesToTime(pasteSpot.startMinutes),
+          });
+        }
+      } else if (key === "delete" || key === "backspace") {
+        if (selectedTask) {
+          event.preventDefault();
+          onRequestDelete(selectedTask);
+        }
+      } else if (key === "enter") {
+        // A focused task's own button opens it; this covers a task picked with the pointer.
+        if (selectedTask && !(event.target instanceof HTMLButtonElement)) {
+          event.preventDefault();
+          onEdit(selectedTask);
+        }
+      } else if (key === "escape") {
+        setSelectedId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedTask, pasteSpot, onPaste, onRequestDelete, onEdit]);
+
   const selectedDay =
     week.days.find((day) => day.date === selectedDate) ?? week.days[0];
   const selectedDoneCount =
     selectedDay?.tasks.filter((task) => task.status === "DONE").length ?? 0;
   const taskInteraction: TaskInteraction = {
     interaction,
+    selectedId,
+    pasteSpot,
     pressTask,
-    // A click that ends a drag does not open the task under it.
-    onEdit: (task) => {
-      if (!isClickIgnored()) onEdit(task);
+    isClickIgnored,
+    onSelect: (task) => setSelectedId(task.id),
+    onEdit,
+    // Picking an empty spot also lets go of the selected task.
+    onSetPasteSpot: (spot) => {
+      setPasteSpot(spot);
+      setSelectedId(null);
     },
   };
 
@@ -318,21 +387,28 @@ function UntimedRow({
   onToggle: (task: WeekTask) => void;
   onPointerMove: (event: PointerEvent<HTMLElement>, column: CalendarColumn) => void;
 }) {
-  const { interaction } = taskInteraction;
+  const { interaction, pasteSpot, isClickIgnored, onSetPasteSpot } = taskInteraction;
   const moving = interaction?.kind === "move" ? interaction : null;
   const isTarget = moving?.target?.date === date && moving.target.startMinutes === null;
+  const isPasteSpot = pasteSpot?.date === date && pasteSpot.startMinutes === null;
 
   return (
     <div
       role="group"
       aria-label={`Untimed tasks for ${date}`}
-      className={`flex min-h-[30px] min-w-0 flex-col gap-1 border-l border-ink/10 py-1 pl-0.5 pr-[3px] ${columnBackground(
+      className={`relative flex min-h-[30px] min-w-0 flex-col gap-1 border-l border-ink/10 py-1 pl-0.5 pr-[3px] ${columnBackground(
         isTarget,
         isToday,
         isPast,
       )}`}
       onPointerMove={(event) => onPointerMove(event, { date, zone: "untimed", isPast })}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !isPast && !isClickIgnored()) {
+          onSetPasteSpot({ date, startMinutes: null });
+        }
+      }}
     >
+      {isPasteSpot ? <PasteMarker className="inset-0.5" /> : null}
       {tasks.map((task) => (
         <TaskBlock
           key={task.id}
@@ -386,7 +462,7 @@ function DayTimeline({
   onPressSlot: (event: PointerEvent<HTMLElement>, date: string) => void;
   onPointerMove: (event: PointerEvent<HTMLElement>, column: CalendarColumn) => void;
 }) {
-  const { interaction } = taskInteraction;
+  const { interaction, pasteSpot, isClickIgnored, onSetPasteSpot } = taskInteraction;
   // A task being resized takes its new length in the layout while the edge is dragged.
   const shownTasks = tasks.map((task) =>
     interaction?.kind === "resize" && interaction.task.id === task.id
@@ -398,12 +474,20 @@ function DayTimeline({
   const moveTarget =
     moving?.target?.date === date && moving.target.startMinutes !== null ? moving.target : null;
   const drawing = interaction?.kind === "draw" && interaction.date === date ? interaction : null;
+  const pasteMinutes =
+    pasteSpot?.date === date && pasteSpot.startMinutes !== null ? pasteSpot.startMinutes : null;
 
-  // A keyboard press has no pointer position, so it proposes the start of a working day.
-  function handleKeyboardCreate(event: MouseEvent<HTMLButtonElement>) {
+  // A click picks the quarter hour under the pointer as the paste spot. A keyboard press has no
+  // pointer position, so it proposes a task at the start of a working day instead.
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
     if (event.detail === 0) {
       onCreate({ scheduledDate: date, startTime: "09:00", durationMinutes: 60 });
+      return;
     }
+    if (isClickIgnored()) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const minutes = ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60;
+    onSetPasteSpot({ date, startMinutes: clampStart(Math.floor(minutes / 15) * 15) });
   }
 
   // A double-click proposes an hour from the quarter hour under the pointer.
@@ -433,8 +517,14 @@ function DayTimeline({
           aria-label={`Add a task on ${date}`}
           className="absolute inset-0 cursor-cell focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
           onPointerDown={(event) => onPressSlot(event, date)}
-          onClick={handleKeyboardCreate}
+          onClick={handleClick}
           onDoubleClick={handleDoubleClick}
+        />
+      ) : null}
+      {pasteMinutes !== null ? (
+        <PasteMarker
+          className="inset-x-[2px]"
+          style={{ top: (pasteMinutes / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 4 }}
         />
       ) : null}
       {isToday ? <NowLine /> : null}
@@ -498,6 +588,17 @@ function PlacementGhost({
   );
 }
 
+// Marks where Ctrl or Cmd+V would put a copy.
+function PasteMarker({ className, style }: { className: string; style?: CSSProperties }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute z-[1] rounded-[5px] border-2 border-dashed border-accent/60 bg-accent/6 ${className}`}
+      style={style}
+    />
+  );
+}
+
 // Today's column marks the current time and moves the mark along as the day goes.
 function NowLine() {
   const [minutes, setMinutes] = useState(currentMinutes);
@@ -536,8 +637,9 @@ function TaskBlock({
   taskInteraction: TaskInteraction;
   onToggle: (task: WeekTask) => void;
 }) {
-  const { interaction, pressTask, onEdit } = taskInteraction;
+  const { interaction, selectedId, pressTask, isClickIgnored, onSelect, onEdit } = taskInteraction;
   const isDone = task.status === "DONE";
+  const isSelected = selectedId === task.id;
   // Open work on an elapsed day can still move to today or later; finished work stays put,
   // though its length can still change.
   const isMovable = !isPending && !(isPast && isDone);
@@ -588,17 +690,27 @@ function TaskBlock({
             : isDone
               ? "opacity-50"
               : ""
-      } ${isResizing ? "z-[5] ring-2 ring-accent/50" : ""} ${isMovable ? "touch-none" : ""}`}
+      } ${isResizing ? "z-[5] ring-2 ring-accent/50" : ""} ${
+        isSelected ? "z-[3] ring-2 ring-accent ring-offset-1 ring-offset-canvas" : ""
+      } ${isMovable ? "touch-none" : ""}`}
       style={placement}
       onPointerDown={handlePointerDown}
     >
       <button
         type="button"
         aria-label={taskSummary(task, area)}
+        aria-pressed={isSelected}
         className={`absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
           isPending ? "cursor-wait" : isMovable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
         }`}
-        onClick={() => onEdit(task)}
+        onClick={(event) => {
+          // The release that ends a drag is not a click on the task.
+          if (isClickIgnored()) return;
+          onSelect(task);
+          // Enter or Space on a focused task opens it, as a double-click does.
+          if (event.detail === 0) onEdit(task);
+        }}
+        onDoubleClick={() => onEdit(task)}
       />
       <div
         className={`pointer-events-none relative flex h-full min-w-0 gap-x-[5px] gap-y-px px-1.5 ${

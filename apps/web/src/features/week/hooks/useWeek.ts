@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { checkTask, uncheckTask, updateTask } from "../../tasks/api/tasksApi";
+import {
+  checkTask,
+  createTask,
+  deleteTask,
+  uncheckTask,
+  updateTask,
+} from "../../tasks/api/tasksApi";
 import { endTime } from "../calendarTime";
 import { getToday } from "../../today/api/todayApi";
 import { getWeek, type WeekResponse, type WeekTask } from "../api/weekApi";
@@ -178,6 +184,55 @@ export function useWeek() {
     }
   }
 
+  // A copy is new work at the spot with the same hours: goal work stays with its goal and does
+  // not repeat; Journal work becomes a new item with only its title.
+  async function pasteTask(task: WeekTask, spot: { date: string; startTime: string | null }) {
+    setActionError(null);
+    try {
+      const { data, error } = await createTask({
+        ...(task.goal_id ? { goal_id: task.goal_id } : { title: task.title }),
+        scheduled_date: spot.date,
+        start_time: spot.startTime,
+        duration_minutes: task.duration_minutes,
+      });
+      if (!data) {
+        setActionError(errorMessage(error, "Task could not be pasted."));
+        return;
+      }
+      await loadWeek(position, false);
+    } catch {
+      setActionError("We couldn't reach Spoons Up. Please try again.");
+    }
+  }
+
+  // The task leaves the calendar at once; a failed delete puts it back.
+  async function removeTask(task: WeekTask) {
+    if (pendingTaskIds.has(task.id)) return;
+
+    setActionError(null);
+    setPendingTaskIds((current) => new Set(current).add(task.id));
+    setWeek((current) => (current ? withoutTask(current, task.id) : current));
+
+    try {
+      const { error, response } = await deleteTask(task.id);
+      if (response.status !== 204) {
+        setWeek((current) => (current ? withTask(current, task) : current));
+        setActionError(errorMessage(error, "Task could not be deleted."));
+      } else {
+        await loadWeek(position, false);
+      }
+    } catch {
+      setWeek((current) => (current ? withTask(current, task) : current));
+      setActionError("We couldn't reach Spoons Up. Please try again.");
+    } finally {
+      setPendingTaskIds((current) => {
+        const next = new Set(current);
+        next.delete(task.id);
+        return next;
+      });
+    }
+  }
+
   return {
     week,
     todayDate,
@@ -191,6 +246,19 @@ export function useWeek() {
     reload,
     toggleTask,
     placeTask,
+    pasteTask,
+    removeTask,
+  };
+
+}
+
+function withoutTask(week: WeekResponse, taskId: string): WeekResponse {
+  return {
+    ...week,
+    days: week.days.map((day) => ({
+      ...day,
+      tasks: day.tasks.filter((item) => item.id !== taskId),
+    })),
   };
 }
 

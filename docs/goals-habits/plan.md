@@ -348,7 +348,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Show each change at once and save it in the background; put the task back and show the error on failure
 - Keep the elapsed-slot rules; a done task on an elapsed day can still change its duration
 
-### Block 5 — Selection, copy, paste and delete
+### Block 5 — Selection, copy, paste and delete — DONE
 
 - A click selects, a double-click or Enter opens the form, Escape clears; a click on an empty slot places the paste cursor
 - Ctrl/Cmd+C and Ctrl/Cmd+V through `POST /tasks`: a goal task copies as an ad-hoc task of its goal, a Journal task as a new item with its title and duration; steps are not copied

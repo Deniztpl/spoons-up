@@ -10,8 +10,8 @@ const onLogout = vi.fn(async () => ({ ok: true as const }));
 function task(id: string, title: string, date: string, time: string | null = "09:00") {
   return {
     id,
-    goal_id: null,
-    rule_id: null,
+    goal_id: null as string | null,
+    rule_id: null as string | null,
     title,
     scheduled_date: date,
     occurrence_date: null,
@@ -668,6 +668,161 @@ describe("Week page", () => {
     ).not.toHaveClass("area-green");
   });
 
+  it("selects a task with a click and opens it with Enter or a double-click", async () => {
+    vi.stubGlobal("fetch", defaultFetch());
+    const user = userEvent.setup();
+    renderPage();
+
+    const planSprint = (await screen.findAllByRole("button", { name: /^Plan sprint/ }))[0]!;
+    await user.click(planSprint);
+    expect(planSprint).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // Enter opens the task picked with the pointer, even once focus has moved on.
+    planSprint.blur();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("dialog", { name: "Edit task" })).toBeInTheDocument();
+    // Shortcuts stay quiet inside a dialog.
+    await user.keyboard("{Delete}");
+    expect(screen.queryByRole("dialog", { name: "Delete task" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    planSprint.blur();
+    await user.keyboard("{Escape}");
+    expect(planSprint).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("copies a task and pastes it at the clicked quarter hour or untimed row", async () => {
+    const goalTask = {
+      ...task("43", "Deep work", "2026-09-24", "13:00"),
+      goal_id: "7",
+      rule_id: "21",
+      duration_minutes: 240,
+      end_time: "17:00",
+    };
+    const step = {
+      ...task("44", "Rehearse", "2026-09-24", "18:00"),
+      parent_id: "70",
+      parent: { id: "70", title: "Conference", step_progress: { done: 0, total: 2 } },
+    };
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json(weekWith("2026-09-24", [goalTask, step]));
+      }
+      if (request.method === "GET" && ["/api/v1/areas", "/api/v1/goals"].includes(url.pathname)) {
+        return Response.json(url.pathname === "/api/v1/areas" ? { areas: [] } : { goals: [] });
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/tasks") {
+        return Response.json(task("90", "Copy", "2026-09-26"), { status: 201 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Sep 21 – 27");
+    const posts = () =>
+      Promise.all(
+        fetchMock.mock.calls
+          .map(([request]) => request)
+          .filter((request) => request.method === "POST")
+          .map((request) => request.clone().json()),
+      );
+
+    // A repeating goal task copies as one more task of its goal.
+    await user.click(screen.getAllByRole("button", { name: /^Deep work/ })[0]!);
+    await user.keyboard("{Control>}c{/Control}");
+    fireEvent.click(screen.getByRole("button", { name: "Add a task on 2026-09-26" }), {
+      clientY: 640,
+      detail: 1,
+    });
+    await user.keyboard("{Control>}v{/Control}");
+    await waitFor(async () =>
+      expect(await posts()).toEqual([
+        { goal_id: "7", scheduled_date: "2026-09-26", start_time: "10:00", duration_minutes: 240 },
+      ]),
+    );
+
+    // Journal work copies as a new item with its title, here into a day's untimed row.
+    await user.click(screen.getAllByRole("button", { name: /^Plan sprint/ })[0]!);
+    await user.keyboard("{Meta>}c{/Meta}");
+    fireEvent.click(screen.getByRole("group", { name: "Untimed tasks for 2026-09-25" }), {
+      detail: 1,
+    });
+    await user.keyboard("{Meta>}v{/Meta}");
+    await waitFor(async () => expect(await posts()).toHaveLength(2));
+    expect((await posts())[1]).toEqual({
+      title: "Plan sprint",
+      scheduled_date: "2026-09-25",
+      start_time: null,
+      duration_minutes: 60,
+    });
+
+    // A step is not copied, so the last copy is pasted again.
+    await user.click(screen.getAllByRole("button", { name: /^Rehearse/ })[0]!);
+    await user.keyboard("{Control>}c{/Control}");
+    fireEvent.click(screen.getByRole("group", { name: "Untimed tasks for 2026-09-27" }), {
+      detail: 1,
+    });
+    await user.keyboard("{Control>}v{/Control}");
+    await waitFor(async () => expect(await posts()).toHaveLength(3));
+    expect((await posts())[2]).toMatchObject({ title: "Plan sprint", scheduled_date: "2026-09-27" });
+  });
+
+  it("deletes the selected task with the Delete key after asking", async () => {
+    let deleted = false;
+    const fetchMock = defaultFetch();
+    fetchMock.mockImplementation(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        const response = weekResponse();
+        return Response.json(
+          deleted
+            ? {
+                ...response,
+                days: response.days.map((day) => ({
+                  ...day,
+                  tasks: day.tasks.filter((item) => item.id !== "41"),
+                })),
+              }
+            : response,
+        );
+      }
+      if (request.method === "DELETE" && url.pathname === "/api/v1/tasks/41") {
+        deleted = true;
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click((await screen.findAllByRole("button", { name: /^Plan sprint/ }))[0]!);
+    await user.keyboard("{Delete}");
+    let dialog = screen.getByRole("dialog", { name: "Delete task" });
+    expect(dialog).toHaveTextContent("Delete “Plan sprint”?");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([request]) => request.method === "DELETE")).toBe(false);
+
+    await user.keyboard("{Backspace}");
+    dialog = screen.getByRole("dialog", { name: "Delete task" });
+    expect(within(dialog).getByRole("button", { name: "Delete task" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: /^Plan sprint/ })).toHaveLength(0));
+    expect(fetchMock.mock.calls.filter(([request]) => request.method === "DELETE")).toHaveLength(1);
+  });
+
   it("edits and deletes a task through the shared form", async () => {
     let hasTask = true;
     const fetchMock = vi.fn(async (request: Request) => {
@@ -698,7 +853,7 @@ describe("Week page", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click((await screen.findAllByRole("button", { name: /Plan sprint/ }))[0]!);
+    await user.dblClick((await screen.findAllByRole("button", { name: /Plan sprint/ }))[0]!);
     const dialog = screen.getByRole("dialog", { name: "Edit task" });
     expect(within(dialog).getByLabelText("Date")).toBeEnabled();
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));

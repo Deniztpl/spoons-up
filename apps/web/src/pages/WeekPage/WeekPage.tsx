@@ -6,6 +6,7 @@ import type { AuthActionResult } from "../../features/auth/AuthContext";
 import { JournalTaskDialog } from "../../features/journal/components/JournalTaskDialog";
 import { OpenStepsDialog } from "../../features/journal/components/OpenStepsDialog";
 import { useJournalTaskForm } from "../../features/journal/hooks/useJournalTaskForm";
+import { TaskDeleteDialog } from "../../features/tasks/components/TaskDeleteDialog";
 import { TaskFormDialog } from "../../features/tasks/components/TaskFormDialog";
 import { type NewTaskDefaults, useTaskForm } from "../../features/tasks/hooks/useTaskForm";
 import type { WeekTask } from "../../features/week/api/weekApi";
@@ -37,6 +38,7 @@ export function WeekPage({
   // A slot or the add button first asks which kind of task it is for.
   const [newTask, setNewTask] = useState<NewTaskDefaults | null>(null);
   const [confirmingTask, setConfirmingTask] = useState<WeekTask | null>(null);
+  const [deletingTask, setDeletingTask] = useState<WeekTask | null>(null);
   const [isHoursOpen, setIsHoursOpen] = useState(initialHoursOpen);
   const hoursPanelId = useId();
   const { week, todayDate } = weekState;
@@ -189,6 +191,8 @@ export function WeekPage({
               onEdit={taskForm.openEdit}
               onToggle={requestToggle}
               onPlace={(task, placement) => void weekState.placeTask(task, placement)}
+              onPaste={(task, spot) => void weekState.pasteTask(task, spot)}
+              onRequestDelete={setDeletingTask}
             />
             {isHoursOpen ? (
               <WeekHoursPanel
@@ -268,6 +272,19 @@ export function WeekPage({
           onDurationChange={journalForm.setDurationMinutes}
           onSubmit={() => void journalForm.save()}
           onClose={journalForm.close}
+        />
+      ) : null}
+
+      {deletingTask ? (
+        <TaskDeleteDialog
+          title={deletingTask.title}
+          isGoalLinked={deletingTask.goal_id !== null}
+          stepCount={deletingTask.step_progress?.total ?? 0}
+          onCancel={() => setDeletingTask(null)}
+          onDelete={() => {
+            setDeletingTask(null);
+            void weekState.removeTask(deletingTask);
+          }}
         />
       ) : null}
 
