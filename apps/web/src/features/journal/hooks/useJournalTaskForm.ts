@@ -48,9 +48,14 @@ export function useJournalTaskForm({ onSaved }: { onSaved: () => void }) {
     }
   };
 
-  const open = ({ scheduledDate, startTime = "" }: NewTaskDefaults) => {
+  const open = ({ scheduledDate, startTime = "", durationMinutes }: NewTaskDefaults) => {
     formRequest.current += 1;
-    setDraft({ scheduledDate, startTime, durationMinutes: "", choice: null });
+    setDraft({
+      scheduledDate,
+      startTime,
+      durationMinutes: durationMinutes === undefined ? "" : String(durationMinutes),
+      choice: null,
+    });
     setItems(null);
     setLoadError(null);
     setFormError(null);

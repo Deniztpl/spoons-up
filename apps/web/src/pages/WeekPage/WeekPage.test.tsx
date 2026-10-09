@@ -114,6 +114,22 @@ function defaultFetch() {
   });
 }
 
+// Presses one element, moves the pointer over another and lets go there.
+function drag(from: Element, over: Element, { fromY = 0, toY }: { fromY?: number; toY: number }) {
+  fireEvent.pointerDown(from, { button: 0, clientX: 10, clientY: fromY });
+  fireEvent.pointerMove(over, { clientX: 40, clientY: toY });
+  fireEvent.pointerUp(over, { clientX: 40, clientY: toY });
+}
+
+function patchBodies(fetchMock: ReturnType<typeof vi.fn>, path: string) {
+  return Promise.all(
+    fetchMock.mock.calls
+      .map(([request]) => request as Request)
+      .filter((request) => request.method === "PATCH" && new URL(request.url).pathname === path)
+      .map((request) => request.clone().json()),
+  );
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/week"]}>
@@ -232,7 +248,7 @@ describe("Week page", () => {
     expect(await screen.findByText("Sep 21 – 27")).toBeInTheDocument();
   });
 
-  it("asks for Goal or Journal, then opens that form with today or the clicked slot", async () => {
+  it("asks for Goal or Journal, then opens that form with today or the double-clicked slot", async () => {
     vi.stubGlobal("fetch", defaultFetch());
     const user = userEvent.setup();
     renderPage();
@@ -250,20 +266,52 @@ describe("Week page", () => {
     expect(within(dialog).queryByRole("option", { name: "No goal" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
+    // A single click on an empty slot no longer opens anything.
     fireEvent.click(screen.getByRole("button", { name: "Add a task on 2026-09-25" }), {
+      clientY: 608,
+      detail: 1,
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Add a task on 2026-09-25" }), {
       clientY: 608,
     });
     chooser = screen.getByRole("dialog", { name: "Add a task" });
-    expect(chooser).toHaveTextContent("Fri, Sep 25 · 09:30");
+    expect(chooser).toHaveTextContent("Fri, Sep 25 · 09:30 · 1h");
     await user.click(within(chooser).getByRole("button", { name: "Journal task" }));
     dialog = screen.getByRole("dialog", { name: "Journal task" });
     expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-25");
     expect(within(dialog).getByLabelText("Date")).toHaveAttribute("min", "2026-09-24");
     expect(within(dialog).getByLabelText("Date")).toBeEnabled();
     expect(within(dialog).getByLabelText("Start time")).toHaveValue("09:30");
+    expect(within(dialog).getByRole("spinbutton", { name: "Duration" })).toHaveAttribute(
+      "aria-valuetext",
+      "1 hour",
+    );
   });
 
-  it("plans open Journal work on a clicked slot without creating a task", async () => {
+  it("draws a new task's range on an empty slot and opens the form with it", async () => {
+    vi.stubGlobal("fetch", defaultFetch());
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Sep 21 – 27");
+
+    const slot = screen.getByRole("button", { name: "Add a task on 2026-09-25" });
+    // From the 10:00 line down to the 14:00 line.
+    drag(slot, slot, { fromY: 640, toY: 896 });
+
+    const chooser = screen.getByRole("dialog", { name: "Add a task" });
+    expect(chooser).toHaveTextContent("Fri, Sep 25 · 10:00 · 4h");
+    await user.click(within(chooser).getByRole("button", { name: "Goal task" }));
+    const dialog = screen.getByRole("dialog", { name: "New task" });
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-25");
+    expect(within(dialog).getByLabelText("Start time")).toHaveValue("10:00");
+    expect(within(dialog).getByRole("spinbutton", { name: "Duration" })).toHaveAttribute(
+      "aria-valuetext",
+      "4 hours",
+    );
+  });
+
+  it("plans open Journal work on a double-clicked slot without creating a task", async () => {
     let planned = false;
     const fetchMock = defaultFetch();
     fetchMock.mockImplementation(async (request: Request) => {
@@ -296,7 +344,7 @@ describe("Week page", () => {
         expect(await request.clone().json()).toEqual({
           scheduled_date: "2026-09-25",
           start_time: "09:30",
-          duration_minutes: null,
+          duration_minutes: 60,
         });
         planned = true;
         return Response.json({ ...task("60", "Buy a gift", "2026-09-25", "09:30") });
@@ -308,7 +356,7 @@ describe("Week page", () => {
     renderPage();
     await screen.findByText("Sep 21 – 27");
 
-    fireEvent.click(screen.getByRole("button", { name: "Add a task on 2026-09-25" }), {
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Add a task on 2026-09-25" }), {
       clientY: 608,
     });
     await user.click(
@@ -385,20 +433,35 @@ describe("Week page", () => {
           ]),
         );
       }
+      if (request.method === "PATCH" && url.pathname === "/api/v1/tasks/80") {
+        return Response.json(task("80", "Open review", "2026-09-24", "10:00"));
+      }
       throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
     vi.stubGlobal("fetch", fetchMock);
     renderPage();
 
-    const open = (await screen.findByRole("button", { name: "Open review, 09:00 to 10:00, 1 hour" })).closest(
-      "article",
-    );
+    const open = (
+      await screen.findByRole("button", { name: "Open review, 09:00 to 10:00, 1 hour" })
+    ).closest("article")!;
     const finished = screen
       .getByRole("button", { name: "Finished review, 11:00 to 10:00, 1 hour" })
-      .closest("article");
-    expect(open).toHaveAttribute("draggable", "true");
-    expect(finished).toHaveAttribute("draggable", "false");
+      .closest("article")!;
+    const today = screen.getByRole("button", { name: "Add a task on 2026-09-24" });
     expect(screen.queryByRole("button", { name: "Add a task on 2026-09-22" })).not.toBeInTheDocument();
+
+    // Finished work on an elapsed day does not move, and no elapsed day takes a drop.
+    drag(finished, today, { toY: 640 });
+    drag(open, screen.getByRole("group", { name: "Untimed tasks for 2026-09-23" }), { toY: 10 });
+    expect(await patchBodies(fetchMock, "/api/v1/tasks/81")).toEqual([]);
+    expect(await patchBodies(fetchMock, "/api/v1/tasks/80")).toEqual([]);
+
+    drag(open, today, { toY: 640 });
+    await waitFor(async () =>
+      expect(await patchBodies(fetchMock, "/api/v1/tasks/80")).toEqual([
+        { scheduled_date: "2026-09-24", start_time: "10:00" },
+      ]),
+    );
   });
 
   it("shows the count and list of later tasks from the week response", async () => {
@@ -455,16 +518,12 @@ describe("Week page", () => {
     });
   });
 
-  it("moves a task to a future calendar slot with PATCH", async () => {
+  it("moves a task with the pointer and resizes it from its bottom edge", async () => {
     const fetchMock = defaultFetch();
     fetchMock.mockImplementation(async (request: Request) => {
       const url = new URL(request.url);
       if (request.method === "PATCH" && url.pathname === "/api/v1/tasks/41") {
-        expect(await request.clone().json()).toEqual({
-          scheduled_date: "2026-09-25",
-          start_time: "10:00",
-        });
-        return Response.json({ ...task("41", "Plan sprint", "2026-09-25", "10:00"), completed_at: null });
+        return Response.json(task("41", "Plan sprint", "2026-09-24"));
       }
       if (request.method === "GET" && url.pathname === "/api/v1/today") {
         return Response.json(todayResponse());
@@ -478,26 +537,67 @@ describe("Week page", () => {
     renderPage();
     await screen.findByText("Sep 21 – 27");
 
-    const values = new Map<string, string>();
-    const dataTransfer = {
-      effectAllowed: "none",
-      types: ["application/x-spoons-up-task"],
-      setData: (type: string, value: string) => values.set(type, value),
-      getData: (type: string) => values.get(type) ?? "",
-    };
     const card = screen.getAllByText("Plan sprint")[0]!.closest("article")!;
-    const target = screen.getByRole("button", { name: "Add a task on 2026-09-25" });
-    fireEvent.dragStart(card, { clientY: 0, dataTransfer });
-    fireEvent.drop(target, { clientY: 640, dataTransfer });
+    drag(card, screen.getByRole("button", { name: "Add a task on 2026-09-25" }), { toY: 640 });
+    await waitFor(async () =>
+      expect(await patchBodies(fetchMock, "/api/v1/tasks/41")).toHaveLength(1),
+    );
 
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(
-          ([request]) =>
-            request.method === "PATCH" && new URL(request.url).pathname === "/api/v1/tasks/41",
-        ),
-      ).toBe(true);
+    // From 09:00, the bottom edge pulled down to the 11:00 line makes two hours.
+    drag(
+      screen.getByTestId("resize-41"),
+      screen.getByRole("button", { name: "Add a task on 2026-09-24" }),
+      { fromY: 640, toY: 704 },
+    );
+    await waitFor(async () =>
+      expect(await patchBodies(fetchMock, "/api/v1/tasks/41")).toEqual([
+        { scheduled_date: "2026-09-25", start_time: "10:00" },
+        { duration_minutes: 120 },
+      ]),
+    );
+  });
+
+  it("shows a moved task at once and puts it back when the save fails", async () => {
+    let failMove: (() => void) | undefined;
+    const fetchMock = defaultFetch();
+    fetchMock.mockImplementation(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "PATCH" && url.pathname === "/api/v1/tasks/41") {
+        return new Promise<Response>((resolve) => {
+          failMove = () =>
+            resolve(
+              Response.json(
+                { code: "validation_error", message: "Task could not be saved" },
+                { status: 422 },
+              ),
+            );
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        return Response.json(weekResponse());
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
     });
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+    await screen.findByText("Sep 21 – 27");
+
+    const card = screen.getAllByText("Plan sprint")[0]!.closest("article")!;
+    drag(card, screen.getByRole("button", { name: "Add a task on 2026-09-25" }), { toY: 640 });
+
+    expect(
+      await screen.findByRole("button", { name: "Plan sprint, 10:00 to 11:00, 1 hour" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(failMove).toBeDefined());
+    failMove?.();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Task could not be saved");
+    expect(
+      screen.getByRole("button", { name: "Plan sprint, 09:00 to 10:00, 1 hour" }),
+    ).toBeInTheDocument();
   });
 
   it("draws goal tasks in their area's colour and names the area on long blocks", async () => {

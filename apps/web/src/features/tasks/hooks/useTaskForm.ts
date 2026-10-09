@@ -49,6 +49,8 @@ type TaskFormCallbacks = {
 export type NewTaskDefaults = {
   scheduledDate: string;
   startTime?: string;
+  // A range drawn on the calendar; goal work otherwise starts at an hour.
+  durationMinutes?: number;
 };
 
 export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
@@ -113,7 +115,7 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
     }
   };
 
-  const openCreate = ({ scheduledDate, startTime = "" }: NewTaskDefaults) => {
+  const openCreate = ({ scheduledDate, startTime = "", durationMinutes = 60 }: NewTaskDefaults) => {
     formRequest.current += 1;
     setDraft({
       task: null,
@@ -122,7 +124,7 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
       title: "",
       startTime,
       // New work here is goal work, which always carries its hours.
-      durationMinutes: "60",
+      durationMinutes: String(durationMinutes),
       isRepeating: false,
       byweekday: [],
       savedWeekdays: [],

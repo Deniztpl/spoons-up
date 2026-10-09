@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
 import { checkTask, uncheckTask, updateTask } from "../../tasks/api/tasksApi";
+import { endTime } from "../calendarTime";
 import { getToday } from "../../today/api/todayApi";
 import { getWeek, type WeekResponse, type WeekTask } from "../api/weekApi";
 
 export type WeekPosition = "current" | "following";
+
+// Where a task sits on the calendar: its day, its time (null for untimed) and its hours.
+export type TaskPlacement = {
+  scheduled_date?: string;
+  start_time?: string | null;
+  duration_minutes?: number;
+};
 
 function errorMessage(error: unknown, fallback: string) {
   if (
@@ -139,25 +147,27 @@ export function useWeek() {
     }
   }
 
-  async function moveTask(task: WeekTask, scheduledDate: string, startTime: string | null) {
+  // The task takes its new place at once; a failed save puts it back where it was.
+  async function placeTask(task: WeekTask, placement: TaskPlacement) {
     if (pendingTaskIds.has(task.id)) return;
-    if (task.scheduled_date === scheduledDate && task.start_time === startTime) return;
 
+    const placed = { ...task, ...placement };
+    placed.end_time = endTime(placed.start_time, placed.duration_minutes);
     setActionError(null);
     setPendingTaskIds((current) => new Set(current).add(task.id));
+    setWeek((current) => (current ? withTask(current, placed) : current));
 
     try {
-      const { error } = await updateTask(task.id, {
-        scheduled_date: scheduledDate,
-        start_time: startTime,
-      });
-
+      const { error } = await updateTask(task.id, placement);
       if (error) {
+        setWeek((current) => (current ? withTask(current, task) : current));
         setActionError(errorMessage(error, "Task could not be moved."));
       } else {
+        // A move can change other numbers, such as the week's hours, so read the week again.
         await loadWeek(position, false);
       }
     } catch {
+      setWeek((current) => (current ? withTask(current, task) : current));
       setActionError("We couldn't reach Spoons Up. Please try again.");
     } finally {
       setPendingTaskIds((current) => {
@@ -180,6 +190,17 @@ export function useWeek() {
     showFollowingWeek: () => void loadWeek("following"),
     reload,
     toggleTask,
-    moveTask,
+    placeTask,
+  };
+}
+
+// The week with the task shown on its own day, wherever it was before.
+function withTask(week: WeekResponse, task: WeekTask): WeekResponse {
+  return {
+    ...week,
+    days: week.days.map((day) => {
+      const others = day.tasks.filter((item) => item.id !== task.id);
+      return { ...day, tasks: day.date === task.scheduled_date ? [...others, task] : others };
+    }),
   };
 }

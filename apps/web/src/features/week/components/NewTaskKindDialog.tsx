@@ -2,12 +2,14 @@ import { useId, useRef } from "react";
 
 import { CloseIcon } from "../../../components/ui/CloseIcon";
 import { ModalDialog } from "../../../components/ui/ModalDialog";
+import { formatDuration } from "../../../lib/duration";
 
 export type NewTaskKind = "goal" | "journal";
 
 type NewTaskKindDialogProps = {
   scheduledDate: string;
   startTime?: string;
+  durationMinutes?: number;
   onChoose: (kind: NewTaskKind) => void;
   onClose: () => void;
 };
@@ -20,6 +22,7 @@ const choiceClassName =
 export function NewTaskKindDialog({
   scheduledDate,
   startTime,
+  durationMinutes,
   onChoose,
   onClose,
 }: NewTaskKindDialogProps) {
@@ -40,6 +43,7 @@ export function NewTaskKindDialog({
           <p className="text-[13px] text-ink-soft tabular-nums">
             {dateFormat.format(localDate(scheduledDate))}
             {startTime ? ` · ${startTime}` : ""}
+            {startTime && durationMinutes ? ` · ${formatDuration(durationMinutes)}` : ""}
           </p>
         </div>
         <button

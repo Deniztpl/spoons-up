@@ -1,9 +1,8 @@
 import {
   type CSSProperties,
-  type DragEvent,
   type MouseEvent,
+  type PointerEvent,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -12,7 +11,15 @@ import { CheckIcon } from "../../../components/ui/CheckIcon";
 import { describeDuration, formatDuration } from "../../../lib/duration";
 import type { Area } from "../../areas/api/areasApi";
 import { areaColorClass } from "../../areas/areaColor";
+import type { NewTaskDefaults } from "../../tasks/hooks/useTaskForm";
 import type { WeekResponse, WeekTask } from "../api/weekApi";
+import { minutesToTime, timeToMinutes } from "../calendarTime";
+import {
+  type CalendarColumn,
+  type CalendarInteraction,
+  useCalendarInteraction,
+} from "../hooks/useCalendarInteraction";
+import type { TaskPlacement } from "../hooks/useWeek";
 
 const HOUR_HEIGHT = 64;
 const DAY_HEIGHT = 24 * HOUR_HEIGHT;
@@ -25,7 +32,6 @@ const AREA_LABEL_BLOCK_HEIGHT = 94;
 // A step's block names its item under the title once there is room for the line.
 const PARENT_LABEL_BLOCK_HEIGHT = 56;
 const LAST_START_MINUTES = 23 * 60 + 45;
-const TASK_DRAG_TYPE = "application/x-spoons-up-task";
 const calendarColumns = "grid grid-cols-[52px_repeat(7,minmax(0,1fr))]";
 // Midnight would sit on the top edge, so the scale is labelled from 01:00.
 const labelledHours = Array.from({ length: 23 }, (_, index) => index + 1);
@@ -47,10 +53,10 @@ type WeekCalendarProps = {
   todayDate: string;
   areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
-  onCreate: (defaults: { scheduledDate: string; startTime?: string }) => void;
+  onCreate: (defaults: NewTaskDefaults) => void;
   onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
-  onMove: (task: WeekTask, scheduledDate: string, startTime: string | null) => void;
+  onPlace: (task: WeekTask, placement: TaskPlacement) => void;
 };
 
 type BlockPlacement = {
@@ -58,6 +64,13 @@ type BlockPlacement = {
   height: number;
   left: string;
   width: string;
+};
+
+// What a task block needs to take part in pressing, dragging and resizing.
+type TaskInteraction = {
+  interaction: CalendarInteraction | null;
+  pressTask: (event: PointerEvent<HTMLElement>, task: WeekTask, mode: "move" | "resize") => void;
+  onEdit: (task: WeekTask) => void;
 };
 
 export function WeekCalendar({
@@ -68,15 +81,12 @@ export function WeekCalendar({
   onCreate,
   onEdit,
   onToggle,
-  onMove,
+  onPlace,
 }: WeekCalendarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const taskById = useMemo(
-    () =>
-      new Map(
-        week.days.flatMap((day) => day.tasks.map((task) => [task.id, task] as const)),
-      ),
-    [week.days],
+  const { interaction, pressTask, pressSlot, moveOver, isClickIgnored } = useCalendarInteraction(
+    { onPlace, onDraw: onCreate },
+    HOUR_HEIGHT,
   );
   const defaultSelectedDate =
     week.days.find((day) => day.date === todayDate)?.date ?? week.days[0]?.date ?? todayDate;
@@ -106,17 +116,21 @@ export function WeekCalendar({
     week.days.find((day) => day.date === selectedDate) ?? week.days[0];
   const selectedDoneCount =
     selectedDay?.tasks.filter((task) => task.status === "DONE").length ?? 0;
-
-  function moveFromDrop(event: DragEvent<HTMLElement>, scheduledDate: string, startTime: string | null) {
-    const payload = readDragPayload(event);
-    if (!payload) return;
-    const task = taskById.get(payload.taskId);
-    if (task) onMove(task, scheduledDate, startTime);
-  }
+  const taskInteraction: TaskInteraction = {
+    interaction,
+    pressTask,
+    // A click that ends a drag does not open the task under it.
+    onEdit: (task) => {
+      if (!isClickIgnored()) onEdit(task);
+    },
+  };
 
   return (
     <>
-      <div ref={scrollRef} className="hidden min-h-0 min-w-0 flex-1 overflow-y-auto pb-6 md:block">
+      <div
+        ref={scrollRef}
+        className={`hidden min-h-0 min-w-0 flex-1 select-none overflow-y-auto pb-6 md:block ${interactionCursor(interaction)}`}
+      >
         <div className="min-w-[700px]">
           <div className="sticky top-0 z-[6] border-b border-ink/12 bg-canvas">
             <div className={`${calendarColumns} pb-2.5 pt-0.5`}>
@@ -145,7 +159,7 @@ export function WeekCalendar({
             <div className={`${calendarColumns} border-t border-ink/8`}>
               <div className="pr-2 pt-[7px] text-right text-[10.5px] text-muted">Untimed</div>
               {week.days.map((day) => (
-                <UntimedDropZone
+                <UntimedRow
                   key={day.date}
                   date={day.date}
                   isToday={day.date === todayDate}
@@ -153,9 +167,9 @@ export function WeekCalendar({
                   tasks={day.tasks.filter((task) => task.start_time === null)}
                   areaByGoalId={areaByGoalId}
                   pendingTaskIds={pendingTaskIds}
-                  onEdit={onEdit}
+                  taskInteraction={taskInteraction}
                   onToggle={onToggle}
-                  onDrop={(event) => moveFromDrop(event, day.date, null)}
+                  onPointerMove={moveOver}
                 />
               ))}
             </div>
@@ -182,10 +196,11 @@ export function WeekCalendar({
                 tasks={day.tasks.filter((task) => task.start_time !== null)}
                 areaByGoalId={areaByGoalId}
                 pendingTaskIds={pendingTaskIds}
+                taskInteraction={taskInteraction}
                 onCreate={onCreate}
-                onEdit={onEdit}
                 onToggle={onToggle}
-                onDrop={(event, startTime) => moveFromDrop(event, day.date, startTime)}
+                onPressSlot={pressSlot}
+                onPointerMove={moveOver}
               />
             ))}
           </div>
@@ -282,16 +297,16 @@ export function WeekCalendar({
   );
 }
 
-function UntimedDropZone({
+function UntimedRow({
   date,
   isToday,
   isPast,
   tasks,
   areaByGoalId,
   pendingTaskIds,
-  onEdit,
+  taskInteraction,
   onToggle,
-  onDrop,
+  onPointerMove,
 }: {
   date: string;
   isToday: boolean;
@@ -299,22 +314,24 @@ function UntimedDropZone({
   tasks: WeekTask[];
   areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
-  onEdit: (task: WeekTask) => void;
+  taskInteraction: TaskInteraction;
   onToggle: (task: WeekTask) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: PointerEvent<HTMLElement>, column: CalendarColumn) => void;
 }) {
-  const dropTarget = useDropTarget(!isPast, onDrop);
+  const { interaction } = taskInteraction;
+  const moving = interaction?.kind === "move" ? interaction : null;
+  const isTarget = moving?.target?.date === date && moving.target.startMinutes === null;
 
   return (
     <div
       role="group"
       aria-label={`Untimed tasks for ${date}`}
       className={`flex min-h-[30px] min-w-0 flex-col gap-1 border-l border-ink/10 py-1 pl-0.5 pr-[3px] ${columnBackground(
-        dropTarget.isOver,
+        isTarget,
         isToday,
         isPast,
       )}`}
-      {...dropTarget.handlers}
+      onPointerMove={(event) => onPointerMove(event, { date, zone: "untimed", isPast })}
     >
       {tasks.map((task) => (
         <TaskBlock
@@ -323,10 +340,23 @@ function UntimedDropZone({
           area={taskArea(task, areaByGoalId)}
           isPast={isPast}
           isPending={pendingTaskIds.has(task.id)}
-          onEdit={onEdit}
+          taskInteraction={taskInteraction}
           onToggle={onToggle}
         />
       ))}
+      {isTarget && moving ? (
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none flex h-[22px] shrink-0 items-center gap-1.5 rounded-[7px] border border-dashed px-1.5 text-[11px] font-medium text-ink ${ghostTone(moving.task)} ${areaColorClass(taskArea(moving.task, areaByGoalId))}`}
+        >
+          <span className="min-w-0 flex-1 truncate">{moving.task.title}</span>
+          {moving.task.duration_minutes !== null ? (
+            <span className="shrink-0 text-ink-soft tabular-nums">
+              {formatDuration(moving.task.duration_minutes)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -338,10 +368,11 @@ function DayTimeline({
   tasks,
   areaByGoalId,
   pendingTaskIds,
+  taskInteraction,
   onCreate,
-  onEdit,
   onToggle,
-  onDrop,
+  onPressSlot,
+  onPointerMove,
 }: {
   date: string;
   isToday: boolean;
@@ -349,42 +380,61 @@ function DayTimeline({
   tasks: WeekTask[];
   areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
+  taskInteraction: TaskInteraction;
   onCreate: WeekCalendarProps["onCreate"];
-  onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>, startTime: string) => void;
+  onPressSlot: (event: PointerEvent<HTMLElement>, date: string) => void;
+  onPointerMove: (event: PointerEvent<HTMLElement>, column: CalendarColumn) => void;
 }) {
-  const laidOutTasks = layoutTimedTasks(tasks);
-  const dropTarget = useDropTarget(!isPast, (event) => {
-    const payload = readDragPayload(event);
-    if (!payload) return;
-    const startMinutes = Math.round((pointerMinutes(event) - payload.offsetMinutes) / 15) * 15;
-    onDrop(event, minutesToTime(clampStart(startMinutes)));
-  });
+  const { interaction } = taskInteraction;
+  // A task being resized takes its new length in the layout while the edge is dragged.
+  const shownTasks = tasks.map((task) =>
+    interaction?.kind === "resize" && interaction.task.id === task.id
+      ? { ...task, duration_minutes: interaction.durationMinutes }
+      : task,
+  );
+  const laidOutTasks = layoutTimedTasks(shownTasks);
+  const moving = interaction?.kind === "move" ? interaction : null;
+  const moveTarget =
+    moving?.target?.date === date && moving.target.startMinutes !== null ? moving.target : null;
+  const drawing = interaction?.kind === "draw" && interaction.date === date ? interaction : null;
 
-  function handleCreate(event: MouseEvent<HTMLButtonElement>) {
-    // A keyboard press has no pointer position, so it proposes the start of a working day.
-    const fromKeyboard = event.detail === 0 && event.clientX === 0 && event.clientY === 0;
+  // A keyboard press has no pointer position, so it proposes the start of a working day.
+  function handleKeyboardCreate(event: MouseEvent<HTMLButtonElement>) {
+    if (event.detail === 0) {
+      onCreate({ scheduledDate: date, startTime: "09:00", durationMinutes: 60 });
+    }
+  }
+
+  // A double-click proposes an hour from the quarter hour under the pointer.
+  function handleDoubleClick(event: MouseEvent<HTMLButtonElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const minutes = ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60;
     onCreate({
       scheduledDate: date,
-      startTime: fromKeyboard
-        ? "09:00"
-        : minutesToTime(clampStart(Math.floor(pointerMinutes(event) / 30) * 30)),
+      startTime: minutesToTime(clampStart(Math.floor(minutes / 15) * 15)),
+      durationMinutes: 60,
     });
   }
 
   return (
     <div
-      className={`relative min-w-0 border-l border-ink/10 ${columnBackground(dropTarget.isOver, isToday, isPast)}`}
+      className={`relative min-w-0 border-l border-ink/10 ${columnBackground(
+        moveTarget !== null || drawing !== null,
+        isToday,
+        isPast,
+      )}`}
       style={hourLines}
-      {...dropTarget.handlers}
+      onPointerMove={(event) => onPointerMove(event, { date, zone: "timeline", isPast })}
     >
       {!isPast ? (
         <button
           type="button"
           aria-label={`Add a task on ${date}`}
-          className="absolute inset-0 cursor-copy focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-          onClick={handleCreate}
+          className="absolute inset-0 cursor-cell focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          onPointerDown={(event) => onPressSlot(event, date)}
+          onClick={handleKeyboardCreate}
+          onDoubleClick={handleDoubleClick}
         />
       ) : null}
       {isToday ? <NowLine /> : null}
@@ -396,10 +446,54 @@ function DayTimeline({
           placement={blockPlacement(task, column, columns)}
           isPast={isPast}
           isPending={pendingTaskIds.has(task.id)}
-          onEdit={onEdit}
+          taskInteraction={taskInteraction}
           onToggle={onToggle}
         />
       ))}
+      {moving && moveTarget?.startMinutes != null ? (
+        <PlacementGhost
+          startMinutes={moveTarget.startMinutes}
+          durationMinutes={moving.task.duration_minutes}
+          title={moving.task.title}
+          className={`${ghostTone(moving.task)} ${areaColorClass(taskArea(moving.task, areaByGoalId))}`}
+        />
+      ) : null}
+      {drawing ? (
+        <PlacementGhost
+          startMinutes={drawing.startMinutes}
+          durationMinutes={drawing.endMinutes - drawing.startMinutes}
+          title="New task"
+          className="border-accent/50 bg-accent/12"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// Where a dragged or drawn task would land, with its time range and hours.
+function PlacementGhost({
+  startMinutes,
+  durationMinutes,
+  title,
+  className,
+}: {
+  startMinutes: number;
+  durationMinutes: number | null;
+  title: string;
+  className: string;
+}) {
+  const top = (startMinutes / 60) * HOUR_HEIGHT;
+  const length = ((durationMinutes ?? 30) / 60) * HOUR_HEIGHT;
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-x-[2px] z-[5] overflow-hidden rounded-[7px] border border-dashed px-1.5 py-1 shadow-[0_6px_16px_rgb(28_43_33/0.16)] ${className}`}
+      style={{ top, height: Math.max(MIN_BLOCK_HEIGHT, Math.min(length, DAY_HEIGHT - top) - 2) }}
+    >
+      <div className="text-[10.5px] font-semibold text-ink tabular-nums">
+        {rangeLabel(startMinutes, durationMinutes)}
+      </div>
+      <div className="truncate text-[11px] text-ink-soft">{title}</div>
     </div>
   );
 }
@@ -431,7 +525,7 @@ function TaskBlock({
   placement,
   isPast,
   isPending,
-  onEdit,
+  taskInteraction,
   onToggle,
 }: {
   task: WeekTask;
@@ -439,12 +533,17 @@ function TaskBlock({
   placement?: BlockPlacement;
   isPast: boolean;
   isPending: boolean;
-  onEdit: (task: WeekTask) => void;
+  taskInteraction: TaskInteraction;
   onToggle: (task: WeekTask) => void;
 }) {
+  const { interaction, pressTask, onEdit } = taskInteraction;
   const isDone = task.status === "DONE";
-  // Open work on an elapsed day can still move to today or later; finished work stays put.
+  // Open work on an elapsed day can still move to today or later; finished work stays put,
+  // though its length can still change.
   const isMovable = !isPending && !(isPast && isDone);
+  const isResizable = !isPending && placement !== undefined;
+  const isMoving = interaction?.kind === "move" && interaction.task.id === task.id;
+  const isResizing = interaction?.kind === "resize" && interaction.task.id === task.id;
   const isTall = placement !== undefined && placement.height >= TALL_BLOCK_HEIGHT;
   const showsArea = area !== undefined && isTall && placement.height >= AREA_LABEL_BLOCK_HEIGHT;
   const parentLine = task.parent
@@ -466,9 +565,14 @@ function TaskBlock({
       </span>
     ) : null;
 
+  function handlePointerDown(event: PointerEvent<HTMLElement>) {
+    // The checkbox checks; it does not pick the task up.
+    if (!isMovable || (event.target as Element).closest("label")) return;
+    pressTask(event, task, "move");
+  }
+
   return (
     <article
-      draggable={isMovable}
       title={parentLine ? `${task.title} · ${parentLine}` : task.title}
       className={`${
         placement ? "absolute z-[2] hover:z-[3]" : "relative h-[22px] shrink-0"
@@ -476,9 +580,17 @@ function TaskBlock({
         task.goal_id
           ? "border-area/38 bg-[color-mix(in_oklch,var(--area)_9%,var(--color-card))]"
           : "border-ink/16 bg-card"
-      } ${areaColorClass(area)} ${isPending ? "cursor-wait opacity-60" : isDone ? "opacity-50" : ""}`}
+      } ${areaColorClass(area)} ${
+        isMoving
+          ? "pointer-events-none opacity-40"
+          : isPending
+            ? "cursor-wait opacity-60"
+            : isDone
+              ? "opacity-50"
+              : ""
+      } ${isResizing ? "z-[5] ring-2 ring-accent/50" : ""} ${isMovable ? "touch-none" : ""}`}
       style={placement}
-      onDragStart={(event) => startDragging(event, task, task.duration_minutes ?? 30)}
+      onPointerDown={handlePointerDown}
     >
       <button
         type="button"
@@ -526,6 +638,26 @@ function TaskBlock({
           </>
         )}
       </div>
+      {isResizing && task.start_time !== null ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0.5 right-1 rounded-[4px] bg-ink/80 px-1 text-[10px] font-semibold text-white tabular-nums"
+        >
+          {rangeLabel(timeToMinutes(task.start_time), task.duration_minutes)}
+        </span>
+      ) : null}
+      {isResizable ? (
+        // The bottom edge drags the task's length in 15-minute steps.
+        <span
+          aria-hidden="true"
+          data-testid={`resize-${task.id}`}
+          className="absolute inset-x-0 bottom-0 z-[1] h-1.5 cursor-ns-resize touch-none"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            pressTask(event, task, "resize");
+          }}
+        />
+      ) : null}
     </article>
   );
 }
@@ -639,36 +771,31 @@ function RepeatIcon({ className }: { className: string }) {
   );
 }
 
-// Lights a column or untimed cell while a task is dragged over it.
-function useDropTarget(isEnabled: boolean, onDrop: (event: DragEvent<HTMLDivElement>) => void) {
-  const [isOver, setIsOver] = useState(false);
-
-  return {
-    isOver,
-    handlers: {
-      onDragOver: (event: DragEvent<HTMLDivElement>) => {
-        if (!isEnabled) return;
-        event.preventDefault();
-        setIsOver(true);
-      },
-      onDragLeave: (event: DragEvent<HTMLDivElement>) => {
-        const next = event.relatedTarget;
-        if (!(next instanceof Node && event.currentTarget.contains(next))) setIsOver(false);
-      },
-      onDrop: (event: DragEvent<HTMLDivElement>) => {
-        setIsOver(false);
-        if (!isEnabled) return;
-        event.preventDefault();
-        onDrop(event);
-      },
-    },
-  };
+function interactionCursor(interaction: CalendarInteraction | null) {
+  if (interaction?.kind === "move") return "cursor-grabbing";
+  if (interaction?.kind === "resize") return "cursor-ns-resize";
+  if (interaction?.kind === "draw") return "cursor-cell";
+  return "";
 }
 
-function columnBackground(isDropTarget: boolean, isToday: boolean, isPast: boolean) {
-  if (isDropTarget) return "bg-accent/8";
+function columnBackground(isTarget: boolean, isToday: boolean, isPast: boolean) {
+  if (isTarget) return "bg-accent/8";
   if (isToday) return "bg-card/90";
   return isPast ? "" : "bg-card/40";
+}
+
+function ghostTone(task: WeekTask) {
+  return task.goal_id
+    ? "border-area/60 bg-[color-mix(in_oklch,var(--area)_16%,var(--color-card))]"
+    : "border-ink/30 bg-card";
+}
+
+// "10:00–14:00 · 4h", or just the start for work without hours.
+function rangeLabel(startMinutes: number, durationMinutes: number | null) {
+  if (durationMinutes === null) {
+    return minutesToTime(startMinutes);
+  }
+  return `${minutesToTime(startMinutes)}–${minutesToTime(startMinutes + durationMinutes)} · ${formatDuration(durationMinutes)}`;
 }
 
 function blockPlacement(task: WeekTask, column: number, columns: number): BlockPlacement {
@@ -711,38 +838,6 @@ function taskSummary(task: WeekTask, area: Area | undefined) {
   return details.join(", ");
 }
 
-function startDragging(event: DragEvent<HTMLElement>, task: WeekTask, duration: number) {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  const relativeY = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
-  const offsetMinutes = Math.round(((relativeY / Math.max(bounds.height, 1)) * duration) / 15) * 15;
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData(TASK_DRAG_TYPE, JSON.stringify({ taskId: task.id, offsetMinutes }));
-}
-
-function readDragPayload(event: DragEvent<HTMLElement>) {
-  try {
-    const value = JSON.parse(event.dataTransfer.getData(TASK_DRAG_TYPE)) as unknown;
-    if (
-      value &&
-      typeof value === "object" &&
-      "taskId" in value &&
-      "offsetMinutes" in value &&
-      typeof value.taskId === "string" &&
-      typeof value.offsetMinutes === "number"
-    ) {
-      return value as { taskId: string; offsetMinutes: number };
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function pointerMinutes(event: MouseEvent<HTMLElement> | DragEvent<HTMLElement>) {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  return ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60;
-}
-
 function clampStart(minutes: number) {
   return Math.max(0, Math.min(LAST_START_MINUTES, minutes));
 }
@@ -750,18 +845,6 @@ function clampStart(minutes: number) {
 function currentMinutes() {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
-}
-
-function timeToMinutes(value: string) {
-  const hour = Number(value.slice(0, 2));
-  const minute = Number(value.slice(3, 5));
-  return hour * 60 + minute;
-}
-
-function minutesToTime(value: number) {
-  const hour = Math.floor(value / 60);
-  const minute = value % 60;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 function layoutTimedTasks(tasks: WeekTask[]) {

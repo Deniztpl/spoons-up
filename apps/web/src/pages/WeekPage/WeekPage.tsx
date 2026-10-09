@@ -188,9 +188,7 @@ export function WeekPage({
               onCreate={setNewTask}
               onEdit={taskForm.openEdit}
               onToggle={requestToggle}
-              onMove={(task, scheduledDate, startTime) =>
-                void weekState.moveTask(task, scheduledDate, startTime)
-              }
+              onPlace={(task, placement) => void weekState.placeTask(task, placement)}
             />
             {isHoursOpen ? (
               <WeekHoursPanel
@@ -248,6 +246,7 @@ export function WeekPage({
         <NewTaskKindDialog
           scheduledDate={newTask.scheduledDate}
           startTime={newTask.startTime}
+          durationMinutes={newTask.durationMinutes}
           onChoose={openNewTask}
           onClose={() => setNewTask(null)}
         />
