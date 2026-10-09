@@ -1,11 +1,9 @@
+import { formatHours } from "../../lib/duration";
 import type { Requirement } from "./api/resultsApi";
 
-// "1½/4": done against target, with half blocks written as ½.
+// Done against target: hours for a goal ("12h 15m/20h"), days or weeks for a habit ("5/7").
 export function weekAmount(item: Requirement) {
-  return `${formatAmount(item.done)}/${formatAmount(item.target)}`;
-}
-
-function formatAmount(value: number) {
-  const whole = Math.floor(value);
-  return value - whole === 0.5 ? `${whole === 0 ? "" : whole}½` : String(value);
+  return item.ref_type === "GOAL"
+    ? `${formatHours(item.done)}/${formatHours(item.target)}`
+    : `${item.done}/${item.target}`;
 }

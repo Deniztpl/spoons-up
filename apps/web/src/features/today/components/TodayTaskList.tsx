@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { CheckIcon } from "../../../components/ui/CheckIcon";
+import { describeDuration, formatDuration } from "../../../lib/duration";
 import type { Area } from "../../areas/api/areasApi";
 import { areaColorClass } from "../../areas/areaColor";
 import type { TodayTask } from "../api/todayApi";
@@ -13,9 +14,9 @@ type TodayTaskListProps = {
   onEdit: (task: TodayTask) => void;
 };
 
-// A task is as tall as its blocks: 72px per block, with the 8px gaps between them.
-const blockHeight = 72;
-const blockGap = 8;
+// A task is as tall as its hours: 72px an hour, with the 8px gaps between tasks.
+const hourHeight = 72;
+const taskGap = 8;
 // A step's line naming its item, under the title.
 const contextLineHeight = 17;
 
@@ -26,9 +27,9 @@ export function TodayTaskList({
   onToggle,
   onEdit,
 }: TodayTaskListProps) {
-  const totalBlocks = tasks.reduce((sum, task) => sum + visualBlocks(task.block_count), 0);
-  const doneBlocks = leadingDoneBlocks(tasks);
-  const ticks = Array.from({ length: Math.floor(totalBlocks) + 1 }, (_, block) => block);
+  const totalHours = tasks.reduce((sum, task) => sum + visualHours(task), 0);
+  const doneHours = leadingDoneHours(tasks);
+  const ticks = Array.from({ length: Math.floor(totalHours) + 1 }, (_, hour) => hour);
 
   return (
     <div className="relative">
@@ -36,20 +37,20 @@ export function TodayTaskList({
       <div
         aria-hidden="true"
         className="absolute -left-[26px] top-0 w-3.5"
-        style={{ height: stackHeight(totalBlocks) }}
+        style={{ height: stackHeight(totalHours) }}
       >
         <div className="absolute inset-y-0 left-1.5 w-px bg-track" />
         <div
           className="absolute left-1.5 top-0 w-px bg-accent"
-          style={{ height: stackHeight(doneBlocks) }}
+          style={{ height: stackHeight(doneHours) }}
         />
-        {ticks.map((block) => (
+        {ticks.map((hour) => (
           <div
-            key={block}
+            key={hour}
             className={`absolute left-0.5 h-px w-[9px] ${
-              block <= doneBlocks ? "bg-accent" : "bg-muted-light"
+              hour <= doneHours ? "bg-accent" : "bg-muted-light"
             }`}
-            style={{ top: block === 0 ? 0 : block * (blockHeight + blockGap) - blockGap / 2 }}
+            style={{ top: hour === 0 ? 0 : hour * (hourHeight + taskGap) - taskGap / 2 }}
           />
         ))}
       </div>
@@ -58,9 +59,9 @@ export function TodayTaskList({
         {tasks.map((task) => {
           const isDone = task.status === "DONE";
           const isPending = pendingTaskIds.includes(task.id);
-          const blocks = visualBlocks(task.block_count);
-          const isShort = blocks < 1;
-          const height = stackHeight(blocks);
+          const hours = visualHours(task);
+          const isShort = hours < 1;
+          const height = stackHeight(hours);
           const checkId = `task-${task.id}-check`;
           const titleId = `task-${task.id}-title`;
           const detailsId = `task-${task.id}-details`;
@@ -147,13 +148,9 @@ export function TodayTaskList({
                   </span>
                   <span
                     aria-hidden="true"
-                    className="w-[26px] shrink-0 text-center text-[11px] font-medium leading-[19px] text-ink-soft tabular-nums"
+                    className="w-[44px] shrink-0 text-right text-[11px] font-medium leading-[19px] text-ink-soft tabular-nums"
                   >
-                    {task.block_count === null
-                      ? "—"
-                      : task.block_count === 0.5
-                        ? "½"
-                        : `×${task.block_count}`}
+                    {task.duration_minutes === null ? "—" : formatDuration(task.duration_minutes)}
                   </span>
                   <span id={detailsId} className="sr-only">
                     {taskDetails(task)}
@@ -168,20 +165,20 @@ export function TodayTaskList({
   );
 }
 
-function stackHeight(blocks: number) {
-  return Math.max(0, Math.round(blocks * (blockHeight + blockGap) - blockGap));
+function stackHeight(hours: number) {
+  return Math.max(0, Math.round(hours * (hourHeight + taskGap) - taskGap));
 }
 
 // The rail fills through the tasks done in a row from the top of the day.
-function leadingDoneBlocks(tasks: TodayTask[]) {
-  let blocks = 0;
+function leadingDoneHours(tasks: TodayTask[]) {
+  let hours = 0;
   for (const task of tasks) {
     if (task.status !== "DONE") {
       break;
     }
-    blocks += visualBlocks(task.block_count);
+    hours += visualHours(task);
   }
-  return blocks;
+  return hours;
 }
 
 // Fit the title between the 12px top padding and the card's bottom edge.
@@ -194,8 +191,12 @@ function titleClamp(height: number): CSSProperties {
   };
 }
 
-function visualBlocks(count: number | null) {
-  return count ?? 1;
+// Cards run from half an hour to four hours tall; a Journal task without a duration takes one.
+function visualHours(task: TodayTask) {
+  if (task.duration_minutes === null) {
+    return 1;
+  }
+  return Math.min(4, Math.max(0.5, task.duration_minutes / 60));
 }
 
 function taskDetails(task: TodayTask) {
@@ -204,20 +205,12 @@ function taskDetails(task: TodayTask) {
       ? `${task.start_time} to ${task.end_time}`
       : `Starts at ${task.start_time}`
     : "No start time";
-  const details = `${time}, ${blockCountText(task.block_count)}`;
+  const duration =
+    task.duration_minutes === null ? "no duration" : describeDuration(task.duration_minutes);
+  const details = `${time}, ${duration}`;
   if (!task.parent) {
     return details;
   }
   const { done, total } = task.parent.step_progress;
   return `${details}, a step of ${task.parent.title}, ${done} of ${total} steps done`;
-}
-
-function blockCountText(count: number | null) {
-  if (count === null) {
-    return "no block value";
-  }
-  if (count === 0.5) {
-    return "half a block";
-  }
-  return count === 1 ? "1 block" : `${count} blocks`;
 }

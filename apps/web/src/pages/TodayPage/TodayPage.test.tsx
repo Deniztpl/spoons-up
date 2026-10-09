@@ -15,7 +15,7 @@ function todayTask(
   id: string,
   title: string,
   times: [string | null, string | null],
-  blockCount: number | null,
+  durationMinutes: number | null,
   status: "PENDING" | "DONE" = "PENDING",
 ) {
   return {
@@ -24,9 +24,8 @@ function todayTask(
     rule_id: "21",
     title,
     start_time: times[0],
-    duration_minutes: 60,
+    duration_minutes: durationMinutes,
     end_time: times[1],
-    block_count: blockCount,
     status,
     scheduled_date: "2026-09-24",
     occurrence_date: "2026-09-24",
@@ -283,14 +282,14 @@ describe("Today page", () => {
     expect(screen.getByRole("checkbox", { name: "Read" })).not.toBeChecked();
   });
 
-  it("shows the day's tasks above the habits, sized by their blocks", async () => {
+  it("shows the day's tasks above the habits, sized by their hours", async () => {
     stubFetch(
       vi.fn(async () =>
         todayResponse({
           tasks: [
-            todayTask("481", "Review PR", ["09:30", "10:30"], 1, "DONE"),
-            todayTask("482", "Pay bills", ["14:00", "14:15"], 0.5),
-            todayTask("483", "CS Block", ["19:00", "21:00"], 2),
+            todayTask("481", "Review PR", ["09:30", "10:30"], 60, "DONE"),
+            todayTask("482", "Pay bills", ["14:00", "14:15"], 15),
+            todayTask("483", "CS Block", ["19:00", "21:00"], 120),
           ],
         }),
       ),
@@ -301,16 +300,17 @@ describe("Today page", () => {
     const tasks = await screen.findByRole("list", { name: "Tasks" });
     const csBlock = within(tasks).getByRole("checkbox", { name: "CS Block" });
     expect(csBlock).not.toBeChecked();
-    expect(csBlock).toHaveAccessibleDescription("19:00 to 21:00, 2 blocks");
+    expect(csBlock).toHaveAccessibleDescription("19:00 to 21:00, 2 hours");
     expect(within(tasks).getByRole("checkbox", { name: "Review PR" })).toBeChecked();
     expect(within(tasks).getByRole("checkbox", { name: "Pay bills" })).not.toBeChecked();
+    // A quarter of an hour still gets half an hour's height.
     expect(within(tasks).getAllByRole("listitem").map((item) => item.style.height)).toEqual([
       "72px",
       "32px",
       "152px",
     ]);
-    expect(within(tasks).getByText("½")).toBeInTheDocument();
-    expect(within(tasks).getByText("×2")).toBeInTheDocument();
+    expect(within(tasks).getByText("15m")).toBeInTheDocument();
+    expect(within(tasks).getByText("2h")).toBeInTheDocument();
 
     const firstHabit = screen.getByRole("checkbox", { name: "Read" });
     expect(tasks.compareDocumentPosition(firstHabit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -346,7 +346,7 @@ describe("Today page", () => {
         }
         return todayResponse({
           tasks: [
-            todayTask("483", "CS Block", ["19:00", "21:00"], 2),
+            todayTask("483", "CS Block", ["19:00", "21:00"], 120),
             { ...todayTask("484", "Dentist", ["08:00", "09:00"], null), goal_id: null, rule_id: null },
           ],
         });
@@ -367,7 +367,7 @@ describe("Today page", () => {
   });
 
   it("completes and undoes a task", async () => {
-    const pending = todayTask("483", "CS Block", ["19:00", "21:00"], 2);
+    const pending = todayTask("483", "CS Block", ["19:00", "21:00"], 120);
     const done = todayTask("481", "Review PR", ["09:30", "10:30"], 1, "DONE");
     stubFetch(
       vi.fn(async (request: Request) => {
@@ -400,7 +400,7 @@ describe("Today page", () => {
   });
 
   it("edits a task and its linked schedule with one save, then deletes the task", async () => {
-    let task = todayTask("483", "CS Block", ["19:00", "20:00"], 2);
+    let task = todayTask("483", "CS Block", ["19:00", "20:00"], 60);
     let hasTask = true;
     let weekdays = [4];
     const fetchMock = vi.fn(async (request: Request) => {
@@ -422,7 +422,6 @@ describe("Today page", () => {
               byweekday: weekdays,
               start_time: "19:00",
               duration_minutes: 60,
-              block_count: 2,
             },
           ],
         });
@@ -441,7 +440,6 @@ describe("Today page", () => {
           byweekday: weekdays,
           start_time: "19:00",
           duration_minutes: 60,
-          block_count: 2,
         });
       }
       if (request.method === "DELETE" && url.pathname === "/api/v1/tasks/483") {
@@ -490,7 +488,7 @@ describe("Today page", () => {
 
   it("turns on Repeat from a goal task's edit form without adding a duplicate task", async () => {
     let task = {
-      ...todayTask("490", "CS Block", ["19:00", "20:00"], 2),
+      ...todayTask("490", "CS Block", ["19:00", "20:00"], 60),
       rule_id: null as string | null,
       occurrence_date: null as string | null,
     };
@@ -537,7 +535,7 @@ describe("Today page", () => {
 
   it("turns off Repeat from a repeating task's edit form and keeps the task", async () => {
     let task = {
-      ...todayTask("483", "CS Block", ["19:00", "20:00"], 2),
+      ...todayTask("483", "CS Block", ["19:00", "20:00"], 60),
       rule_id: "21" as string | null,
       occurrence_date: "2026-09-24" as string | null,
     };
@@ -560,7 +558,6 @@ describe("Today page", () => {
               byweekday: [4],
               start_time: "19:00",
               duration_minutes: 60,
-              block_count: 2,
             },
           ],
         });
@@ -603,7 +600,7 @@ describe("Today page", () => {
       vi.fn(async (request: Request) =>
         request.method === "POST"
           ? Response.json({ code: "not_found", message: "Not found" }, { status: 404 })
-          : todayResponse({ tasks: [todayTask("483", "CS Block", ["19:00", "21:00"], 2)] }),
+          : todayResponse({ tasks: [todayTask("483", "CS Block", ["19:00", "21:00"], 120)] }),
       ),
     );
     const user = userEvent.setup();
@@ -621,7 +618,7 @@ describe("Today page", () => {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/api/v1/today") {
         return todayResponse({
-          tasks: hasTask ? [todayTask("490", "CS Block", ["19:00", "20:00"], 2)] : [],
+          tasks: hasTask ? [todayTask("490", "CS Block", ["19:00", "20:00"], 60)] : [],
         });
       }
       if (request.method === "GET" && url.pathname === "/api/v1/areas") {
@@ -649,7 +646,6 @@ describe("Today page", () => {
           byweekday: [4, 6],
           start_time: "19:00",
           duration_minutes: 60,
-          block_count: 2,
         });
         hasTask = true;
         return Response.json({ id: "21", goal_id: "7", ...body }, { status: 201 });
@@ -674,8 +670,6 @@ describe("Today page", () => {
     fireEvent.change(within(dialog).getByLabelText("Start time"), {
       target: { value: "19:00" },
     });
-    await user.selectOptions(within(dialog).getByLabelText("Duration"), "60");
-    await user.click(within(dialog).getByRole("radio", { name: "2 blocks" }));
     await user.click(within(dialog).getByRole("checkbox", { name: "Repeat" }));
     expect(within(dialog).getByRole("button", { name: "Thursday, task date" })).toHaveAttribute(
       "aria-pressed",
@@ -710,7 +704,6 @@ describe("Today page", () => {
           scheduled_date: "2026-09-24",
           start_time: null,
           duration_minutes: null,
-          block_count: null,
         });
         hasTask = true;
         return Response.json(
@@ -726,7 +719,6 @@ describe("Today page", () => {
             start_time: null,
             duration_minutes: null,
             end_time: null,
-            block_count: null,
             period_start: "2026-09-21",
             status: "PENDING",
             completed_at: null,
@@ -757,10 +749,10 @@ describe("Today page", () => {
       vi.fn(async () =>
         todayResponse({
           tasks: [
-            todayTask("483", "CS Block", ["09:00", "10:00"], 1),
+            todayTask("483", "CS Block", ["09:00", "10:00"], 60),
             journalTask("492", "Prepare the slides", {
               start_time: "10:30",
-              block_count: 1,
+              duration_minutes: 60,
               parent_id: "490",
               parent: { id: "490", title: "Conference", step_progress: { done: 1, total: 3 } },
             }),
@@ -773,7 +765,7 @@ describe("Today page", () => {
     const tasks = await screen.findByRole("list", { name: "Tasks" });
     expect(within(tasks).getAllByRole("listitem")).toHaveLength(2);
     expect(within(tasks).getByRole("checkbox", { name: "Prepare the slides" })).toHaveAccessibleDescription(
-      "Starts at 10:30, 1 block, a step of Conference, 1 of 3 steps done",
+      "Starts at 10:30, 1 hour, a step of Conference, 1 of 3 steps done",
     );
     expect(within(tasks).getByText("Conference · 1/3")).toBeInTheDocument();
   });

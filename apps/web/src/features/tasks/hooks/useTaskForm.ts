@@ -25,7 +25,6 @@ export type EditableTask = {
   scheduled_date: string;
   start_time: string | null;
   duration_minutes: number | null;
-  block_count: number | null;
   // A Journal item's steps, which go with it when it is deleted.
   step_progress?: { done: number; total: number } | null;
 };
@@ -37,7 +36,6 @@ export type TaskDraft = {
   title: string;
   startTime: string;
   durationMinutes: string;
-  blockCount: string;
   isRepeating: boolean;
   byweekday: number[];
   savedWeekdays: number[] | null;
@@ -123,8 +121,8 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
       goalId: "",
       title: "",
       startTime,
-      durationMinutes: "",
-      blockCount: "",
+      // New work here is goal work, which always carries its hours.
+      durationMinutes: "60",
       isRepeating: false,
       byweekday: [],
       savedWeekdays: [],
@@ -146,7 +144,6 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
       title: task.title,
       startTime: task.start_time ?? "",
       durationMinutes: task.duration_minutes === null ? "" : String(task.duration_minutes),
-      blockCount: task.block_count === null ? "" : String(task.block_count),
       isRepeating: task.rule_id !== null,
       byweekday: [],
       savedWeekdays: task.rule_id === null ? [] : null,
@@ -238,7 +235,6 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
                     scheduled_date: scheduledDate,
                     start_time: data.start_time,
                     duration_minutes: data.duration_minutes,
-                    block_count: data.block_count,
                     step_progress: current.task.step_progress,
                   },
                   title: data.title,
@@ -246,7 +242,6 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
                   startTime: data.start_time ?? "",
                   durationMinutes:
                     data.duration_minutes === null ? "" : String(data.duration_minutes),
-                  blockCount: data.block_count === null ? "" : String(data.block_count),
                 }
               : current,
           );
@@ -263,7 +258,8 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
       } else if (draft.isRepeating) {
         const { data, error } = await createGoalRule(draft.goalId, {
           byweekday: draft.byweekday,
-          ...scheduleValues(draft),
+          start_time: draft.startTime || null,
+          duration_minutes: Number(draft.durationMinutes),
         });
         if (!data) {
           setFormError(taskErrorMessage(error, "We couldn't add this schedule."));
@@ -369,8 +365,6 @@ export function useTaskForm({ onSaved, onDeleted }: TaskFormCallbacks) {
       updateDraft((current) => ({ ...current, startTime })),
     setDurationMinutes: (durationMinutes: string) =>
       updateDraft((current) => ({ ...current, durationMinutes })),
-    setBlockCount: (blockCount: string) =>
-      updateDraft((current) => ({ ...current, blockCount })),
     setRepeating,
     toggleWeekday,
     saveTask,
@@ -394,7 +388,9 @@ export function isTaskDraftComplete(draft: TaskDraft) {
     !draft.isRepeating ||
     Boolean(draft.task?.rule_id) ||
     (draft.goalId !== "" && draft.byweekday.includes(weekdayForDate(draft.scheduledDate)));
-  return hasWork && canCreateRepeat;
+  // Goal work always carries its hours.
+  const hasDuration = draft.goalId === "" || draft.durationMinutes !== "";
+  return hasWork && canCreateRepeat && hasDuration;
 }
 
 export function isScheduleChanged(draft: TaskDraft) {
@@ -444,7 +440,6 @@ function scheduleValues(draft: TaskDraft) {
   return {
     start_time: draft.startTime || null,
     duration_minutes: draft.durationMinutes ? Number(draft.durationMinutes) : null,
-    block_count: draft.blockCount ? Number(draft.blockCount) : null,
   };
 }
 
@@ -466,9 +461,6 @@ function taskChanges(draft: TaskDraft) {
   }
   if (values.duration_minutes !== task.duration_minutes) {
     changes.duration_minutes = values.duration_minutes;
-  }
-  if (values.block_count !== task.block_count) {
-    changes.block_count = values.block_count;
   }
   return Object.keys(changes).length > 0 ? changes : null;
 }

@@ -21,7 +21,7 @@ export function AreaGoalList({ goals, weekResults, onEdit }: AreaGoalListProps) 
             <button
               type="button"
               aria-label={`${goal.title}, goal${
-                result ? `, ${result.done} of ${result.target} this week` : ""
+                result ? `, ${result.done} of ${result.target} hours this week` : ""
               }`}
               className="flex w-full items-center gap-2.5 rounded-lg px-2 py-[7px] text-left transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               onClick={() => onEdit(goal)}
@@ -62,5 +62,5 @@ function goalSummary(goal: Goal) {
   if (goal.weekly_target === null) {
     return "No target";
   }
-  return `${goal.weekly_target} ${goal.weekly_target === 1 ? "block" : "blocks"}/week`;
+  return `${goal.weekly_target}h / week`;
 }

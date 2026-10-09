@@ -328,7 +328,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Remove `block_count` from requests and responses, validate durations, and drop blocks from the redraw's untouched match
 - Regenerate `apps/api/openapi.json` and `packages/api-client/src/generated/schema.d.ts`; update the API tests
 
-### Block 2 — Hours in the web client
+### Block 2 — Hours in the web client — DONE
 
 - One duration control for the task, Journal and schedule forms: a 15-minute stepper up to 24 hours with 30 min, 1 h, 2 h and 4 h shortcuts; a new goal task starts at one hour; the block picker goes
 - Goal form: weekly target in hours / week; goal rows read `20h / week`

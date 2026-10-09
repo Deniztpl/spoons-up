@@ -57,7 +57,6 @@ describe("useTaskForm", () => {
           start_time: null,
           duration_minutes: null,
           end_time: null,
-          block_count: null,
           period_start: "2026-09-28",
           status: "PENDING",
           completed_at: null,
@@ -77,7 +76,6 @@ describe("useTaskForm", () => {
         scheduled_date: "2026-09-24",
         start_time: null,
         duration_minutes: null,
-        block_count: null,
       });
       result.current.setScheduledDate("2026-10-02");
     });

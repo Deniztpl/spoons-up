@@ -27,20 +27,13 @@ function goal(id: string, title: string, weeklyTarget: number | null, rules: unk
   return { id, area_id: "1", title, weekly_target: weeklyTarget, created_at: createdAt, rules };
 }
 
-function rule(
-  id: string,
-  byweekday: number[],
-  startTime: string,
-  durationMinutes = 60,
-  blockCount = 1,
-) {
+function rule(id: string, byweekday: number[], startTime: string, durationMinutes = 60) {
   return {
     id,
     goal_id: "7",
     byweekday,
     start_time: startTime,
     duration_minutes: durationMinutes,
-    block_count: blockCount,
   };
 }
 
@@ -403,12 +396,12 @@ describe("Areas page", () => {
     renderPage();
 
     const csBlock = await screen.findByRole("button", {
-      name: "CS Block, goal, 2 of 2 this week",
+      name: "CS Block, goal, 2 of 2 hours this week",
     });
-    expect(within(csBlock).getByText("2/2")).toBeInTheDocument();
+    expect(within(csBlock).getByText("2h/2h")).toBeInTheDocument();
     expect(
-      within(screen.getByRole("button", { name: "Ship, goal, 1.5 of 2 this week" })).getByText(
-        "1½/2",
+      within(screen.getByRole("button", { name: "Ship, goal, 1.5 of 2 hours this week" })).getByText(
+        "1h 30m/2h",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "SWE" })).toHaveAccessibleDescription(
@@ -554,10 +547,10 @@ describe("Areas page", () => {
       screen.getByRole("list", { name: "SWE goals and habits" }),
     ).getAllByRole("listitem");
     expect(sweItems).toHaveLength(3);
-    expect(sweItems[0]).toHaveTextContent("CS Block, goal, 2 of 2");
+    expect(sweItems[0]).toHaveTextContent("CS Block, goal, 2 of 2 hours");
     expect(sweItems[0]).toHaveTextContent("100%");
-    expect(within(sweItems[1]!).getByText("1½/2")).toBeInTheDocument();
-    expect(sweItems[1]).toHaveTextContent("Ship, goal, 1.5 of 2");
+    expect(within(sweItems[1]!).getByText("1h 30m/2h")).toBeInTheDocument();
+    expect(sweItems[1]).toHaveTextContent("Ship, goal, 1.5 of 2 hours");
     expect(sweItems[1]).toHaveTextContent("75%");
     expect(sweItems[2]).toHaveTextContent("Read, habit, 5 of 7");
     expect(sweItems[2]).toHaveTextContent("71%");
@@ -865,18 +858,21 @@ describe("Areas page", () => {
     fireEvent.change(within(firstRule).getByLabelText("Start time"), {
       target: { value: "19:00" },
     });
-    await user.selectOptions(within(firstRule).getByLabelText("Duration"), "90");
-    await user.click(within(firstRule).getByRole("radio", { name: "2 blocks" }));
+    // Two 15-minute steps up from the hour a new schedule starts with.
+    await user.click(within(firstRule).getByRole("button", { name: "Longer" }));
+    await user.click(within(firstRule).getByRole("button", { name: "Longer" }));
     expect(within(firstRule).getByText("Mon, Wed, Fri · 19:00–20:30")).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: "Add schedule" }));
     const secondRule = within(dialog).getByRole("group", { name: "Schedule 2" });
     await user.click(within(secondRule).getByRole("button", { name: "Saturday" }));
-    await user.click(within(secondRule).getByRole("radio", { name: "Half a block" }));
+    fireEvent.change(within(secondRule).getByLabelText("Start time"), { target: { value: "" } });
+    await user.click(within(secondRule).getByRole("button", { name: "4 hours" }));
+    expect(within(secondRule).getByText("Sat · 4h, any time")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
     expect(await screen.findByRole("button", { name: "CS Block, goal" })).toBeInTheDocument();
-    expect(screen.getByText("3 blocks/week")).toBeInTheDocument();
+    expect(screen.getByText("3h / week")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const ruleBodies = await Promise.all(
       requestsTo(fetchMock, "POST", "/api/v1/goals/7/rules").map((request) =>
@@ -884,8 +880,8 @@ describe("Areas page", () => {
       ),
     );
     expect(ruleBodies).toEqual([
-      { byweekday: [1, 3, 5], start_time: "19:00", duration_minutes: 90, block_count: 2 },
-      { byweekday: [6], start_time: "09:00", duration_minutes: 60, block_count: 0.5 },
+      { byweekday: [1, 3, 5], start_time: "19:00", duration_minutes: 90 },
+      { byweekday: [6], start_time: null, duration_minutes: 240 },
     ]);
   });
 
@@ -918,8 +914,8 @@ describe("Areas page", () => {
         return new Response(null, { status: 204 });
       }
       if (request.method === "PATCH" && url.pathname === "/api/v1/rules/22") {
-        expect(await request.clone().json()).toEqual({ block_count: 2 });
-        return Response.json(rule("22", [6], "10:00", 60, 2));
+        expect(await request.clone().json()).toEqual({ duration_minutes: 120 });
+        return Response.json(rule("22", [6], "10:00", 120));
       }
       if (request.method === "DELETE" && url.pathname === "/api/v1/goals/7") {
         return new Response(null, { status: 204 });
@@ -938,7 +934,7 @@ describe("Areas page", () => {
     await user.click(within(editDialog).getByRole("button", { name: "Remove schedule 1" }));
     const remainingRule = within(editDialog).getByRole("group", { name: "Schedule 1" });
     expect(within(remainingRule).getByText("Sat · 10:00–11:00")).toBeInTheDocument();
-    await user.click(within(remainingRule).getByRole("radio", { name: "2 blocks" }));
+    await user.click(within(remainingRule).getByRole("button", { name: "2 hours" }));
     await user.click(within(editDialog).getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("No target")).toBeInTheDocument();
@@ -1036,7 +1032,7 @@ describe("Areas page", () => {
     const goals = await screen.findByRole("list", { name: "Goals" });
     const habits = screen.getByRole("list", { name: "Habits" });
     expect(goals.compareDocumentPosition(habits) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(goals).getByText("3 blocks/week")).toBeInTheDocument();
+    expect(within(goals).getByText("3h / week")).toBeInTheDocument();
     expect(within(goals).getByText("No target")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Area actions" }));

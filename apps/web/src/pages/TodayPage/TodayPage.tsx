@@ -239,7 +239,6 @@ export function TodayPage({
           onScheduledDateChange={taskForm.setScheduledDate}
           onStartTimeChange={taskForm.setStartTime}
           onDurationChange={taskForm.setDurationMinutes}
-          onBlockCountChange={taskForm.setBlockCount}
           onRepeatChange={taskForm.setRepeating}
           onWeekdayToggle={taskForm.toggleWeekday}
           onSubmit={() => void taskForm.saveTask()}
@@ -264,7 +263,6 @@ export function TodayPage({
           onScheduledDateChange={journalForm.setScheduledDate}
           onStartTimeChange={journalForm.setStartTime}
           onDurationChange={journalForm.setDurationMinutes}
-          onBlockCountChange={journalForm.setBlockCount}
           onSubmit={() => void journalForm.save()}
           onClose={journalForm.close}
         />

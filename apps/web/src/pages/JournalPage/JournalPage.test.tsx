@@ -53,7 +53,6 @@ function fakeApi(initial: FakeTask[]) {
     start_time: null,
     duration_minutes: null,
     end_time: null,
-    block_count: null,
     status: step.status,
     completed_at: step.completedAt,
   });
@@ -68,7 +67,6 @@ function fakeApi(initial: FakeTask[]) {
       start_time: item.startTime,
       duration_minutes: null,
       end_time: null,
-      block_count: null,
       status: item.status,
       completed_at: item.completedAt,
       created_at: item.createdAt,
@@ -92,7 +90,6 @@ function fakeApi(initial: FakeTask[]) {
     start_time: row.startTime,
     duration_minutes: null,
     end_time: null,
-    block_count: null,
     period_start: row.dueDate ? "2026-09-21" : null,
     status: row.status,
     completed_at: row.completedAt,

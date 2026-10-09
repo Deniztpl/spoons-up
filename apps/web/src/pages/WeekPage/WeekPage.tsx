@@ -187,7 +187,6 @@ export function WeekPage({
           onScheduledDateChange={taskForm.setScheduledDate}
           onStartTimeChange={taskForm.setStartTime}
           onDurationChange={taskForm.setDurationMinutes}
-          onBlockCountChange={taskForm.setBlockCount}
           onRepeatChange={taskForm.setRepeating}
           onWeekdayToggle={taskForm.toggleWeekday}
           onSubmit={() => void taskForm.saveTask()}
@@ -232,7 +231,6 @@ export function WeekPage({
           onScheduledDateChange={journalForm.setScheduledDate}
           onStartTimeChange={journalForm.setStartTime}
           onDurationChange={journalForm.setDurationMinutes}
-          onBlockCountChange={journalForm.setBlockCount}
           onSubmit={() => void journalForm.save()}
           onClose={journalForm.close}
         />

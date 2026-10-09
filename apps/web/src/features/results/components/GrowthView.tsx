@@ -370,6 +370,7 @@ function GrowthAreaRow({
                       </span>
                       <span className="sr-only">
                         , {isGoal ? "goal" : "habit"}, {item.done} of {item.target}
+                        {isGoal ? " hours" : ""}
                       </span>
                       <span
                         aria-hidden="true"

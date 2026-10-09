@@ -19,7 +19,6 @@ function task(id: string, title: string, date: string, time: string | null = "09
     start_time: time,
     duration_minutes: time ? 60 : null,
     end_time: time ? "10:00" : null,
-    block_count: null,
     status: "PENDING",
     parent_id: null as string | null,
     step_progress: null as { done: number; total: number } | null,
@@ -222,7 +221,6 @@ describe("Week page", () => {
           scheduled_date: "2026-09-25",
           start_time: "09:30",
           duration_minutes: null,
-          block_count: null,
         });
         planned = true;
         return Response.json({ ...task("60", "Buy a gift", "2026-09-25", "09:30") });
@@ -246,7 +244,7 @@ describe("Week page", () => {
     await user.click(await within(dialog).findByRole("button", { name: "Buy a gift" }));
     await user.click(within(dialog).getByRole("button", { name: "Plan" }));
 
-    expect(await screen.findByRole("button", { name: "Buy a gift, 09:30 to 10:00" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Buy a gift, 09:30 to 10:00, 1 hour" })).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([request]) => request.method === "POST")).toBe(false);
   });
 
@@ -281,7 +279,7 @@ describe("Week page", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: "Prepare the slides, a step of Conference, 1 of 3 steps done, 13:00 to 10:00",
+        name: "Prepare the slides, a step of Conference, 1 of 3 steps done, 13:00 to 10:00, 1 hour",
       }),
     ).toBeInTheDocument();
 
@@ -316,11 +314,11 @@ describe("Week page", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderPage();
 
-    const open = (await screen.findByRole("button", { name: "Open review, 09:00 to 10:00" })).closest(
+    const open = (await screen.findByRole("button", { name: "Open review, 09:00 to 10:00, 1 hour" })).closest(
       "article",
     );
     const finished = screen
-      .getByRole("button", { name: "Finished review, 11:00 to 10:00" })
+      .getByRole("button", { name: "Finished review, 11:00 to 10:00, 1 hour" })
       .closest("article");
     expect(open).toHaveAttribute("draggable", "true");
     expect(finished).toHaveAttribute("draggable", "false");
@@ -482,12 +480,15 @@ describe("Week page", () => {
     );
     renderPage();
 
-    const block = await screen.findByRole("button", { name: "Deep work, Coding, 13:00 to 15:00" });
+    const block = await screen.findByRole("button", {
+      name: "Deep work, Coding, 13:00 to 15:00, 2 hours",
+    });
     const card = block.closest("article")!;
     expect(card).toHaveClass("area-green");
     expect(within(card).getByText("Coding")).toBeInTheDocument();
+    expect(within(card).getByText("2h")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Plan sprint, 09:00 to 10:00" }).closest("article"),
+      screen.getByRole("button", { name: "Plan sprint, 09:00 to 10:00, 1 hour" }).closest("article"),
     ).not.toHaveClass("area-green");
   });
 

@@ -27,7 +27,6 @@ type JournalTaskDialogProps = {
   onScheduledDateChange: (scheduledDate: string) => void;
   onStartTimeChange: (startTime: string) => void;
   onDurationChange: (durationMinutes: string) => void;
-  onBlockCountChange: (blockCount: string) => void;
   onSubmit: () => void;
   onClose: () => void;
 };
@@ -57,7 +56,6 @@ export function JournalTaskDialog({
   onScheduledDateChange,
   onStartTimeChange,
   onDurationChange,
-  onBlockCountChange,
   onSubmit,
   onClose,
 }: JournalTaskDialogProps) {
@@ -356,10 +354,9 @@ export function JournalTaskDialog({
         <TaskPlanFields
           startTime={draft.startTime}
           durationMinutes={draft.durationMinutes}
-          blockCount={draft.blockCount}
+          isDurationRequired={false}
           onStartTimeChange={onStartTimeChange}
           onDurationChange={onDurationChange}
-          onBlockCountChange={onBlockCountChange}
         />
 
         {error ? (

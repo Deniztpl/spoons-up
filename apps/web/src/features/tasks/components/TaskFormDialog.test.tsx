@@ -32,7 +32,6 @@ function GoalEntry() {
           onScheduledDateChange={form.setScheduledDate}
           onStartTimeChange={form.setStartTime}
           onDurationChange={form.setDurationMinutes}
-          onBlockCountChange={form.setBlockCount}
           onRepeatChange={form.setRepeating}
           onWeekdayToggle={form.toggleWeekday}
           onSubmit={() => void form.saveTask()}
@@ -90,9 +89,8 @@ describe("TaskFormDialog", () => {
             scheduled_date: "2026-09-24",
             due_date: null,
             start_time: null,
-            duration_minutes: null,
+            duration_minutes: 120,
             end_time: null,
-            block_count: null,
             period_start: "2026-09-21",
             status: "PENDING",
             completed_at: null,
@@ -115,8 +113,13 @@ describe("TaskFormDialog", () => {
     expect(goal).toHaveValue("");
     expect(within(dialog).queryByLabelText("Title")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+    // Goal work always carries its hours, starting at one.
+    const duration = within(dialog).getByRole("spinbutton", { name: "Duration" });
+    expect(duration).toHaveAttribute("aria-valuetext", "1 hour");
+    expect(within(dialog).queryByRole("button", { name: "None" })).not.toBeInTheDocument();
 
     await user.selectOptions(goal, "7");
+    await user.click(within(dialog).getByRole("button", { name: "2 hours" }));
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
@@ -127,8 +130,7 @@ describe("TaskFormDialog", () => {
       goal_id: "7",
       scheduled_date: "2026-09-24",
       start_time: null,
-      duration_minutes: null,
-      block_count: null,
+      duration_minutes: 120,
     });
   });
 });

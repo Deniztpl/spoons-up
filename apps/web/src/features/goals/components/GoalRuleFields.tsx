@@ -1,6 +1,8 @@
 import { useId } from "react";
 
 import { CloseIcon } from "../../../components/ui/CloseIcon";
+import { DurationField } from "../../../components/ui/DurationField";
+import { formatDuration } from "../../../lib/duration";
 import type { GoalRuleDraft, GoalRuleValues } from "../hooks/useGoalForm";
 
 type GoalRuleFieldsProps = {
@@ -20,17 +22,12 @@ const weekdays = [
   { value: 6, letter: "S", short: "Sat", name: "Saturday" },
   { value: 7, letter: "S", short: "Sun", name: "Sunday" },
 ];
-const durations = [15, 30, 45, 60, 90, 120, 180];
-const blockCounts = [0.5, 1, 2, 4];
 
 const controlClassName =
   "rounded-[7px] border border-ink/14 bg-card px-2 py-1.5 text-[13px] text-ink outline-none transition focus:border-accent focus:ring-3 focus:ring-accent/15";
 
 export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFieldsProps) {
-  const blockName = useId();
-  // Keep values set outside the offered options selectable.
-  const durationOptions = withValue(durations, rule.durationMinutes);
-  const blockOptions = withValue(blockCounts, rule.blockCount);
+  const durationLabelId = useId();
 
   const toggleDay = (day: number) =>
     onChange({
@@ -87,57 +84,22 @@ export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFiel
           className={`${controlClassName} w-28`}
           onChange={(event) => onChange({ startTime: event.target.value || null })}
         />
-        <select
-          aria-label="Duration"
-          value={rule.durationMinutes ?? ""}
-          className={controlClassName}
-          onChange={(event) =>
-            onChange({
-              durationMinutes: event.target.value ? Number(event.target.value) : null,
-            })
-          }
-        >
-          <option value="">No duration</option>
-          {durationOptions.map((minutes) => (
-            <option key={minutes} value={minutes}>
-              {durationLabel(minutes)}
-            </option>
-          ))}
-        </select>
+        <span id={durationLabelId} className="sr-only">
+          Duration
+        </span>
+        <DurationField
+          labelledBy={durationLabelId}
+          value={rule.durationMinutes}
+          size="compact"
+          onChange={(value) => {
+            if (value !== null) {
+              onChange({ durationMinutes: value });
+            }
+          }}
+        />
       </div>
-
-      <fieldset className="flex flex-col">
-        <legend className="mb-[5px] text-[11.5px] text-ink-soft">Blocks</legend>
-        <div className="grid auto-cols-fr grid-flow-col gap-0.5 rounded-[7px] border border-ink/12 bg-card p-0.5">
-          {[null, ...blockOptions].map((count) => (
-            <label key={count ?? "none"}>
-              <input
-                type="radio"
-                name={blockName}
-                value={count ?? ""}
-                checked={rule.blockCount === count}
-                aria-label={blockCountLabel(count)}
-                className="peer sr-only"
-                onChange={() => onChange({ blockCount: count })}
-              />
-              <span
-                aria-hidden="true"
-                className="block cursor-pointer rounded-[5px] py-1 text-center text-xs font-medium text-ink-soft transition peer-checked:bg-accent peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
-              >
-                {count === null ? "—" : count === 0.5 ? "½" : count}
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
     </div>
   );
-}
-
-function withValue(options: number[], value: number | null) {
-  return value === null || options.includes(value)
-    ? options
-    : [...options, value].sort((a, b) => a - b);
 }
 
 function ruleSummary(rule: GoalRuleDraft) {
@@ -148,10 +110,8 @@ function ruleSummary(rule: GoalRuleDraft) {
         .join(", ")
     : "No days selected";
   const time = rule.startTime
-    ? rule.durationMinutes
-      ? `${rule.startTime}–${endTime(rule.startTime, rule.durationMinutes)}`
-      : rule.startTime
-    : "No start time";
+    ? `${rule.startTime}–${endTime(rule.startTime, rule.durationMinutes)}`
+    : `${formatDuration(rule.durationMinutes)}, any time`;
   return `${days} · ${time}`;
 }
 
@@ -160,22 +120,4 @@ function endTime(startTime: string, minutes: number) {
   const [hours = 0, mins = 0] = startTime.split(":").map(Number);
   const end = (hours * 60 + mins + minutes) % (24 * 60);
   return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
-}
-
-function durationLabel(minutes: number) {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-  const hours = Math.floor(minutes / 60);
-  return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
-}
-
-function blockCountLabel(count: number | null) {
-  if (count === null) {
-    return "No block value";
-  }
-  if (count === 0.5) {
-    return "Half a block";
-  }
-  return count === 1 ? "1 block" : `${count} blocks`;
 }

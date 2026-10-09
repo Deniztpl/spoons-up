@@ -195,7 +195,7 @@ export function GoalFormDialog({
                 +
               </button>
             </div>
-            <span className="text-[13px] text-ink-soft">blocks / week</span>
+            <span className="text-[13px] text-ink-soft">hours / week</span>
           </div>
         </div>
 

@@ -15,7 +15,6 @@ export type JournalTaskDraft = {
   scheduledDate: string;
   startTime: string;
   durationMinutes: string;
-  blockCount: string;
   choice: JournalChoice | null;
 };
 
@@ -51,7 +50,7 @@ export function useJournalTaskForm({ onSaved }: { onSaved: () => void }) {
 
   const open = ({ scheduledDate, startTime = "" }: NewTaskDefaults) => {
     formRequest.current += 1;
-    setDraft({ scheduledDate, startTime, durationMinutes: "", blockCount: "", choice: null });
+    setDraft({ scheduledDate, startTime, durationMinutes: "", choice: null });
     setItems(null);
     setLoadError(null);
     setFormError(null);
@@ -78,8 +77,6 @@ export function useJournalTaskForm({ onSaved }: { onSaved: () => void }) {
         durationMinutes:
           current.durationMinutes ||
           (task?.duration_minutes == null ? "" : String(task.duration_minutes)),
-        blockCount:
-          current.blockCount || (task?.block_count == null ? "" : String(task.block_count)),
       };
     });
 
@@ -92,7 +89,6 @@ export function useJournalTaskForm({ onSaved }: { onSaved: () => void }) {
       scheduled_date: draft.scheduledDate,
       start_time: draft.startTime || null,
       duration_minutes: draft.durationMinutes ? Number(draft.durationMinutes) : null,
-      block_count: draft.blockCount ? Number(draft.blockCount) : null,
     };
     setIsSaving(true);
     setFormError(null);
@@ -137,7 +133,6 @@ export function useJournalTaskForm({ onSaved }: { onSaved: () => void }) {
     setStartTime: (startTime: string) => updateDraft((current) => ({ ...current, startTime })),
     setDurationMinutes: (durationMinutes: string) =>
       updateDraft((current) => ({ ...current, durationMinutes })),
-    setBlockCount: (blockCount: string) => updateDraft((current) => ({ ...current, blockCount })),
     save,
   };
 }

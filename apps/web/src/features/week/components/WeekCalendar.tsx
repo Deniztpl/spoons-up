@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { CheckIcon } from "../../../components/ui/CheckIcon";
+import { describeDuration, formatDuration } from "../../../lib/duration";
 import type { Area } from "../../areas/api/areasApi";
 import { areaColorClass } from "../../areas/areaColor";
 import type { WeekResponse, WeekTask } from "../api/weekApi";
@@ -453,7 +454,7 @@ function TaskBlock({
     parentLine !== null && isTall && placement.height >= PARENT_LABEL_BLOCK_HEIGHT;
   const titleClassName = `min-w-0 text-[12px] font-medium leading-[1.25] text-ink ${isDone ? "line-through" : ""}`;
   const badge =
-    task.block_count !== null || task.rule_id !== null ? (
+    task.duration_minutes !== null || task.rule_id !== null ? (
       <span
         aria-hidden="true"
         className={`ml-auto flex h-[15px] shrink-0 items-center gap-[3px] rounded-[5px] px-1 text-[9.5px] font-semibold text-white tabular-nums ${
@@ -461,7 +462,7 @@ function TaskBlock({
         }`}
       >
         {task.rule_id !== null ? <RepeatIcon className="size-[9px]" /> : null}
-        {task.block_count !== null ? `×${task.block_count === 0.5 ? "½" : task.block_count}` : null}
+        {task.duration_minutes !== null ? formatDuration(task.duration_minutes) : null}
       </span>
     ) : null;
 
@@ -705,7 +706,7 @@ function taskSummary(task: WeekTask, area: Area | undefined) {
   if (task.start_time) {
     details.push(task.end_time ? `${task.start_time} to ${task.end_time}` : task.start_time);
   }
-  if (task.block_count !== null) details.push(blockLabel(task.block_count));
+  if (task.duration_minutes !== null) details.push(describeDuration(task.duration_minutes));
   if (task.rule_id) details.push("repeating");
   return details.join(", ");
 }
@@ -761,10 +762,6 @@ function minutesToTime(value: number) {
   const hour = Math.floor(value / 60);
   const minute = value % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function blockLabel(value: number) {
-  return value === 0.5 ? "half a block" : `${value} block${value === 1 ? "" : "s"}`;
 }
 
 function layoutTimedTasks(tasks: WeekTask[]) {

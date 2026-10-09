@@ -18,7 +18,6 @@ function item(id: string, title: string, fields: Fields = {}, steps: Fields[] = 
     start_time: null,
     duration_minutes: null,
     end_time: null,
-    block_count: null,
     status: "PENDING",
     completed_at: null,
     progress: {
@@ -39,7 +38,6 @@ function step(id: string, parentId: string, title: string, fields: Fields = {}) 
     start_time: null,
     duration_minutes: null,
     end_time: null,
-    block_count: null,
     status: "PENDING",
     completed_at: null,
     ...fields,
@@ -96,7 +94,6 @@ function taskResponse(fields: Fields, status = 200) {
       start_time: null,
       duration_minutes: null,
       end_time: null,
-      block_count: null,
       period_start: "2026-09-21",
       status: "PENDING",
       completed_at: null,
@@ -146,7 +143,6 @@ function Harness() {
           onScheduledDateChange={form.setScheduledDate}
           onStartTimeChange={form.setStartTime}
           onDurationChange={form.setDurationMinutes}
-          onBlockCountChange={form.setBlockCount}
           onSubmit={() => void form.save()}
           onClose={form.close}
         />
@@ -234,13 +230,16 @@ describe("JournalTaskDialog", () => {
     expect(within(dialog).getByRole("group", { name: "Chosen task" })).toHaveTextContent("Dentist");
     expect(within(dialog).getByRole("button", { name: "Change" })).toHaveFocus();
     expect(within(dialog).getByLabelText("Start time")).toHaveValue("09:30");
-    expect(within(dialog).getByLabelText("Duration")).toHaveValue("45");
+    expect(within(dialog).getByRole("spinbutton", { name: "Duration" })).toHaveAttribute(
+      "aria-valuetext",
+      "45 minutes",
+    );
     await user.click(within(dialog).getByRole("button", { name: "Add to today" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(await bodiesOf(fetchMock, "PATCH")).toEqual([
-      { scheduled_date: "2026-09-24", start_time: "09:30", duration_minutes: 45, block_count: null },
+      { scheduled_date: "2026-09-24", start_time: "09:30", duration_minutes: 45 },
     ]);
     expect(fetchMock.mock.calls[1]?.[0].url).toMatch(/\/api\/v1\/tasks\/486$/);
     expect(await bodiesOf(fetchMock, "POST")).toEqual([]);
@@ -257,13 +256,17 @@ describe("JournalTaskDialog", () => {
     expect(chosen).toHaveTextContent("Conference");
     expect(chosen).toHaveTextContent("Rehearse");
     fireEvent.change(within(dialog).getByLabelText("Start time"), { target: { value: "15:00" } });
-    await user.selectOptions(within(dialog).getByLabelText("Duration"), "30");
-    await user.click(within(dialog).getByRole("radio", { name: "1 block" }));
+    // Journal work may go without a duration until one is picked.
+    expect(within(dialog).getByRole("button", { name: "None" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "30 minutes" }));
     await user.click(within(dialog).getByRole("button", { name: "Add to today" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     expect(await bodiesOf(fetchMock, "PATCH")).toEqual([
-      { scheduled_date: "2026-09-24", start_time: "15:00", duration_minutes: 30, block_count: 1 },
+      { scheduled_date: "2026-09-24", start_time: "15:00", duration_minutes: 30 },
     ]);
     expect(fetchMock.mock.calls[1]?.[0].url).toMatch(/\/api\/v1\/tasks\/484$/);
   });
@@ -290,7 +293,6 @@ describe("JournalTaskDialog", () => {
         scheduled_date: "2026-09-24",
         start_time: null,
         duration_minutes: null,
-        block_count: null,
       },
     ]);
   });

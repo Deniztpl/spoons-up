@@ -29,7 +29,6 @@ type TaskFormDialogProps = {
   onScheduledDateChange: (scheduledDate: string) => void;
   onStartTimeChange: (startTime: string) => void;
   onDurationChange: (durationMinutes: string) => void;
-  onBlockCountChange: (blockCount: string) => void;
   onRepeatChange: (isRepeating: boolean) => void;
   onWeekdayToggle: (weekday: number) => void;
   onSubmit: () => void;
@@ -70,7 +69,6 @@ export function TaskFormDialog({
   onScheduledDateChange,
   onStartTimeChange,
   onDurationChange,
-  onBlockCountChange,
   onRepeatChange,
   onWeekdayToggle,
   onSubmit,
@@ -191,11 +189,10 @@ export function TaskFormDialog({
         <TaskPlanFields
           startTime={draft.startTime}
           durationMinutes={draft.durationMinutes}
-          blockCount={draft.blockCount}
+          isDurationRequired={!isEditing || isGoalLinked}
           startTimeRef={isEditing && isGoalLinked ? initialFocusRef : undefined}
           onStartTimeChange={onStartTimeChange}
           onDurationChange={onDurationChange}
-          onBlockCountChange={onBlockCountChange}
         />
 
         {isGoalLinked ? (

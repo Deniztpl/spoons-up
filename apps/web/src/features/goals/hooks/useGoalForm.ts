@@ -18,8 +18,7 @@ import {
 export type GoalRuleValues = {
   byweekday: number[];
   startTime: string | null;
-  durationMinutes: number | null;
-  blockCount: number | null;
+  durationMinutes: number;
 };
 
 export type GoalRuleDraft = GoalRuleValues & {
@@ -335,7 +334,6 @@ function newRule(): GoalRuleDraft {
     byweekday: [],
     startTime: "09:00",
     durationMinutes: 60,
-    blockCount: 1,
   };
 }
 
@@ -346,7 +344,6 @@ function savedRule(rule: GoalRule): GoalRuleDraft {
     byweekday: rule.byweekday,
     startTime: rule.start_time,
     durationMinutes: rule.duration_minutes,
-    blockCount: rule.block_count,
   };
 }
 
@@ -355,7 +352,6 @@ function ruleFields(rule: GoalRuleDraft): GoalRuleFields {
     byweekday: rule.byweekday,
     start_time: rule.startTime,
     duration_minutes: rule.durationMinutes,
-    block_count: rule.blockCount,
   };
 }
 
@@ -380,9 +376,6 @@ function ruleChanges(rule: GoalRuleDraft, saved: GoalRule) {
   }
   if (rule.durationMinutes !== saved.duration_minutes) {
     changes.duration_minutes = rule.durationMinutes;
-  }
-  if (rule.blockCount !== saved.block_count) {
-    changes.block_count = rule.blockCount;
   }
   return Object.keys(changes).length > 0 ? changes : null;
 }
