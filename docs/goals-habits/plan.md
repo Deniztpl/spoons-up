@@ -355,7 +355,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Delete or Backspace opens a new confirmation component: Enter deletes, Escape cancels
 - Shortcuts stay quiet while a dialog or text field has focus
 
-### Block 6 — Only this or All repeating
+### Block 6 — Only this or All repeating — DONE
 
 - API: `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`, each one transaction; tests cover the weekday wrap, gaps in both directions, a time-only change, the dragged task's `occurrence_date`, no duplicate generation, a date another task of the rule holds, done and retimed tasks staying, and closed weeks
 - Web: the question after moving, resizing or deleting a task that repeats; Enter picks Only this; the task shows at its new place while the question is open and Escape puts it back; a resize on an elapsed day skips the question

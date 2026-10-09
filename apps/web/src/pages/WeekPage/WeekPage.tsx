@@ -15,9 +15,10 @@ import {
   type NewTaskKind,
   NewTaskKindDialog,
 } from "../../features/week/components/NewTaskKindDialog";
+import { RepeatScopeDialog } from "../../features/week/components/RepeatScopeDialog";
 import { WeekCalendar } from "../../features/week/components/WeekCalendar";
 import { WeekHoursPanel } from "../../features/week/components/WeekHoursPanel";
-import { useWeek } from "../../features/week/hooks/useWeek";
+import { type TaskPlacement, useWeek } from "../../features/week/hooks/useWeek";
 
 const weekFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
 const hoursPanelKey = "spoons-up:week-hours-panel";
@@ -39,9 +40,49 @@ export function WeekPage({
   const [newTask, setNewTask] = useState<NewTaskDefaults | null>(null);
   const [confirmingTask, setConfirmingTask] = useState<WeekTask | null>(null);
   const [deletingTask, setDeletingTask] = useState<WeekTask | null>(null);
+  // A change to a repeating task waits here until Only this or All repeating is chosen.
+  const [scopeChoice, setScopeChoice] = useState<
+    | { action: "change"; task: WeekTask; placement: TaskPlacement }
+    | { action: "delete"; task: WeekTask }
+    | null
+  >(null);
   const [isHoursOpen, setIsHoursOpen] = useState(initialHoursOpen);
   const hoursPanelId = useId();
   const { week, todayDate } = weekState;
+
+  // A repeating task shows its new place while Week asks how far the change reaches. Resizing
+  // one on an elapsed day changes only that task.
+  const placeTask = (task: WeekTask, placement: TaskPlacement) => {
+    const isElapsedResize =
+      todayDate !== null &&
+      task.scheduled_date < todayDate &&
+      placement.scheduled_date === undefined &&
+      placement.start_time === undefined;
+    if (task.rule_id === null || isElapsedResize) {
+      void weekState.placeTask(task, placement);
+      return;
+    }
+    weekState.previewPlacement(task, placement);
+    setScopeChoice({ action: "change", task, placement });
+  };
+
+  const requestDelete = (task: WeekTask) => {
+    if (task.rule_id === null) {
+      setDeletingTask(task);
+    } else {
+      setScopeChoice({ action: "delete", task });
+    }
+  };
+
+  const chooseScope = (scope: "task" | "repeat") => {
+    if (!scopeChoice) return;
+    setScopeChoice(null);
+    if (scopeChoice.action === "change") {
+      void weekState.placeTask(scopeChoice.task, scopeChoice.placement, scope);
+    } else {
+      void weekState.removeTask(scopeChoice.task, scope);
+    }
+  };
 
   const toggleHours = () => {
     const next = !isHoursOpen;
@@ -190,9 +231,9 @@ export function WeekPage({
               onCreate={setNewTask}
               onEdit={taskForm.openEdit}
               onToggle={requestToggle}
-              onPlace={(task, placement) => void weekState.placeTask(task, placement)}
+              onPlace={placeTask}
               onPaste={(task, spot) => void weekState.pasteTask(task, spot)}
-              onRequestDelete={setDeletingTask}
+              onRequestDelete={requestDelete}
             />
             {isHoursOpen ? (
               <WeekHoursPanel
@@ -272,6 +313,19 @@ export function WeekPage({
           onDurationChange={journalForm.setDurationMinutes}
           onSubmit={() => void journalForm.save()}
           onClose={journalForm.close}
+        />
+      ) : null}
+
+      {scopeChoice ? (
+        <RepeatScopeDialog
+          title={scopeChoice.task.title}
+          action={scopeChoice.action}
+          onOnlyThis={() => chooseScope("task")}
+          onAll={() => chooseScope("repeat")}
+          onCancel={() => {
+            setScopeChoice(null);
+            if (scopeChoice.action === "change") weekState.restoreTask(scopeChoice.task);
+          }}
         />
       ) : null}
 

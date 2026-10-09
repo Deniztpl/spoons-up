@@ -334,6 +334,7 @@ class TaskService:
         rule: GoalRule,
         user_id: int,
         from_date: date,
+        keep_task_id: int | None = None,
     ) -> None:
         self.task_repository.delete_untouched_pending_tasks_for_rule(
             rule_id=rule.id,
@@ -341,7 +342,54 @@ class TaskService:
             from_date=from_date,
             start_time=rule.start_time,
             duration_minutes=rule.duration_minutes,
+            keep_task_id=keep_task_id,
         )
+
+    def move_with_rule(
+        self,
+        *,
+        task: Task,
+        rule: GoalRule,
+        scheduled_date: date,
+        start_time: time | None,
+        duration_minutes: int,
+        gap_days: int,
+    ) -> None:
+        """Place a rule's task where it was dropped while its rule moves by the same gap.
+
+        Its occurrence date moves with the rule's weekdays, so generation does not add a second
+        task for it, unless another task of the rule already holds that date.
+        """
+        if task.occurrence_date is not None and gap_days != 0:
+            shifted = task.occurrence_date + timedelta(days=gap_days)
+            if not self.task_repository.holds_occurrence(
+                rule_id=rule.id,
+                occurrence_date=shifted,
+                except_task_id=task.id,
+            ):
+                self.task_repository.set_rule(task=task, rule_id=rule.id, occurrence_date=shifted)
+        self.task_repository.update(
+            task=task,
+            title=task.title,
+            scheduled_date=scheduled_date,
+            due_date=task.due_date,
+            priority=task.priority,
+            start_time=start_time,
+            duration_minutes=duration_minutes,
+            end_time=_add_minutes(start_time, duration_minutes),
+            period_start=task.period_start,
+            update_title=False,
+            update_scheduled_date=True,
+            update_due_date=False,
+            update_priority=False,
+            update_start_time=True,
+            update_duration_minutes=True,
+            update_end_time=True,
+            update_period_start=False,
+        )
+
+    def hard_delete(self, *, task: Task) -> None:
+        self.task_repository.hard_delete(task=task)
 
     def delete_pending_tasks_for_area(
         self,

@@ -365,6 +365,25 @@ class TaskRepository:
         task.completed_at = None
         self.session.flush()
 
+    def hard_delete(self, *, task: Task) -> None:
+        self.session.delete(task)
+        self.session.flush()
+
+    def holds_occurrence(
+        self,
+        *,
+        rule_id: int,
+        occurrence_date: date,
+        except_task_id: int,
+    ) -> bool:
+        """Whether another task of the rule, in any status, already stands for that date."""
+        query = select(Task.id).where(
+            Task.rule_id == rule_id,
+            Task.occurrence_date == occurrence_date,
+            Task.id != except_task_id,
+        )
+        return self.session.scalar(query.limit(1)) is not None
+
     def complete(self, *, task: Task, completed_at: datetime) -> None:
         if task.status == TaskStatus.DONE.value:
             return
@@ -400,6 +419,7 @@ class TaskRepository:
         from_date: date,
         start_time: time | None,
         duration_minutes: int,
+        keep_task_id: int | None = None,
     ) -> None:
         query = delete(Task).where(
             Task.rule_id == rule_id,
@@ -410,6 +430,8 @@ class TaskRepository:
             Task.start_time.is_(None) if start_time is None else Task.start_time == start_time,
             Task.duration_minutes == duration_minutes,
         )
+        if keep_task_id is not None:
+            query = query.where(Task.id != keep_task_id)
         self.session.execute(query)
 
     def delete_pending_tasks_for_area(

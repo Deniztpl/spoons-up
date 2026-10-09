@@ -371,7 +371,8 @@ export interface paths {
         delete: operations["stop_repeating_task_api_v1_tasks__task_id__repeat_delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Change Repeat */
+        patch: operations["change_repeat_api_v1_tasks__task_id__repeat_patch"];
         trace?: never;
     };
     "/api/v1/today": {
@@ -456,6 +457,21 @@ export interface components {
             percent: number;
             /** Requirements */
             requirements: components["schemas"]["RequirementResponse"][];
+        };
+        /**
+         * ChangeRepeatRequest
+         * @description Where a repeating task was dropped or resized to, applied to its whole schedule.
+         */
+        ChangeRepeatRequest: {
+            /** Duration Minutes */
+            duration_minutes: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Start Time */
+            start_time: string | null;
         };
         /** CheckHabitRequest */
         CheckHabitRequest: {
@@ -2449,7 +2465,9 @@ export interface operations {
     };
     delete_task_api_v1_tasks__task_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: "task" | "repeat";
+            };
             header?: never;
             path: {
                 task_id: string;
@@ -2708,6 +2726,59 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationErrorResponse"];
+                };
+            };
+        };
+    };
+    change_repeat_api_v1_tasks__task_id__repeat_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRepeatRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

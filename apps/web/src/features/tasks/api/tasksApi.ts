@@ -4,6 +4,7 @@ import { apiClient } from "../../../lib/api";
 
 export type CreateTaskFields = components["schemas"]["CreateTaskRequest"];
 export type UpdateTaskFields = components["schemas"]["UpdateTaskRequest"];
+export type ChangeRepeatFields = components["schemas"]["ChangeRepeatRequest"];
 
 export function createTask(task: CreateTaskFields) {
   return apiClient.POST("/api/v1/tasks", { body: task });
@@ -16,9 +17,18 @@ export function updateTask(taskId: string, changes: UpdateTaskFields) {
   });
 }
 
-export function deleteTask(taskId: string) {
+// `repeat` also ends the task's schedule, as Week's All repeating does.
+export function deleteTask(taskId: string, scope: "task" | "repeat" = "task") {
   return apiClient.DELETE("/api/v1/tasks/{task_id}", {
+    params: { path: { task_id: taskId }, query: scope === "repeat" ? { scope } : undefined },
+  });
+}
+
+// All repeating: the task moves or resizes and its whole schedule follows.
+export function changeRepeat(taskId: string, fields: ChangeRepeatFields) {
+  return apiClient.PATCH("/api/v1/tasks/{task_id}/repeat", {
     params: { path: { task_id: taskId } },
+    body: fields,
   });
 }
 

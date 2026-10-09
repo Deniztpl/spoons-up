@@ -1,11 +1,12 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Path, Response, status
+from fastapi import APIRouter, Path, Query, Response, status
 
 from app.api.deps.auth import CurrentUserDependency
 from app.api.deps.services import GoalServiceDependency, TaskServiceDependency
 from app.schemas.errors import ErrorResponse, ValidationErrorResponse
 from app.schemas.tasks import (
+    ChangeRepeatRequest,
     CreateTaskRequest,
     RepeatTaskRequest,
     TaskResponse,
@@ -56,8 +57,14 @@ def delete_task(
     task_id: TaskIdPath,
     current_user: CurrentUserDependency,
     task_service: TaskServiceDependency,
+    goal_service: GoalServiceDependency,
+    # `repeat` is Week's All repeating: the task's schedule goes too.
+    scope: Annotated[Literal["task", "repeat"], Query()] = "task",
 ) -> None:
-    task_service.delete(task_id=int(task_id), user_id=current_user.id)
+    if scope == "repeat":
+        goal_service.delete_repeat(task_id=int(task_id), user_id=current_user.id)
+    else:
+        task_service.delete(task_id=int(task_id), user_id=current_user.id)
 
 
 @router.post("/{task_id}/check", response_model=TaskResponse, responses=READ_RESPONSES)
@@ -86,6 +93,16 @@ def repeat_task(
     goal_service: GoalServiceDependency,
 ) -> TaskResponse:
     return goal_service.repeat_task(payload, task_id=int(task_id), user_id=current_user.id)
+
+
+@router.patch("/{task_id}/repeat", response_model=TaskResponse, responses=READ_RESPONSES)
+def change_repeat(
+    task_id: TaskIdPath,
+    payload: ChangeRepeatRequest,
+    current_user: CurrentUserDependency,
+    goal_service: GoalServiceDependency,
+) -> TaskResponse:
+    return goal_service.change_repeat(payload, task_id=int(task_id), user_id=current_user.id)
 
 
 @router.delete("/{task_id}/repeat", response_model=TaskResponse, responses=READ_RESPONSES)

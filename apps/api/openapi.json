@@ -137,6 +137,42 @@
         "title": "AreaResultResponse",
         "type": "object"
       },
+      "ChangeRepeatRequest": {
+        "description": "Where a repeating task was dropped or resized to, applied to its whole schedule.",
+        "properties": {
+          "duration_minutes": {
+            "maximum": 1440.0,
+            "minimum": 15.0,
+            "multipleOf": 15.0,
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "scheduled_date": {
+            "format": "date",
+            "title": "Scheduled Date",
+            "type": "string"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          }
+        },
+        "required": [
+          "scheduled_date",
+          "start_time",
+          "duration_minutes"
+        ],
+        "title": "ChangeRepeatRequest",
+        "type": "object"
+      },
       "CheckHabitRequest": {
         "properties": {
           "date": {
@@ -4004,6 +4040,20 @@
               "title": "Task Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "task",
+              "enum": [
+                "task",
+                "repeat"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4325,6 +4375,82 @@
           }
         ],
         "summary": "Stop Repeating Task",
+        "tags": [
+          "tasks"
+        ]
+      },
+      "patch": {
+        "operationId": "change_repeat_api_v1_tasks__task_id__repeat_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRepeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Change Repeat",
         "tags": [
           "tasks"
         ]

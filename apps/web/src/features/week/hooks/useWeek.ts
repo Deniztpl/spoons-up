@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  changeRepeat,
   checkTask,
   createTask,
   deleteTask,
@@ -153,18 +154,38 @@ export function useWeek() {
     }
   }
 
-  // The task takes its new place at once; a failed save puts it back where it was.
-  async function placeTask(task: WeekTask, placement: TaskPlacement) {
+  // Shows a task at a new place before anything is saved, while Week asks how far it reaches.
+  function previewPlacement(task: WeekTask, placement: TaskPlacement) {
+    setWeek((current) => (current ? withTask(current, placedTask(task, placement)) : current));
+  }
+
+  function restoreTask(task: WeekTask) {
+    setWeek((current) => (current ? withTask(current, task) : current));
+  }
+
+  // The task takes its new place at once; a failed save puts it back where it was. With
+  // `repeat`, its whole schedule follows from the server, so the week is read again.
+  async function placeTask(
+    task: WeekTask,
+    placement: TaskPlacement,
+    scope: "task" | "repeat" = "task",
+  ) {
     if (pendingTaskIds.has(task.id)) return;
 
-    const placed = { ...task, ...placement };
-    placed.end_time = endTime(placed.start_time, placed.duration_minutes);
+    const placed = placedTask(task, placement);
     setActionError(null);
     setPendingTaskIds((current) => new Set(current).add(task.id));
     setWeek((current) => (current ? withTask(current, placed) : current));
 
     try {
-      const { error } = await updateTask(task.id, placement);
+      const { error } =
+        scope === "repeat"
+          ? await changeRepeat(task.id, {
+              scheduled_date: placed.scheduled_date,
+              start_time: placed.start_time,
+              duration_minutes: placed.duration_minutes ?? 60,
+            })
+          : await updateTask(task.id, placement);
       if (error) {
         setWeek((current) => (current ? withTask(current, task) : current));
         setActionError(errorMessage(error, "Task could not be moved."));
@@ -206,7 +227,7 @@ export function useWeek() {
   }
 
   // The task leaves the calendar at once; a failed delete puts it back.
-  async function removeTask(task: WeekTask) {
+  async function removeTask(task: WeekTask, scope: "task" | "repeat" = "task") {
     if (pendingTaskIds.has(task.id)) return;
 
     setActionError(null);
@@ -214,7 +235,7 @@ export function useWeek() {
     setWeek((current) => (current ? withoutTask(current, task.id) : current));
 
     try {
-      const { error, response } = await deleteTask(task.id);
+      const { error, response } = await deleteTask(task.id, scope);
       if (response.status !== 204) {
         setWeek((current) => (current ? withTask(current, task) : current));
         setActionError(errorMessage(error, "Task could not be deleted."));
@@ -245,11 +266,18 @@ export function useWeek() {
     showFollowingWeek: () => void loadWeek("following"),
     reload,
     toggleTask,
+    previewPlacement,
+    restoreTask,
     placeTask,
     pasteTask,
     removeTask,
   };
 
+}
+
+function placedTask(task: WeekTask, placement: TaskPlacement): WeekTask {
+  const placed = { ...task, ...placement };
+  return { ...placed, end_time: endTime(placed.start_time, placed.duration_minutes) };
 }
 
 function withoutTask(week: WeekResponse, taskId: string): WeekResponse {

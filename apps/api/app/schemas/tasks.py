@@ -64,6 +64,15 @@ class RepeatTaskRequest(BaseModel):
     byweekday: Weekdays
 
 
+class ChangeRepeatRequest(BaseModel):
+    """Where a repeating task was dropped or resized to, applied to its whole schedule."""
+
+    scheduled_date: date
+    # Required, though null for the untimed row.
+    start_time: LocalTime | None
+    duration_minutes: DurationMinutes
+
+
 class TaskResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,

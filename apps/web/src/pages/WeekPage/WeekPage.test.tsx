@@ -14,7 +14,7 @@ function task(id: string, title: string, date: string, time: string | null = "09
     rule_id: null as string | null,
     title,
     scheduled_date: date,
-    occurrence_date: null,
+    occurrence_date: null as string | null,
     period_start: "2026-09-21",
     start_time: time,
     duration_minutes: time ? 60 : null,
@@ -821,6 +821,117 @@ describe("Week page", () => {
 
     await waitFor(() => expect(screen.queryAllByRole("button", { name: /^Plan sprint/ })).toHaveLength(0));
     expect(fetchMock.mock.calls.filter(([request]) => request.method === "DELETE")).toHaveLength(1);
+  });
+
+  it("asks Only this or All repeating before a repeating task moves or is deleted", async () => {
+    const repeating = {
+      ...task("43", "Deep work", "2026-09-24", "13:00"),
+      goal_id: "7",
+      rule_id: "21",
+      occurrence_date: "2026-09-24",
+      end_time: "14:00",
+    };
+    const elapsed = {
+      ...task("45", "Old session", "2026-09-22", "13:00"),
+      goal_id: "7",
+      rule_id: "21",
+      occurrence_date: "2026-09-22",
+      end_time: "14:00",
+    };
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/api/v1/today") {
+        return Response.json(todayResponse());
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/week") {
+        const response = weekWith("2026-09-24", [repeating]);
+        return Response.json({
+          ...response,
+          days: response.days.map((day) =>
+            day.date === "2026-09-22" ? { ...day, tasks: [elapsed] } : day,
+          ),
+        });
+      }
+      if (request.method === "GET" && ["/api/v1/areas", "/api/v1/goals"].includes(url.pathname)) {
+        return Response.json(url.pathname === "/api/v1/areas" ? { areas: [] } : { goals: [] });
+      }
+      if (request.method === "PATCH") {
+        return Response.json(repeating);
+      }
+      if (request.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Sep 21 – 27");
+    const card = () => screen.getAllByRole("button", { name: /^Deep work, 13:00/ })[0]!.closest("article")!;
+    const friday = screen.getByRole("button", { name: "Add a task on 2026-09-25" });
+    const writes = () =>
+      Promise.all(
+        fetchMock.mock.calls
+          .map(([request]) => request)
+          .filter((request) => request.method === "PATCH" || request.method === "DELETE")
+          .map(async (request) => ({
+            call: `${request.method} ${new URL(request.url).pathname}${new URL(request.url).search}`,
+            body: request.method === "PATCH" ? await request.clone().json() : null,
+          })),
+      );
+
+    // While the question is open the task shows where it was dropped; Escape puts it back.
+    drag(card(), friday, { toY: 640 });
+    let dialog = screen.getByRole("dialog", { name: "Change “Deep work”?" });
+    expect(within(dialog).getByRole("button", { name: "Only this task" })).toHaveFocus();
+    expect(screen.getAllByRole("button", { name: /^Deep work, 10:00 to 11:00/ }).length).toBeGreaterThan(0);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Deep work, 13:00 to 14:00/ }).length).toBeGreaterThan(0);
+    expect(await writes()).toEqual([]);
+
+    // All repeating sends the whole drop to the task's schedule.
+    drag(card(), friday, { toY: 640 });
+    await user.click(screen.getByRole("button", { name: "All repeating" }));
+    await waitFor(async () =>
+      expect(await writes()).toEqual([
+        {
+          call: "PATCH /api/v1/tasks/43/repeat",
+          body: { scheduled_date: "2026-09-25", start_time: "10:00", duration_minutes: 60 },
+        },
+      ]),
+    );
+
+    // Enter picks Only this, a plain move of the one task.
+    await screen.findAllByRole("button", { name: /^Deep work, 13:00/ });
+    drag(card(), friday, { toY: 640 });
+    await user.keyboard("{Enter}");
+    await waitFor(async () => expect(await writes()).toHaveLength(2));
+    expect((await writes())[1]).toEqual({
+      call: "PATCH /api/v1/tasks/43",
+      body: { scheduled_date: "2026-09-25", start_time: "10:00" },
+    });
+
+    // Resizing a repeating task on an elapsed day changes only that task, without asking.
+    drag(screen.getByTestId("resize-45"), friday, { fromY: 896, toY: 960 });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(async () => expect(await writes()).toHaveLength(3));
+    expect((await writes())[2]).toEqual({
+      call: "PATCH /api/v1/tasks/45",
+      body: { duration_minutes: 120 },
+    });
+
+    // Deleting asks too, and All repeating ends the schedule.
+    await screen.findAllByRole("button", { name: /^Deep work, 13:00/ });
+    await user.click(screen.getAllByRole("button", { name: /^Deep work, 13:00/ })[0]!);
+    await user.keyboard("{Delete}");
+    dialog = screen.getByRole("dialog", { name: "Delete “Deep work”?" });
+    await user.click(within(dialog).getByRole("button", { name: "All repeating" }));
+    await waitFor(async () => expect(await writes()).toHaveLength(4));
+    expect((await writes())[3]).toEqual({
+      call: "DELETE /api/v1/tasks/43?scope=repeat",
+      body: null,
+    });
   });
 
   it("edits and deletes a task through the shared form", async () => {
