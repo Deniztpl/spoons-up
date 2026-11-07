@@ -314,6 +314,79 @@ describe("Week page", () => {
     );
   });
 
+  it("drops a goal from the hours panel on a slot and opens its form with that goal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (request.method === "GET" && url.pathname === "/api/v1/today") {
+          return Response.json(todayResponse());
+        }
+        if (request.method === "GET" && url.pathname === "/api/v1/week") {
+          return Response.json({
+            ...weekResponse(),
+            goals: [{ goal_id: "7", area_id: "3", title: "Beats", target: 20, done: 0, planned: 0 }],
+          });
+        }
+        if (request.method === "GET" && url.pathname === "/api/v1/areas") {
+          return Response.json({
+            areas: [
+              {
+                id: "3",
+                name: "Music",
+                color: "GREEN",
+                archived_at: null,
+                unarchived_at: null,
+                created_at: "2026-09-22T09:00:00Z",
+              },
+            ],
+          });
+        }
+        if (request.method === "GET" && url.pathname === "/api/v1/goals") {
+          return Response.json({
+            goals: [
+              {
+                id: "7",
+                area_id: "3",
+                title: "Beats",
+                weekly_target: 20,
+                created_at: "2026-09-22T09:00:00Z",
+                rules: [],
+              },
+            ],
+          });
+        }
+        throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    const panel = await screen.findByRole("complementary", { name: "Hours" });
+    const beats = await within(panel).findByRole("listitem");
+
+    // Dropped on Friday at 19:00, it proposes an hour there with Beats already chosen.
+    drag(beats, screen.getByRole("button", { name: "Add a task on 2026-09-25" }), { toY: 1216 });
+
+    let dialog = screen.getByRole("dialog", { name: "New task" });
+    await waitFor(() => expect(within(dialog).getByLabelText("Goal")).toHaveValue("7"));
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-25");
+    expect(within(dialog).getByLabelText("Start time")).toHaveValue("19:00");
+    expect(within(dialog).getByRole("spinbutton", { name: "Duration" })).toHaveAttribute(
+      "aria-valuetext",
+      "1 hour",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    // On a day's untimed row it has no time; on an elapsed day it opens nothing.
+    drag(beats, screen.getByRole("group", { name: "Untimed tasks for 2026-09-26" }), { toY: 0 });
+    dialog = screen.getByRole("dialog", { name: "New task" });
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-09-26");
+    expect(within(dialog).getByLabelText("Start time")).toHaveValue("");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    drag(beats, screen.getByRole("group", { name: "Untimed tasks for 2026-09-23" }), { toY: 0 });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("plans open Journal work on a double-clicked slot without creating a task", async () => {
     let planned = false;
     const fetchMock = defaultFetch();

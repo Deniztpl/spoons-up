@@ -1,18 +1,21 @@
-import { useId } from "react";
+import { type PointerEvent, useId } from "react";
 
-import { formatHours } from "../../../lib/duration";
+import { formatDuration, formatHours } from "../../../lib/duration";
 import type { Area } from "../../areas/api/areasApi";
 import { areaColorClass } from "../../areas/areaColor";
 import type { WeekGoalHours } from "../api/weekApi";
+import { ADDED_GOAL_MINUTES, type DraggedGoal } from "../hooks/useCalendarInteraction";
 
 type WeekHoursPanelProps = {
   id: string;
   goals: WeekGoalHours[];
   areaById: ReadonlyMap<string, Area>;
+  // A row is picked up to be dropped on the calendar as new work for its goal.
+  onPressGoal: (event: PointerEvent<HTMLElement>, goal: DraggedGoal) => void;
 };
 
 // Each goal's target for the shown week, split into done, planned and not planned hours.
-export function WeekHoursPanel({ id, goals, areaById }: WeekHoursPanelProps) {
+export function WeekHoursPanel({ id, goals, areaById, onPressGoal }: WeekHoursPanelProps) {
   const headingId = useId();
 
   return (
@@ -47,7 +50,7 @@ export function WeekHoursPanel({ id, goals, areaById }: WeekHoursPanelProps) {
                 ) : null}
                 <ul className="flex flex-col gap-3">
                   {areaGoals.map((goal) => (
-                    <GoalHoursRow key={goal.goal_id} goal={goal} />
+                    <GoalHoursRow key={goal.goal_id} goal={goal} onPress={onPressGoal} />
                   ))}
                 </ul>
               </section>
@@ -59,14 +62,26 @@ export function WeekHoursPanel({ id, goals, areaById }: WeekHoursPanelProps) {
   );
 }
 
-function GoalHoursRow({ goal }: { goal: WeekGoalHours }) {
+function GoalHoursRow({
+  goal,
+  onPress,
+}: {
+  goal: WeekGoalHours;
+  onPress: WeekHoursPanelProps["onPressGoal"];
+}) {
   const notPlanned = Math.max(goal.target - goal.done - goal.planned, 0);
   const extra = Math.max(goal.done + goal.planned - goal.target, 0);
   // Past the target the bar stretches to the hours placed, so the target stays readable.
   const scale = Math.max(goal.target, goal.done + goal.planned) || 1;
 
   return (
-    <li className="flex flex-col gap-1.5">
+    <li
+      title="Drag onto the calendar to plan it"
+      className="group relative flex cursor-grab select-none flex-col gap-1.5 active:cursor-grabbing"
+      onPointerDown={(event) => onPress(event, { goalId: goal.goal_id, title: goal.title })}
+    >
+      {/* Sits in the panel's padding, so showing it moves nothing. */}
+      <GripIcon className="pointer-events-none absolute -left-3.5 top-[3px] text-muted opacity-0 transition group-hover:opacity-100" />
       <div className="flex items-baseline gap-2">
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{goal.title}</span>
         <span className="shrink-0 text-[11px] text-ink-soft tabular-nums">
@@ -105,6 +120,41 @@ function HoursFigure({
       </span>{" "}
       <span className="text-[11px] leading-4 text-ink-soft">{label}</span>
     </p>
+  );
+}
+
+// Follows the pointer while a goal from the panel has no slot under it.
+export function GoalDragChip({
+  title,
+  area,
+  x,
+  y,
+}: {
+  title: string;
+  area: Area | undefined;
+  x: number;
+  y: number;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none fixed z-50 flex max-w-[220px] items-center gap-2 rounded-[9px] border border-area/40 bg-card px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-[0_10px_24px_-8px_rgb(28_43_33/0.3)] ${areaColorClass(area)}`}
+      style={{ left: x + 14, top: y + 10 }}
+    >
+      <span className="size-2 shrink-0 rounded-[3px] bg-area" />
+      <span className="min-w-0 truncate">{title}</span>
+      <span className="shrink-0 text-ink-soft tabular-nums">{formatDuration(ADDED_GOAL_MINUTES)}</span>
+    </div>
+  );
+}
+
+function GripIcon({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 8 12" className={`h-3 w-2 ${className}`} fill="currentColor">
+      {[1.5, 6, 10.5].flatMap((cy) =>
+        [1.5, 6.5].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.1" />),
+      )}
+    </svg>
   );
 }
 

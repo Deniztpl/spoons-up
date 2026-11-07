@@ -15,13 +15,13 @@ import type { NewTaskDefaults } from "../../tasks/hooks/useTaskForm";
 import type { WeekResponse, WeekTask } from "../api/weekApi";
 import { minutesToTime, timeToMinutes } from "../calendarTime";
 import {
+  ADDED_GOAL_MINUTES,
   type CalendarColumn,
   type CalendarInteraction,
-  useCalendarInteraction,
+  type CalendarPointer,
 } from "../hooks/useCalendarInteraction";
-import type { TaskPlacement } from "../hooks/useWeek";
 
-const HOUR_HEIGHT = 64;
+export const HOUR_HEIGHT = 64;
 const DAY_HEIGHT = 24 * HOUR_HEIGHT;
 // Short enough to fit a one-line title, tall enough to click.
 const MIN_BLOCK_HEIGHT = 18;
@@ -53,10 +53,11 @@ type WeekCalendarProps = {
   todayDate: string;
   areaByGoalId: ReadonlyMap<string, Area>;
   pendingTaskIds: Set<string>;
+  // The pointer interaction, shared with the hours panel, which starts goal drags.
+  pointer: CalendarPointer;
   onCreate: (defaults: NewTaskDefaults) => void;
   onEdit: (task: WeekTask) => void;
   onToggle: (task: WeekTask) => void;
-  onPlace: (task: WeekTask, placement: TaskPlacement) => void;
   onPaste: (task: WeekTask, spot: { date: string; startTime: string | null }) => void;
   onRequestDelete: (task: WeekTask) => void;
 };
@@ -88,10 +89,10 @@ export function WeekCalendar({
   todayDate,
   areaByGoalId,
   pendingTaskIds,
+  pointer,
   onCreate,
   onEdit,
   onToggle,
-  onPlace,
   onPaste,
   onRequestDelete,
 }: WeekCalendarProps) {
@@ -103,10 +104,7 @@ export function WeekCalendar({
     selectedId === null
       ? null
       : (week.days.flatMap((day) => day.tasks).find((task) => task.id === selectedId) ?? null);
-  const { interaction, pressTask, pressSlot, moveOver, isClickIgnored } = useCalendarInteraction(
-    { onPlace, onDraw: onCreate },
-    HOUR_HEIGHT,
-  );
+  const { interaction, pressTask, pressSlot, moveOver, isClickIgnored } = pointer;
   const defaultSelectedDate =
     week.days.find((day) => day.date === todayDate)?.date ?? week.days[0]?.date ?? todayDate;
   // A day picked in one week does not carry over to the other week.
@@ -389,7 +387,9 @@ function UntimedRow({
 }) {
   const { interaction, pasteSpot, isClickIgnored, onSetPasteSpot } = taskInteraction;
   const moving = interaction?.kind === "move" ? interaction : null;
+  const adding = interaction?.kind === "add" ? interaction : null;
   const isTarget = moving?.target?.date === date && moving.target.startMinutes === null;
+  const isAddTarget = adding?.target?.date === date && adding.target.startMinutes === null;
   const isPasteSpot = pasteSpot?.date === date && pasteSpot.startMinutes === null;
 
   return (
@@ -397,7 +397,7 @@ function UntimedRow({
       role="group"
       aria-label={`Untimed tasks for ${date}`}
       className={`relative flex min-h-[30px] min-w-0 flex-col gap-1 border-l border-ink/10 py-1 pl-0.5 pr-[3px] ${columnBackground(
-        isTarget,
+        isTarget || isAddTarget,
         isToday,
         isPast,
       )}`}
@@ -421,17 +421,41 @@ function UntimedRow({
         />
       ))}
       {isTarget && moving ? (
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none flex h-[22px] shrink-0 items-center gap-1.5 rounded-[7px] border border-dashed px-1.5 text-[11px] font-medium text-ink ${ghostTone(moving.task)} ${areaColorClass(taskArea(moving.task, areaByGoalId))}`}
-        >
-          <span className="min-w-0 flex-1 truncate">{moving.task.title}</span>
-          {moving.task.duration_minutes !== null ? (
-            <span className="shrink-0 text-ink-soft tabular-nums">
-              {formatDuration(moving.task.duration_minutes)}
-            </span>
-          ) : null}
-        </div>
+        <UntimedGhost
+          title={moving.task.title}
+          durationMinutes={moving.task.duration_minutes}
+          className={`${ghostTone(moving.task)} ${areaColorClass(taskArea(moving.task, areaByGoalId))}`}
+        />
+      ) : null}
+      {isAddTarget && adding ? (
+        <UntimedGhost
+          title={adding.goal.title}
+          durationMinutes={ADDED_GOAL_MINUTES}
+          className={`${goalGhostTone} ${areaColorClass(areaByGoalId.get(adding.goal.goalId))}`}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// Where a dragged task or goal would go in a day's untimed row.
+function UntimedGhost({
+  title,
+  durationMinutes,
+  className,
+}: {
+  title: string;
+  durationMinutes: number | null;
+  className: string;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none flex h-[22px] shrink-0 items-center gap-1.5 rounded-[7px] border border-dashed px-1.5 text-[11px] font-medium text-ink ${className}`}
+    >
+      <span className="min-w-0 flex-1 truncate">{title}</span>
+      {durationMinutes !== null ? (
+        <span className="shrink-0 text-ink-soft tabular-nums">{formatDuration(durationMinutes)}</span>
       ) : null}
     </div>
   );
@@ -474,6 +498,12 @@ function DayTimeline({
   const moveTarget =
     moving?.target?.date === date && moving.target.startMinutes !== null ? moving.target : null;
   const drawing = interaction?.kind === "draw" && interaction.date === date ? interaction : null;
+  const adding =
+    interaction?.kind === "add" &&
+    interaction.target?.date === date &&
+    interaction.target.startMinutes !== null
+      ? { goal: interaction.goal, startMinutes: interaction.target.startMinutes }
+      : null;
   const pasteMinutes =
     pasteSpot?.date === date && pasteSpot.startMinutes !== null ? pasteSpot.startMinutes : null;
 
@@ -504,7 +534,7 @@ function DayTimeline({
   return (
     <div
       className={`relative min-w-0 border-l border-ink/10 ${columnBackground(
-        moveTarget !== null || drawing !== null,
+        moveTarget !== null || drawing !== null || adding !== null,
         isToday,
         isPast,
       )}`}
@@ -554,6 +584,14 @@ function DayTimeline({
           durationMinutes={drawing.endMinutes - drawing.startMinutes}
           title="New task"
           className="border-accent/50 bg-accent/12"
+        />
+      ) : null}
+      {adding ? (
+        <PlacementGhost
+          startMinutes={adding.startMinutes}
+          durationMinutes={ADDED_GOAL_MINUTES}
+          title={adding.goal.title}
+          className={`${goalGhostTone} ${areaColorClass(areaByGoalId.get(adding.goal.goalId))}`}
         />
       ) : null}
     </div>
@@ -884,7 +922,7 @@ function RepeatIcon({ className }: { className: string }) {
 }
 
 function interactionCursor(interaction: CalendarInteraction | null) {
-  if (interaction?.kind === "move") return "cursor-grabbing";
+  if (interaction?.kind === "move" || interaction?.kind === "add") return "cursor-grabbing";
   if (interaction?.kind === "resize") return "cursor-ns-resize";
   if (interaction?.kind === "draw") return "cursor-cell";
   return "";
@@ -896,10 +934,10 @@ function columnBackground(isTarget: boolean, isToday: boolean, isPast: boolean) 
   return isPast ? "" : "bg-card/40";
 }
 
+const goalGhostTone = "border-area/60 bg-[color-mix(in_oklch,var(--area)_16%,var(--color-card))]";
+
 function ghostTone(task: WeekTask) {
-  return task.goal_id
-    ? "border-area/60 bg-[color-mix(in_oklch,var(--area)_16%,var(--color-card))]"
-    : "border-ink/30 bg-card";
+  return task.goal_id ? goalGhostTone : "border-ink/30 bg-card";
 }
 
 // "10:00–14:00 · 4h", or just the start for work without hours.

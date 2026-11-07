@@ -8,6 +8,8 @@ const SNAP_MINUTES = 15;
 const LAST_START_MINUTES = DAY_MINUTES - SNAP_MINUTES;
 // A press that moves less than this many pixels stays a click.
 const DRAG_THRESHOLD = 4;
+// A goal dropped from the hours panel proposes an hour of its work, as a double-click does.
+export const ADDED_GOAL_MINUTES = 60;
 
 // The part of a day the pointer is over: its timeline, or its untimed row.
 export type CalendarColumn = {
@@ -16,31 +18,52 @@ export type CalendarColumn = {
   isPast: boolean;
 };
 
+// A goal picked up from the hours panel.
+export type DraggedGoal = { goalId: string; title: string };
+
+// A day and a start on it; a null start is the day's untimed row.
+type DropTarget = { date: string; startMinutes: number | null };
+
 export type CalendarInteraction =
   // Where a dragged task would land; null over an elapsed day.
-  | { kind: "move"; task: WeekTask; target: { date: string; startMinutes: number | null } | null }
+  | { kind: "move"; task: WeekTask; target: DropTarget | null }
   | { kind: "resize"; task: WeekTask; durationMinutes: number }
-  | { kind: "draw"; date: string; startMinutes: number; endMinutes: number };
+  | { kind: "draw"; date: string; startMinutes: number; endMinutes: number }
+  // A goal from the hours panel: where its new task would go, null off the calendar or over an
+  // elapsed day, and the pointer, which a chip follows while there is no slot under it.
+  | { kind: "add"; goal: DraggedGoal; target: DropTarget | null; x: number; y: number };
 
 type Press =
   | { kind: "move"; task: WeekTask; offsetMinutes: number; x: number; y: number }
   | { kind: "resize"; task: WeekTask; x: number; y: number }
-  | { kind: "draw"; date: string; anchorMinutes: number; x: number; y: number };
+  | { kind: "draw"; date: string; anchorMinutes: number; x: number; y: number }
+  | { kind: "add"; goal: DraggedGoal; x: number; y: number };
 
 type InteractionCallbacks = {
   onPlace: (task: WeekTask, placement: TaskPlacement) => void;
   onDraw: (range: { scheduledDate: string; startTime: string; durationMinutes: number }) => void;
+  onAdd: (defaults: {
+    goalId: string;
+    scheduledDate: string;
+    startTime?: string;
+    durationMinutes: number;
+  }) => void;
 };
 
-// Moving, resizing and drawing on the week's timeline with the pointer, in 15-minute steps.
+export type CalendarPointer = ReturnType<typeof useCalendarInteraction>;
+
+// Moving, resizing and drawing on the week's timeline with the pointer, in 15-minute steps, and
+// dropping a goal on it from the hours panel.
 export function useCalendarInteraction(
-  { onPlace, onDraw }: InteractionCallbacks,
+  { onPlace, onDraw, onAdd }: InteractionCallbacks,
   hourHeight: number,
 ) {
   const [interaction, setInteraction] = useState<CalendarInteraction | null>(null);
   const interactionRef = useRef<CalendarInteraction | null>(null);
   const pressRef = useRef<Press | null>(null);
   const ignoreClickRef = useRef(false);
+  // The last pointer move a calendar column handled, so a move anywhere else lets go of the slot.
+  const columnMoveRef = useRef<Event | null>(null);
 
   const show = (next: CalendarInteraction | null) => {
     interactionRef.current = next;
@@ -61,6 +84,15 @@ export function useCalendarInteraction(
         if (finished.durationMinutes !== finished.task.duration_minutes) {
           onPlace(finished.task, { duration_minutes: finished.durationMinutes });
         }
+      } else if (finished.kind === "add") {
+        const { goal, target } = finished;
+        if (!target) return;
+        onAdd({
+          goalId: goal.goalId,
+          scheduledDate: target.date,
+          ...(target.startMinutes === null ? {} : { startTime: minutesToTime(target.startMinutes) }),
+          durationMinutes: ADDED_GOAL_MINUTES,
+        });
       } else {
         onDraw({
           scheduledDate: finished.date,
@@ -92,16 +124,36 @@ export function useCalendarInteraction(
         cancel();
       }
     };
+    // A goal is followed across the whole page: the chip tracks the pointer, and a move that no
+    // calendar column handled has no slot under it. Columns see the move first, as it bubbles.
+    const followGoal = (event: globalThis.PointerEvent) => {
+      const press = pressRef.current;
+      if (press?.kind !== "add") return;
+      let current = interactionRef.current;
+      if (!current) {
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < DRAG_THRESHOLD) return;
+        current = startFrom(press);
+      }
+      if (current.kind !== "add") return;
+      show({
+        ...current,
+        target: columnMoveRef.current === event ? current.target : null,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    };
 
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", cancelOnEscape);
+    window.addEventListener("pointermove", followGoal);
     return () => {
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", cancelOnEscape);
+      window.removeEventListener("pointermove", followGoal);
     };
-  }, [onPlace, onDraw]);
+  }, [onPlace, onDraw, onAdd]);
 
   // A task is pressed: its body moves it, its bottom edge resizes it.
   const pressTask = (event: PointerEvent<HTMLElement>, task: WeekTask, mode: "move" | "resize") => {
@@ -132,6 +184,14 @@ export function useCalendarInteraction(
     };
   };
 
+  // A goal is picked up from the hours panel, to be dropped on a slot or a day's untimed row.
+  const pressGoal = (event: PointerEvent<HTMLElement>, goal: DraggedGoal) => {
+    if (event.button !== 0 || pressRef.current) return;
+    // Dragging out of the panel should not select its text.
+    event.preventDefault();
+    pressRef.current = { kind: "add", goal, x: event.clientX, y: event.clientY };
+  };
+
   const moveOver = (event: PointerEvent<HTMLElement>, column: CalendarColumn) => {
     const press = pressRef.current;
     if (!press) return;
@@ -140,6 +200,7 @@ export function useCalendarInteraction(
       if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < DRAG_THRESHOLD) return;
       current = startFrom(press);
     }
+    columnMoveRef.current = event.nativeEvent;
     const minutes = column.zone === "timeline" ? pointerMinutes(event, hourHeight) : null;
     show(follow(current, press, column, minutes));
   };
@@ -148,6 +209,7 @@ export function useCalendarInteraction(
     interaction,
     pressTask,
     pressSlot,
+    pressGoal,
     moveOver,
     isClickIgnored: () => ignoreClickRef.current,
   };
@@ -159,6 +221,9 @@ function startFrom(press: Press): CalendarInteraction {
   }
   if (press.kind === "resize") {
     return { kind: "resize", task: press.task, durationMinutes: press.task.duration_minutes ?? 60 };
+  }
+  if (press.kind === "add") {
+    return { kind: "add", goal: press.goal, target: null, x: press.x, y: press.y };
   }
   return {
     kind: "draw",
@@ -182,6 +247,15 @@ function follow(
       minutes === null
         ? null
         : clamp(snap(minutes - press.offsetMinutes), 0, LAST_START_MINUTES);
+    return { ...current, target: { date: column.date, startMinutes } };
+  }
+  if (current.kind === "add") {
+    if (column.isPast) {
+      return { ...current, target: null };
+    }
+    // The new task starts at the quarter hour under the pointer, as a double-click proposes.
+    const startMinutes =
+      minutes === null ? null : clamp(floorSnap(minutes), 0, LAST_START_MINUTES);
     return { ...current, target: { date: column.date, startMinutes } };
   }
   if (minutes === null) {

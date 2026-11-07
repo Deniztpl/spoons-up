@@ -16,8 +16,9 @@ import {
   NewTaskKindDialog,
 } from "../../features/week/components/NewTaskKindDialog";
 import { RepeatScopeDialog } from "../../features/week/components/RepeatScopeDialog";
-import { WeekCalendar } from "../../features/week/components/WeekCalendar";
-import { WeekHoursPanel } from "../../features/week/components/WeekHoursPanel";
+import { HOUR_HEIGHT, WeekCalendar } from "../../features/week/components/WeekCalendar";
+import { GoalDragChip, WeekHoursPanel } from "../../features/week/components/WeekHoursPanel";
+import { useCalendarInteraction } from "../../features/week/hooks/useCalendarInteraction";
 import {
   LAST_WEEK_OFFSET,
   type TaskPlacement,
@@ -69,6 +70,14 @@ export function WeekPage({
     weekState.previewPlacement(task, placement);
     setScopeChoice({ action: "change", task, placement });
   };
+
+  // The calendar and the hours panel share one pointer interaction: a goal picked up in the
+  // panel is dropped on the calendar, which opens the Goal form with that goal chosen.
+  const pointer = useCalendarInteraction(
+    { onPlace: placeTask, onDraw: setNewTask, onAdd: taskForm.openCreate },
+    HOUR_HEIGHT,
+  );
+  const draggedGoal = pointer.interaction?.kind === "add" ? pointer.interaction : null;
 
   const requestDelete = (task: WeekTask) => {
     if (task.rule_id === null) {
@@ -234,10 +243,10 @@ export function WeekPage({
               todayDate={todayDate}
               areaByGoalId={areaLookup.areaByGoalId}
               pendingTaskIds={weekState.pendingTaskIds}
+              pointer={pointer}
               onCreate={setNewTask}
               onEdit={taskForm.openEdit}
               onToggle={requestToggle}
-              onPlace={placeTask}
               onPaste={(task, spot) => void weekState.pasteTask(task, spot)}
               onRequestDelete={requestDelete}
             />
@@ -246,6 +255,7 @@ export function WeekPage({
                 id={hoursPanelId}
                 goals={week.goals}
                 areaById={areaLookup.areaById}
+                onPressGoal={pointer.pressGoal}
               />
             ) : null}
           </div>
@@ -255,6 +265,15 @@ export function WeekPage({
           </div>
         ) : null}
       </div>
+
+      {draggedGoal && draggedGoal.target === null ? (
+        <GoalDragChip
+          title={draggedGoal.goal.title}
+          area={areaLookup.areaByGoalId.get(draggedGoal.goal.goalId)}
+          x={draggedGoal.x}
+          y={draggedGoal.y}
+        />
+      ) : null}
 
       {taskForm.draft && todayDate ? (
         <TaskFormDialog

@@ -363,9 +363,10 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Also after first use: Week reaches a third week, and rules generate 21 days ahead so that week is always filled
 - Skipped sessions get their own status, `SKIPPED`, apart from `DELETED`: This and following starts the schedule again on the drop day, so skips from that day on come back, while a session deleted with Only this never does
 
-### Block 7 — Hours panel shortcut (optional)
+### Block 7 — Drag from the hours panel, duration control — DONE
 
-- Each panel row hands out a block: pick its hours from the row's menu and drag it onto a today-or-future slot to create an ad-hoc task of that goal there, without a form
+- A panel row is dragged onto a today-or-future slot or untimed row; the drop opens the Goal component with that goal, the day, the slot's time and an hour. The calendar and the panel share one pointer interaction
+- The duration control matches the time field's height with its shortcuts in an even row under it; the time field says where the work ends
 
 ### Block 8 — Verification
 
