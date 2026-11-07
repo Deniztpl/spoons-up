@@ -510,7 +510,7 @@ A task object:
 
 The task's identity and calendar fields mean different things:
 
-- `occurrence_date` — the date the rule produced. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it, and only `PATCH /tasks/{id}/repeat` moves it, by the same number of days as the rule's weekdays.
+- `occurrence_date` — the date the rule produced. Never changes while the task belongs to its rule. Null for ad-hoc tasks. Only `POST` and `DELETE /tasks/{id}/repeat` set or clear it.
 - `scheduled_date` — where the task sits now. This is what Today and Week draw. It may be null only on Journal work.
 - `due_date` — the optional deadline or event date of a top-level Journal item. Steps and goal tasks never have one.
 - `priority` — the optional `HIGH`, `MEDIUM` or `LOW` of a top-level Journal item. Steps and goal tasks never have one.
@@ -575,7 +575,7 @@ All fields are optional. Send null for `start_time` or `duration_minutes` to cle
 
 `due_date` is editable only on a top-level Journal item and may be null. Supplying a date also sets `scheduled_date` to it. Supplying `due_date: null` clears `scheduled_date`, `period_start`, `start_time` and `end_time` so the item leaves Today and Week; its duration remains as optional size information. If `due_date` is absent, planning and moving through `scheduled_date` never changes the saved due date.
 
-Supplying a date for a previously unscheduled Journal item or step derives `period_start`. Further moves keep that identity fixed. A goal task always remains scheduled. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited, or uses `PATCH /tasks/{id}/repeat` for Week's All repeating.
+Supplying a date for a previously unscheduled Journal item or step derives `period_start`. Further moves keep that identity fixed. A goal task always remains scheduled. A task update never changes its rule; the client patches the linked rule separately when schedule days are edited, or uses `PATCH /tasks/{id}/repeat` for Week's This and following.
 
 When supplied, `scheduled_date` cannot be earlier than today in the user's timezone. There is no upper bound.
 
@@ -597,7 +597,7 @@ Changing a timed task updates its reminder. Clearing its time cancels the remind
 
 With `scope=task`, a rule-generated task (`occurrence_date` set) is soft-deleted to `status = DELETED`, so the next run doesn't add it back. Ad-hoc goal tasks and Journal tasks (`occurrence_date` null) are hard-deleted, since nothing would recreate them. Deleting a top-level Journal item cascades to every step.
 
-`scope=repeat` is Week's All repeating. The task's rule is deleted as `DELETE /rules/{id}` does — its untouched pending tasks from the open week forward go, while done tasks, tasks the user moved or retimed and closed weeks stay — and the task itself is hard-deleted, since no rule is left to recreate it. One transaction.
+`scope=repeat` is Week's This and following. The task is hard-deleted, every unfinished task of its rule from the task's `occurrence_date` on goes with it — moved and retimed ones included — and the rule is deleted, so nothing is generated again. Earlier tasks and done tasks stay and no longer repeat. One transaction.
 
 Either way the reminders of deleted tasks are cancelled.
 
@@ -637,7 +637,7 @@ Repeat on, from the edit form of a goal task that has no schedule.
 
 #### PATCH /tasks/{id}/repeat
 
-All repeating, after a task that belongs to a rule is moved or resized on Week.
+This and following, after a task that belongs to a rule is moved or resized on Week.
 
 ```json
 { "scheduled_date": "2026-10-09", "start_time": "10:00", "duration_minutes": 240 }
@@ -645,14 +645,19 @@ All repeating, after a task that belongs to a rule is moved or resized on Week.
 
 All three fields are required; `start_time` is null for the untimed row. `scheduled_date` is where the task was dropped and cannot be before today.
 
-**200** — the task at its new place. In one transaction:
+**200** — the task, or for a weekly schedule the session on the drop day.
 
-1. The gap is the number of days from the task's current `scheduled_date` to the new one. The rule takes the new `start_time` and `duration_minutes`, and every weekday in its `byweekday` moves by the gap, wrapping round the week: with a gap of 2, `[1, 3, 5]` becomes `[3, 5, 7]` and `[7]` becomes `[2]`.
-2. The rule's untouched pending tasks are removed from the open week forward, as `PATCH /rules/{id}` does, apart from this task.
-3. The task takes the new date, time and duration. Its `occurrence_date` moves by the gap, so it keeps standing in for the rule's occurrence and generation does not add a second one; if another task of the rule already holds that date, its `occurrence_date` stays. `period_start` does not change, as with any move, and its reminder follows the new time.
-4. Tasks are added from today through the current window, as a rule write does.
+A rule with a single weekday moves to the drop day, in one transaction: an open task is removed, the rule's untouched pending tasks go from the task's `occurrence_date` on, the rule takes the drop's weekday, `start_time` and `duration_minutes`, tasks are added from today through the window, and dates of the new weekday from today up to the drop day are marked `DELETED` so no week gains a second session. The session on the drop day is a new occurrence of the rule; no task's `occurrence_date` changes.
 
-Done tasks, tasks the user moved or retimed and closed weeks keep what they had.
+Any other rule keeps its days and nothing is placed on the drop day. In one transaction:
+
+1. A drop on a later day than the task's `scheduled_date` skips the rule's pending tasks scheduled from the task's day up to, but not including, the drop day, the task included: they become `DELETED`, so generation does not bring them back. A drop on the same or an earlier day skips nothing.
+2. The rule's untouched pending tasks are removed from the task's `occurrence_date` on, as `PATCH /rules/{id}` does; earlier ones keep their time and duration.
+3. The rule takes the new `start_time` and `duration_minutes`. Its `byweekday` never changes here; a schedule's days change only through `PATCH /rules/{id}`.
+4. A task that was not skipped stays on its own day with the new time and duration.
+5. Tasks are added from today through the current window. Dates before the task still hold their tasks, so only the task's session on takes the new values.
+
+Done tasks are never skipped, and tasks the user moved or retimed after the task keep their own values. Closed weeks are untouched.
 
 | Error | When |
 |---|---|
@@ -853,7 +858,7 @@ The list includes non-deleted ad-hoc tasks (`occurrence_date` is null) and rule-
 
 Today and Week have separate Goal and Journal task components. On Today the date is today and disabled. On Week it is editable with today as its minimum and no maximum. Drawing a range on a today-or-future slot, double-clicking one or the header add action first asks which kind, then opens that component with the proposed date, time and duration. Elapsed slots in the current week remain visible and pending tasks on them may be dragged or edited to today or later, but a past slot never accepts creation, a paste or a drop.
 
-Week's direct edits use the task endpoints: a move or resize is `PATCH /tasks/{id}` with `scheduled_date`, `start_time` and `duration_minutes` (only `duration_minutes` for a resize on an elapsed day), or `PATCH /tasks/{id}/repeat` for All repeating; a paste and a block from the hours panel are `POST /tasks`; a delete is `DELETE /tasks/{id}`, with `scope=repeat` for All repeating. The client shows each change before the response arrives and reads the week again afterwards, since a rule change redraws other tasks.
+Week's direct edits use the task endpoints: a move or resize is `PATCH /tasks/{id}` with `scheduled_date`, `start_time` and `duration_minutes` (only `duration_minutes` for a resize on an elapsed day), or `PATCH /tasks/{id}/repeat` for This and following; a paste and a block from the hours panel are `POST /tasks`; a delete is `DELETE /tasks/{id}`, with `scope=repeat` for This and following. The client shows each change before the response arrives and reads the week again afterwards, since a rule change redraws other tasks.
 
 Tasks with a null `scheduled_date` are absent. A Journal item put after the following week by its due date or a planning action participates in `later_tasks` like any other manually placed task. A top-level item with steps is not selectable from the Journal planning component; its open steps are selected individually.
 

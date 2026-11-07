@@ -345,33 +345,66 @@ class TaskService:
             keep_task_id=keep_task_id,
         )
 
-    def move_with_rule(
+    def skip_pending_tasks_for_rule(
         self,
         *,
-        task: Task,
         rule: GoalRule,
-        scheduled_date: date,
-        start_time: time | None,
-        duration_minutes: int,
-        gap_days: int,
+        user_id: int,
+        from_date: date,
+        before_date: date,
     ) -> None:
-        """Place a rule's task where it was dropped while its rule moves by the same gap.
+        self.task_repository.skip_pending_tasks_for_rule(
+            rule_id=rule.id,
+            user_id=user_id,
+            from_date=from_date,
+            before_date=before_date,
+        )
 
-        Its occurrence date moves with the rule's weekdays, so generation does not add a second
-        task for it, unless another task of the rule already holds that date.
-        """
-        if task.occurrence_date is not None and gap_days != 0:
-            shifted = task.occurrence_date + timedelta(days=gap_days)
-            if not self.task_repository.holds_occurrence(
-                rule_id=rule.id,
-                occurrence_date=shifted,
-                except_task_id=task.id,
-            ):
-                self.task_repository.set_rule(task=task, rule_id=rule.id, occurrence_date=shifted)
+    def skip_rule_occurrences(
+        self,
+        *,
+        rule: GoalRule,
+        user_id: int,
+        occurrence_dates: list[date],
+    ) -> None:
+        self.task_repository.skip_rule_occurrences(
+            rule_id=rule.id,
+            user_id=user_id,
+            occurrence_dates=occurrence_dates,
+        )
+
+    def get_rule_occurrence(
+        self,
+        *,
+        rule: GoalRule,
+        user_id: int,
+        occurrence_date: date,
+    ) -> Task | None:
+        return self.task_repository.get_rule_occurrence(
+            rule_id=rule.id,
+            user_id=user_id,
+            occurrence_date=occurrence_date,
+        )
+
+    def delete_unfinished_tasks_for_rule(
+        self,
+        *,
+        rule: GoalRule,
+        user_id: int,
+        from_date: date,
+    ) -> None:
+        self.task_repository.delete_unfinished_tasks_for_rule(
+            rule_id=rule.id,
+            user_id=user_id,
+            from_date=from_date,
+        )
+
+    def retime(self, *, task: Task, start_time: time | None, duration_minutes: int) -> None:
+        """Give a task a new time and length on the day it already sits on."""
         self.task_repository.update(
             task=task,
             title=task.title,
-            scheduled_date=scheduled_date,
+            scheduled_date=task.scheduled_date,
             due_date=task.due_date,
             priority=task.priority,
             start_time=start_time,
@@ -379,7 +412,7 @@ class TaskService:
             end_time=_add_minutes(start_time, duration_minutes),
             period_start=task.period_start,
             update_title=False,
-            update_scheduled_date=True,
+            update_scheduled_date=False,
             update_due_date=False,
             update_priority=False,
             update_start_time=True,

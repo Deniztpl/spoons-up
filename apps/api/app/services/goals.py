@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, ValidationAppError
 from app.core.periods import get_week_start
-from app.models import Goal, GoalRule
+from app.models import Goal, GoalRule, Task, TaskStatus
 from app.repositories.areas import AreaRepository
 from app.repositories.goals import GoalRepository
 from app.repositories.users import UserRepository
@@ -223,66 +223,145 @@ class GoalService:
         task_id: int,
         user_id: int,
     ) -> TaskResponse:
-        """All repeating: the task's rule takes the drop's time and length, and its weekdays
-        move by the same number of days as the task did."""
+        """This and following: from this task on, the schedule takes the drop's time and length,
+        and earlier sessions keep theirs.
+
+        A weekly schedule with one day moves to the drop day. Any other schedule keeps its days
+        and nothing is placed on the drop day: a drop on a later day skips this week's open
+        sessions from this task up to that day, and a drop on the same or an earlier day leaves
+        the task on its own day.
+        """
         with self.session.begin():
             task = self.task_service.get_owned_task(task_id=task_id, user_id=user_id)
-            if task.rule_id is None or task.scheduled_date is None:
+            if task.rule_id is None or task.scheduled_date is None or task.occurrence_date is None:
                 raise ValidationAppError(
                     {"rule_id": "This task does not repeat"},
                     "This task does not repeat",
                 )
             rule = self._get_owned_rule(rule_id=task.rule_id, user_id=user_id)
-            today, open_week_start, window_end = self._get_task_generation_dates(user_id=user_id)
+            today, _, window_end = self._get_task_generation_dates(user_id=user_id)
             if payload.scheduled_date < today:
                 raise ValidationAppError(
                     {"scheduled_date": "Scheduled date cannot be before today"}
                 )
 
-            gap_days = (payload.scheduled_date - task.scheduled_date).days
+            if len(rule.byweekday) == 1 and payload.scheduled_date != task.scheduled_date:
+                moved = self._move_weekly_schedule(
+                    payload,
+                    task=task,
+                    occurrence_date=task.occurrence_date,
+                    rule=rule,
+                    user_id=user_id,
+                    today=today,
+                    window_end=window_end,
+                )
+                return TaskResponse.model_validate(moved)
+
+            # Done work is never skipped.
+            is_skipped = (
+                payload.scheduled_date > task.scheduled_date
+                and task.status == TaskStatus.PENDING.value
+            )
+            if payload.scheduled_date > task.scheduled_date:
+                self.task_service.skip_pending_tasks_for_rule(
+                    rule=rule,
+                    user_id=user_id,
+                    from_date=task.scheduled_date,
+                    before_date=payload.scheduled_date,
+                )
             # The redraw matches the rule's old values, so it runs before the rule changes.
             self.task_service.delete_untouched_pending_tasks_for_rule(
                 rule=rule,
                 user_id=user_id,
-                from_date=open_week_start,
+                from_date=task.occurrence_date,
                 keep_task_id=task.id,
             )
             self.goal_repository.update_rule(
                 rule=rule,
-                byweekday=_shift_weekdays(rule.byweekday, gap_days),
+                byweekday=None,
                 start_time=payload.start_time,
                 duration_minutes=payload.duration_minutes,
                 update_start_time=True,
             )
-            self.task_service.move_with_rule(
-                task=task,
-                rule=rule,
-                scheduled_date=payload.scheduled_date,
-                start_time=payload.start_time,
-                duration_minutes=payload.duration_minutes,
-                gap_days=gap_days,
-            )
+            if not is_skipped:
+                self.task_service.retime(
+                    task=task,
+                    start_time=payload.start_time,
+                    duration_minutes=payload.duration_minutes,
+                )
+            # Earlier dates still hold their tasks, so only this task's day on takes the new values.
             self.task_service.add_tasks(user_id=user_id, from_date=today, to_date=window_end)
             response = TaskResponse.model_validate(task)
         return response
 
+    def _move_weekly_schedule(
+        self,
+        payload: ChangeRepeatRequest,
+        *,
+        task: Task,
+        occurrence_date: date,
+        rule: GoalRule,
+        user_id: int,
+        today: date,
+        window_end: date,
+    ) -> Task:
+        """Move a one-day weekly schedule to the drop day from this task's session on.
+
+        The session itself is generated again on the drop day, so no task's occurrence date has
+        to change. Days of the new weekday before the drop day are skipped, so the weeks before
+        do not gain a second session.
+        """
+        # Done work stays where it is; an open session is made again on the drop day.
+        if task.status == TaskStatus.PENDING.value:
+            self.task_service.hard_delete(task=task)
+        # The redraw matches the rule's old values, so it runs before the rule changes.
+        self.task_service.delete_untouched_pending_tasks_for_rule(
+            rule=rule,
+            user_id=user_id,
+            from_date=occurrence_date,
+        )
+        self.goal_repository.update_rule(
+            rule=rule,
+            byweekday=[payload.scheduled_date.isoweekday()],
+            start_time=payload.start_time,
+            duration_minutes=payload.duration_minutes,
+            update_start_time=True,
+        )
+        self.task_service.add_tasks(user_id=user_id, from_date=today, to_date=window_end)
+        skipped_days = (payload.scheduled_date - today).days // 7
+        self.task_service.skip_rule_occurrences(
+            rule=rule,
+            user_id=user_id,
+            occurrence_dates=[
+                payload.scheduled_date - timedelta(weeks=weeks)
+                for weeks in range(1, skipped_days + 1)
+            ],
+        )
+        moved = self.task_service.get_rule_occurrence(
+            rule=rule,
+            user_id=user_id,
+            occurrence_date=payload.scheduled_date,
+        )
+        return moved if moved is not None else task
+
     def delete_repeat(self, *, task_id: int, user_id: int) -> None:
-        """All repeating on delete: the rule goes as a rule delete does, and the task with it."""
+        """This and following on delete: this task and the schedule's later unfinished sessions
+        go, and the schedule ends. Earlier sessions stay and no longer repeat; done work stays."""
         with self.session.begin():
             task = self.task_service.get_owned_task(task_id=task_id, user_id=user_id)
-            if task.rule_id is None:
+            if task.rule_id is None or task.occurrence_date is None:
                 raise ValidationAppError(
                     {"rule_id": "This task does not repeat"},
                     "This task does not repeat",
                 )
             rule = self._get_owned_rule(rule_id=task.rule_id, user_id=user_id)
-            _, open_week_start, _ = self._get_task_generation_dates(user_id=user_id)
+            from_date = task.occurrence_date
             # Nothing is left to generate it again, so the task itself is removed outright.
             self.task_service.hard_delete(task=task)
-            self.task_service.delete_untouched_pending_tasks_for_rule(
+            self.task_service.delete_unfinished_tasks_for_rule(
                 rule=rule,
                 user_id=user_id,
-                from_date=open_week_start,
+                from_date=from_date,
             )
             self.goal_repository.delete_rule(rule=rule)
 
@@ -322,8 +401,3 @@ class GoalService:
     def _ensure_active_area(self, *, area_id: int, user_id: int) -> None:
         if self.area_repository.get_active_for_user(area_id=area_id, user_id=user_id) is None:
             raise NotFoundError
-
-
-def _shift_weekdays(byweekday: list[int], gap_days: int) -> list[int]:
-    """Move every ISO weekday by the gap, wrapping round the week: Sunday plus two is Tuesday."""
-    return sorted({(day - 1 + gap_days) % 7 + 1 for day in byweekday})

@@ -164,7 +164,8 @@ export function useWeek() {
   }
 
   // The task takes its new place at once; a failed save puts it back where it was. With
-  // `repeat`, its whole schedule follows from the server, so the week is read again.
+  // `repeat` (This and following) the server decides where its sessions end up: the task stays
+  // where it was until the week is read again.
   async function placeTask(
     task: WeekTask,
     placement: TaskPlacement,
@@ -175,7 +176,9 @@ export function useWeek() {
     const placed = placedTask(task, placement);
     setActionError(null);
     setPendingTaskIds((current) => new Set(current).add(task.id));
-    setWeek((current) => (current ? withTask(current, placed) : current));
+    setWeek((current) =>
+      current ? withTask(current, scope === "repeat" ? task : placed) : current,
+    );
 
     try {
       const { error } =

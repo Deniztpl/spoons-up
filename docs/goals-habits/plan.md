@@ -317,7 +317,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 
 ### Block 0 — Canonical documentation — DONE
 
-- Record hours as the unit, Week editing, selection and shortcuts, Only this / All repeating and the hours panel in `design.md`
+- Record hours as the unit, Week editing, selection and shortcuts, Only this / This and following and the hours panel in `design.md`
 - Update `api-contract.md`: durations replace `block_count`, goal targets and progress in hours, `goals` on `GET /week`, `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`
 - Move Notifications to Slice 9
 
@@ -355,10 +355,11 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Delete or Backspace opens a new confirmation component: Enter deletes, Escape cancels
 - Shortcuts stay quiet while a dialog or text field has focus
 
-### Block 6 — Only this or All repeating — DONE
+### Block 6 — Only this or This and following — DONE
 
-- API: `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`, each one transaction; tests cover the weekday wrap, gaps in both directions, a time-only change, the dragged task's `occurrence_date`, no duplicate generation, a date another task of the rule holds, done and retimed tasks staying, and closed weeks
+- API: `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`, each one transaction; tests cover a later drop skipping the week's open sessions up to the drop day, a whole skipped week, earlier sessions keeping their time, a same-day or earlier drop only retiming, finished work never being skipped, and the delete taking the later sessions and ending the schedule
 - Web: the question after moving, resizing or deleting a task that repeats; Enter picks Only this; the task shows at its new place while the question is open and Escape puts it back; a resize on an elapsed day skips the question
+- Revised after first use: All repeating became This and following. A one-day weekly schedule moves to the drop day; a daily or several-day schedule never moves its days, which change only in the goal's schedule. The schedule type is read from its weekdays; nothing new is stored
 
 ### Block 7 — Hours panel shortcut (optional)
 
@@ -367,8 +368,8 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 ### Block 8 — Verification
 
 - Run API migration up and down, pytest and Ruff; run web lint, typecheck, Vitest and build; verify OpenAPI and client sync
-- Manually plan a 20h goal as 4h × 5 with timed and untimed tasks, leave one undone on a past day and watch its hours move from planned to not planned, copy a task onto two days, delete one with the key, and move a repeating task two days later with All repeating so a Sunday lands on Tuesday
-- **Done when:** a goal's target and progress read in hours on Week, Areas and Growth; a task is moved, resized, drawn, copied, pasted and deleted on Week without opening its form; and All repeating shifts every weekday of the schedule by the drag's gap
+- Manually plan a 20h goal as 4h × 5 with timed and untimed tasks, leave one undone on a past day and watch its hours move from planned to not planned, copy a task onto two days, delete one with the key, and move a repeating task to a later day and time with This and following and see that week's sessions up to the drop day skipped and later weeks keep their days at the new time
+- **Done when:** a goal's target and progress read in hours on Week, Areas and Growth; a task is moved, resized, drawn, copied, pasted and deleted on Week without opening its form; and This and following gives the task's session and the later ones the new time and length while the schedule's days stay
 
 ## Slice 9 — Notifications
 

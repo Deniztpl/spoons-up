@@ -40,7 +40,7 @@ export function WeekPage({
   const [newTask, setNewTask] = useState<NewTaskDefaults | null>(null);
   const [confirmingTask, setConfirmingTask] = useState<WeekTask | null>(null);
   const [deletingTask, setDeletingTask] = useState<WeekTask | null>(null);
-  // A change to a repeating task waits here until Only this or All repeating is chosen.
+  // A change to a repeating task waits here until Only this or This and following is chosen.
   const [scopeChoice, setScopeChoice] = useState<
     | { action: "change"; task: WeekTask; placement: TaskPlacement }
     | { action: "delete"; task: WeekTask }
@@ -321,7 +321,7 @@ export function WeekPage({
           title={scopeChoice.task.title}
           action={scopeChoice.action}
           onOnlyThis={() => chooseScope("task")}
-          onAll={() => chooseScope("repeat")}
+          onFollowing={() => chooseScope("repeat")}
           onCancel={() => {
             setScopeChoice(null);
             if (scopeChoice.action === "change") weekState.restoreTask(scopeChoice.task);

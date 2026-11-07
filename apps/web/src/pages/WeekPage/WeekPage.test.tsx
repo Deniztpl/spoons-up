@@ -823,7 +823,7 @@ describe("Week page", () => {
     expect(fetchMock.mock.calls.filter(([request]) => request.method === "DELETE")).toHaveLength(1);
   });
 
-  it("asks Only this or All repeating before a repeating task moves or is deleted", async () => {
+  it("asks Only this or This and following before a repeating task moves or is deleted", async () => {
     const repeating = {
       ...task("43", "Deep work", "2026-09-24", "13:00"),
       goal_id: "7",
@@ -890,9 +890,10 @@ describe("Week page", () => {
     expect(screen.getAllByRole("button", { name: /^Deep work, 13:00 to 14:00/ }).length).toBeGreaterThan(0);
     expect(await writes()).toEqual([]);
 
-    // All repeating sends the whole drop to the task's schedule.
+    // This and following sends the whole drop; where the sessions end up is the server's call,
+    // so nothing is left on the drop day meanwhile.
     drag(card(), friday, { toY: 640 });
-    await user.click(screen.getByRole("button", { name: "All repeating" }));
+    await user.click(screen.getByRole("button", { name: "This and following" }));
     await waitFor(async () =>
       expect(await writes()).toEqual([
         {
@@ -901,6 +902,7 @@ describe("Week page", () => {
         },
       ]),
     );
+    expect(screen.queryAllByRole("button", { name: /^Deep work, 10:00/ })).toHaveLength(0);
 
     // Enter picks Only this, a plain move of the one task.
     await screen.findAllByRole("button", { name: /^Deep work, 13:00/ });
@@ -912,23 +914,35 @@ describe("Week page", () => {
       body: { scheduled_date: "2026-09-25", start_time: "10:00" },
     });
 
+    // A move to another day at the same time asks too, since This and following skips the
+    // sessions up to the drop day.
+    await screen.findAllByRole("button", { name: /^Deep work, 13:00/ });
+    drag(card(), friday, { toY: 832 });
+    expect(screen.getByRole("dialog", { name: "Change “Deep work”?" })).toBeInTheDocument();
+    await user.keyboard("{Enter}");
+    await waitFor(async () => expect(await writes()).toHaveLength(3));
+    expect((await writes())[2]).toEqual({
+      call: "PATCH /api/v1/tasks/43",
+      body: { scheduled_date: "2026-09-25" },
+    });
+
     // Resizing a repeating task on an elapsed day changes only that task, without asking.
     drag(screen.getByTestId("resize-45"), friday, { fromY: 896, toY: 960 });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await waitFor(async () => expect(await writes()).toHaveLength(3));
-    expect((await writes())[2]).toEqual({
+    await waitFor(async () => expect(await writes()).toHaveLength(4));
+    expect((await writes())[3]).toEqual({
       call: "PATCH /api/v1/tasks/45",
       body: { duration_minutes: 120 },
     });
 
-    // Deleting asks too, and All repeating ends the schedule.
+    // Deleting asks too, and This and following ends the schedule.
     await screen.findAllByRole("button", { name: /^Deep work, 13:00/ });
     await user.click(screen.getAllByRole("button", { name: /^Deep work, 13:00/ })[0]!);
     await user.keyboard("{Delete}");
     dialog = screen.getByRole("dialog", { name: "Delete “Deep work”?" });
-    await user.click(within(dialog).getByRole("button", { name: "All repeating" }));
-    await waitFor(async () => expect(await writes()).toHaveLength(4));
-    expect((await writes())[3]).toEqual({
+    await user.click(within(dialog).getByRole("button", { name: "This and following" }));
+    await waitFor(async () => expect(await writes()).toHaveLength(5));
+    expect((await writes())[4]).toEqual({
       call: "DELETE /api/v1/tasks/43?scope=repeat",
       body: null,
     });

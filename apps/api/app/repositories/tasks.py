@@ -369,21 +369,6 @@ class TaskRepository:
         self.session.delete(task)
         self.session.flush()
 
-    def holds_occurrence(
-        self,
-        *,
-        rule_id: int,
-        occurrence_date: date,
-        except_task_id: int,
-    ) -> bool:
-        """Whether another task of the rule, in any status, already stands for that date."""
-        query = select(Task.id).where(
-            Task.rule_id == rule_id,
-            Task.occurrence_date == occurrence_date,
-            Task.id != except_task_id,
-        )
-        return self.session.scalar(query.limit(1)) is not None
-
     def complete(self, *, task: Task, completed_at: datetime) -> None:
         if task.status == TaskStatus.DONE.value:
             return
@@ -432,6 +417,85 @@ class TaskRepository:
         )
         if keep_task_id is not None:
             query = query.where(Task.id != keep_task_id)
+        self.session.execute(query)
+
+    def skip_pending_tasks_for_rule(
+        self,
+        *,
+        rule_id: int,
+        user_id: int,
+        from_date: date,
+        before_date: date,
+    ) -> None:
+        """Mark a rule's pending tasks on the days from `from_date` up to `before_date` deleted,
+        keeping the rows so generation does not bring them back."""
+        query = (
+            update(Task)
+            .where(
+                Task.rule_id == rule_id,
+                Task.user_id == user_id,
+                Task.status == TaskStatus.PENDING.value,
+                Task.scheduled_date >= from_date,
+                Task.scheduled_date < before_date,
+            )
+            .values(status=TaskStatus.DELETED.value, completed_at=None)
+            .execution_options(synchronize_session="fetch")
+        )
+        self.session.execute(query)
+
+    def skip_rule_occurrences(
+        self,
+        *,
+        rule_id: int,
+        user_id: int,
+        occurrence_dates: list[date],
+    ) -> None:
+        """Mark a rule's pending tasks for these dates deleted, keeping the rows so generation
+        leaves the dates empty."""
+        if not occurrence_dates:
+            return
+        query = (
+            update(Task)
+            .where(
+                Task.rule_id == rule_id,
+                Task.user_id == user_id,
+                Task.status == TaskStatus.PENDING.value,
+                Task.occurrence_date.in_(occurrence_dates),
+            )
+            .values(status=TaskStatus.DELETED.value, completed_at=None)
+            .execution_options(synchronize_session="fetch")
+        )
+        self.session.execute(query)
+
+    def get_rule_occurrence(
+        self,
+        *,
+        rule_id: int,
+        user_id: int,
+        occurrence_date: date,
+    ) -> Task | None:
+        return self.session.scalar(
+            select(Task).where(
+                Task.rule_id == rule_id,
+                Task.user_id == user_id,
+                Task.occurrence_date == occurrence_date,
+            )
+        )
+
+    def delete_unfinished_tasks_for_rule(
+        self,
+        *,
+        rule_id: int,
+        user_id: int,
+        from_date: date,
+    ) -> None:
+        """Remove a rule's pending and deleted tasks from an occurrence date on; done work stays."""
+        query = delete(Task).where(
+            Task.rule_id == rule_id,
+            Task.user_id == user_id,
+            Task.occurrence_date >= from_date,
+            Task.status != TaskStatus.DONE.value,
+        )
         self.session.execute(query)
 
     def delete_pending_tasks_for_area(

@@ -139,7 +139,7 @@ apps/web/src/
   today screen's view state, check-off flow, task cards and their progress
   rail belong to `features/today`.
 - Week's pointer editing, selection, copy and paste, keyboard shortcuts, the
-  Only this / All repeating question and the hours panel belong to
+  Only this / This and following question and the hours panel belong to
   `features/week`. They use no drag-and-drop or state library.
 - `ModalDialog` in `components/ui/` is the shared modal shell: backdrop, focus
   trap, Escape and focus return. Form content stays in its feature.

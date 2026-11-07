@@ -58,7 +58,7 @@ def delete_task(
     current_user: CurrentUserDependency,
     task_service: TaskServiceDependency,
     goal_service: GoalServiceDependency,
-    # `repeat` is Week's All repeating: the task's schedule goes too.
+    # `repeat` is Week's This and following: the later sessions go and the schedule ends.
     scope: Annotated[Literal["task", "repeat"], Query()] = "task",
 ) -> None:
     if scope == "repeat":

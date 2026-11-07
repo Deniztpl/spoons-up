@@ -6,7 +6,7 @@ type RepeatScopeDialogProps = {
   title: string;
   action: "change" | "delete";
   onOnlyThis: () => void;
-  onAll: () => void;
+  onFollowing: () => void;
   onCancel: () => void;
 };
 
@@ -14,22 +14,22 @@ const copy = {
   change: {
     heading: (title: string) => `Change “${title}”?`,
     detail:
-      "It repeats. Change only this one, or move every repeat of its schedule the same way from today on.",
+      "It repeats. This and following gives this session and the later ones the new time and length. A once-a-week schedule moves to the new day; one with more days keeps its days and skips this week's sessions up to the day you dropped it on.",
   },
   delete: {
     heading: (title: string) => `Delete “${title}”?`,
     detail:
-      "It repeats. Delete only this one, or end its schedule and remove its open repeats from this week on.",
+      "It repeats. This and following removes this session and the later ones and ends the schedule; earlier ones stay.",
   },
 };
 
-// Asks, as Notion Calendar does, whether a change to a repeating task is for this one or all.
-// Enter picks Only this; Escape leaves everything as it was.
+// Asks, as Notion Calendar does, whether a change to a repeating task is for this one or for
+// this and the following ones. Enter picks Only this; Escape leaves everything as it was.
 export function RepeatScopeDialog({
   title,
   action,
   onOnlyThis,
-  onAll,
+  onFollowing,
   onCancel,
 }: RepeatScopeDialogProps) {
   const headingId = useId();
@@ -59,9 +59,9 @@ export function RepeatScopeDialog({
         <button
           type="button"
           className="rounded-[9px] border border-ink/14 bg-card px-3.5 py-2 text-[13px] font-medium text-ink transition hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          onClick={onAll}
+          onClick={onFollowing}
         >
-          All repeating
+          This and following
         </button>
         <span className="flex-1" />
         <button
