@@ -23,7 +23,10 @@ from app.models.base import Base
 class TaskStatus(StrEnum):
     PENDING = "PENDING"
     DONE = "DONE"
+    # Removed by the user; generation never brings it back.
     DELETED = "DELETED"
+    # Left out by a This and following move; a later one can bring it back.
+    SKIPPED = "SKIPPED"
 
 
 class TaskPriority(StrEnum):
@@ -36,7 +39,7 @@ class Task(Base):
     __tablename__ = "tasks"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('PENDING', 'DONE', 'DELETED')",
+            "status IN ('PENDING', 'DONE', 'DELETED', 'SKIPPED')",
             name="status_values",
         ),
         CheckConstraint(

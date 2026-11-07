@@ -58,7 +58,7 @@ These cannot be inferred from the code and are easy to break.
 - `occurrence_date` never changes while a task belongs to its rule. Postponing changes `scheduled_date` only. Repeat on and off from a task (`POST` and `DELETE /tasks/{id}/repeat`) are the only writes that set or clear it.
 - Hours are the unit of goal progress: a goal's `done` is the summed `duration_minutes` of its completed tasks, over 60. There is no block value.
 - `period_start` is fixed at generation. A task moved across a week boundary still counts toward its original week.
-- A rule-generated task is soft-deleted (`status = DELETED`); an ad-hoc task is hard-deleted.
+- A rule-generated task is soft-deleted (`status = DELETED`); an ad-hoc task is hard-deleted. A session This and following skips is `SKIPPED`: generation leaves it out like a deleted one, but a later This and following can bring it back.
 - Closed weeks in `period_results` are written once and never recomputed. Only the open week is computed live.
 - Habit entries are sparse — a row exists only when checked off. There is no MISSED or SKIPPED state, and undo is a hard delete.
 - `archived_at` is a timestamp, not a flag. Past weeks read it to know whether an item existed then.

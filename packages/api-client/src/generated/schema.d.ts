@@ -880,7 +880,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "PENDING" | "DONE" | "DELETED";
+            status: "PENDING" | "DONE" | "DELETED" | "SKIPPED";
             /** Title */
             title: string;
         };

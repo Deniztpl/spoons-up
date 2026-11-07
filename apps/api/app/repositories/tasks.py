@@ -427,7 +427,7 @@ class TaskRepository:
         from_date: date,
         before_date: date,
     ) -> None:
-        """Mark a rule's pending tasks on the days from `from_date` up to `before_date` deleted,
+        """Mark a rule's pending tasks on the days from `from_date` up to `before_date` skipped,
         keeping the rows so generation does not bring them back."""
         query = (
             update(Task)
@@ -438,7 +438,7 @@ class TaskRepository:
                 Task.scheduled_date >= from_date,
                 Task.scheduled_date < before_date,
             )
-            .values(status=TaskStatus.DELETED.value, completed_at=None)
+            .values(status=TaskStatus.SKIPPED.value, completed_at=None)
             .execution_options(synchronize_session="fetch")
         )
         self.session.execute(query)
@@ -450,7 +450,7 @@ class TaskRepository:
         user_id: int,
         occurrence_dates: list[date],
     ) -> None:
-        """Mark a rule's pending tasks for these dates deleted, keeping the rows so generation
+        """Mark a rule's pending tasks for these dates skipped, keeping the rows so generation
         leaves the dates empty."""
         if not occurrence_dates:
             return
@@ -462,8 +462,25 @@ class TaskRepository:
                 Task.status == TaskStatus.PENDING.value,
                 Task.occurrence_date.in_(occurrence_dates),
             )
-            .values(status=TaskStatus.DELETED.value, completed_at=None)
+            .values(status=TaskStatus.SKIPPED.value, completed_at=None)
             .execution_options(synchronize_session="fetch")
+        )
+        self.session.execute(query)
+
+    def delete_skipped_tasks_for_rule(
+        self,
+        *,
+        rule_id: int,
+        user_id: int,
+        from_date: date,
+    ) -> None:
+        """Remove a rule's skipped tasks from an occurrence date on, so generation adds them
+        again. Tasks the user deleted keep their rows and stay away."""
+        query = delete(Task).where(
+            Task.rule_id == rule_id,
+            Task.user_id == user_id,
+            Task.occurrence_date >= from_date,
+            Task.status == TaskStatus.SKIPPED.value,
         )
         self.session.execute(query)
 
@@ -489,7 +506,8 @@ class TaskRepository:
         user_id: int,
         from_date: date,
     ) -> None:
-        """Remove a rule's pending and deleted tasks from an occurrence date on; done work stays."""
+        """Remove a rule's unfinished tasks, deleted and skipped ones included, from an occurrence
+        date on; done work stays."""
         query = delete(Task).where(
             Task.rule_id == rule_id,
             Task.user_id == user_id,
@@ -518,14 +536,14 @@ class TaskRepository:
         self.session.execute(query)
 
     def _select_visible_tasks_for_user(self, *, user_id: int) -> Select[tuple[Task]]:
-        """Select non-deleted tasks that are standalone or under an active area."""
+        """Select pending and done tasks that are standalone or under an active area."""
         return (
             select(Task)
             .outerjoin(Goal, Task.goal_id == Goal.id)
             .outerjoin(Area, Goal.area_id == Area.id)
             .where(
                 Task.user_id == user_id,
-                Task.status != TaskStatus.DELETED.value,
+                Task.status.in_([TaskStatus.PENDING.value, TaskStatus.DONE.value]),
                 or_(
                     Task.goal_id.is_(None),
                     and_(

@@ -374,6 +374,19 @@ class TaskService:
             occurrence_dates=occurrence_dates,
         )
 
+    def delete_skipped_tasks_for_rule(
+        self,
+        *,
+        rule: GoalRule,
+        user_id: int,
+        from_date: date,
+    ) -> None:
+        self.task_repository.delete_skipped_tasks_for_rule(
+            rule_id=rule.id,
+            user_id=user_id,
+            from_date=from_date,
+        )
+
     def get_rule_occurrence(
         self,
         *,

@@ -92,7 +92,7 @@ class TaskResponse(BaseModel):
     duration_minutes: int | None
     end_time: time | None
     period_start: date | None
-    status: Literal["PENDING", "DONE", "DELETED"]
+    status: Literal["PENDING", "DONE", "DELETED", "SKIPPED"]
     completed_at: datetime | None
 
     @field_serializer("start_time", "end_time")

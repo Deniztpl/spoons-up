@@ -223,8 +223,9 @@ class GoalService:
         task_id: int,
         user_id: int,
     ) -> TaskResponse:
-        """This and following: from this task on, the schedule takes the drop's time and length,
-        and earlier sessions keep theirs.
+        """This and following: the schedule starts again on the drop day with the drop's time
+        and length. Sessions an earlier move skipped from that day on come back; sessions before
+        it keep theirs, and deleted ones stay deleted.
 
         A weekly schedule with one day moves to the drop day. Any other schedule keeps its days
         and nothing is placed on the drop day: a drop on a later day skips this week's open
@@ -257,6 +258,13 @@ class GoalService:
                 )
                 return TaskResponse.model_validate(moved)
 
+            # The schedule starts again on the drop day, so what an earlier move skipped from there
+            # comes back.
+            self.task_service.delete_skipped_tasks_for_rule(
+                rule=rule,
+                user_id=user_id,
+                from_date=payload.scheduled_date,
+            )
             # Done work is never skipped.
             is_skipped = (
                 payload.scheduled_date > task.scheduled_date
@@ -273,7 +281,7 @@ class GoalService:
             self.task_service.delete_untouched_pending_tasks_for_rule(
                 rule=rule,
                 user_id=user_id,
-                from_date=task.occurrence_date,
+                from_date=payload.scheduled_date,
                 keep_task_id=task.id,
             )
             self.goal_repository.update_rule(
@@ -289,7 +297,7 @@ class GoalService:
                     start_time=payload.start_time,
                     duration_minutes=payload.duration_minutes,
                 )
-            # Earlier dates still hold their tasks, so only this task's day on takes the new values.
+            # Earlier dates still hold their tasks, so only the drop day on takes the new values.
             self.task_service.add_tasks(user_id=user_id, from_date=today, to_date=window_end)
             response = TaskResponse.model_validate(task)
         return response
@@ -326,6 +334,12 @@ class GoalService:
             start_time=payload.start_time,
             duration_minutes=payload.duration_minutes,
             update_start_time=True,
+        )
+        # An earlier move may have skipped the new weekday from the drop day on.
+        self.task_service.delete_skipped_tasks_for_rule(
+            rule=rule,
+            user_id=user_id,
+            from_date=payload.scheduled_date,
         )
         self.task_service.add_tasks(user_id=user_id, from_date=today, to_date=window_end)
         skipped_days = (payload.scheduled_date - today).days // 7

@@ -645,19 +645,20 @@ This and following, after a task that belongs to a rule is moved or resized on W
 
 All three fields are required; `start_time` is null for the untimed row. `scheduled_date` is where the task was dropped and cannot be before today.
 
-**200** — the task, or for a weekly schedule the session on the drop day.
+**200** — the task, or for a weekly schedule the session on the drop day. A task the drop skipped comes back with `status` `SKIPPED`.
 
-A rule with a single weekday moves to the drop day, in one transaction: an open task is removed, the rule's untouched pending tasks go from the task's `occurrence_date` on, the rule takes the drop's weekday, `start_time` and `duration_minutes`, tasks are added from today through the window, and dates of the new weekday from today up to the drop day are marked `DELETED` so no week gains a second session. The session on the drop day is a new occurrence of the rule; no task's `occurrence_date` changes.
+A rule with a single weekday moves to the drop day, in one transaction: an open task is removed, the rule's untouched pending tasks go from the task's `occurrence_date` on, the rule takes the drop's weekday, `start_time` and `duration_minutes`, its `SKIPPED` tasks from the drop day on are removed, tasks are added from today through the window, and dates of the new weekday from today up to the drop day are marked `SKIPPED` so no week gains a second session. The session on the drop day is a new occurrence of the rule; no task's `occurrence_date` changes.
 
 Any other rule keeps its days and nothing is placed on the drop day. In one transaction:
 
-1. A drop on a later day than the task's `scheduled_date` skips the rule's pending tasks scheduled from the task's day up to, but not including, the drop day, the task included: they become `DELETED`, so generation does not bring them back. A drop on the same or an earlier day skips nothing.
-2. The rule's untouched pending tasks are removed from the task's `occurrence_date` on, as `PATCH /rules/{id}` does; earlier ones keep their time and duration.
-3. The rule takes the new `start_time` and `duration_minutes`. Its `byweekday` never changes here; a schedule's days change only through `PATCH /rules/{id}`.
-4. A task that was not skipped stays on its own day with the new time and duration.
-5. Tasks are added from today through the current window. Dates before the task still hold their tasks, so only the task's session on takes the new values.
+1. The schedule starts again on the drop day: the rule's `SKIPPED` tasks from that day on are removed, so generation adds them again. `DELETED` tasks stay.
+2. A drop on a later day than the task's `scheduled_date` skips the rule's pending tasks scheduled from the task's day up to, but not including, the drop day, the task included: they become `SKIPPED`, so generation does not bring them back. A drop on the same or an earlier day skips nothing.
+3. The rule's untouched pending tasks are removed from the drop day on, as `PATCH /rules/{id}` does; earlier ones keep their time and duration.
+4. The rule takes the new `start_time` and `duration_minutes`. Its `byweekday` never changes here; a schedule's days change only through `PATCH /rules/{id}`.
+5. A task that was not skipped stays on its own day with the new time and duration.
+6. Tasks are added from today through the current window. Dates before the drop day still hold their tasks, so only the drop day on takes the new values.
 
-Done tasks are never skipped, and tasks the user moved or retimed after the task keep their own values. Closed weeks are untouched.
+Done tasks are never skipped, and tasks the user moved or retimed keep their own values. Closed weeks are untouched.
 
 | Error | When |
 |---|---|
@@ -792,7 +793,7 @@ The Today screen: a daily view with habits and the day's tasks, a weekly view wi
 
 `week_start` and `week_end` bound the week `date` falls in, using the user's `week_start_day`. The weekly view labels itself with them, so the client never computes a week boundary. To check off or undo a habit shown here, the client sends this response's `date`; the server resolves it to the habit's day or week.
 
-Timed tasks are ordered by `start_time`, followed by untimed tasks; `DELETED` is excluded. Anything under an archived area is excluded.
+Timed tasks are ordered by `start_time`, followed by untimed tasks; `DELETED` and `SKIPPED` are excluded. Anything under an archived area is excluded.
 
 The scheduled task shape is shared by `/today`, `/week` and `later_tasks`. A top-level Journal item with steps has `step_progress: { "done": 1, "total": 3 }`. A scheduled step instead has `parent_id` and:
 

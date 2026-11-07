@@ -596,12 +596,12 @@ def test_this_and_following_skips_the_week_up_to_a_later_drop_and_retimes_from_t
 
     assert to_tuesday.status_code == 200
     # The task itself is skipped: nothing is placed on Tuesday.
-    assert to_tuesday.json()["status"] == "DELETED"
+    assert to_tuesday.json()["status"] == "SKIPPED"
     stored_rule = db_session.get(GoalRule, rule_id)
     assert stored_rule is not None
     assert stored_rule.byweekday == [1, 3, 5]
     assert (stored_rule.start_time, stored_rule.duration_minutes) == (time(15), 60)
-    # Earlier sessions keep 17:00; from the task on the schedule runs at 15:00.
+    # Earlier sessions keep 17:00; from the drop day on the schedule runs at 15:00.
     assert shown(db_session, rule_id) == [
         (date(2026, 9, 23), time(17)),
         (date(2026, 9, 25), time(17)),
@@ -670,7 +670,7 @@ def test_this_and_following_keeps_earlier_sessions_and_can_skip_a_whole_week(
     ]
 
 
-def test_this_and_following_on_the_same_or_an_earlier_day_only_retimes(
+def test_this_and_following_on_an_earlier_day_skips_nothing_and_retimes_from_that_day(
     client: TestClient,
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
@@ -678,10 +678,10 @@ def test_this_and_following_on_the_same_or_an_earlier_day_only_retimes(
     freeze_goal_service_time(monkeypatch)
     headers, rule_id, ids = schedule_mon_wed_fri(client, db_session, "following-back@example.com")
 
-    # Next Wednesday's task dropped back on Tuesday at 15:00 for 90 minutes: nothing is skipped,
-    # and the task stays on Wednesday with the new time and length.
+    # Next Friday's task dropped back on Tuesday at 15:00 for 90 minutes: nothing is skipped, the
+    # task stays on Friday, and from Tuesday on the schedule runs at the new time and length.
     backwards = client.patch(
-        f"/api/v1/tasks/{ids[date(2026, 9, 30)]}/repeat",
+        f"/api/v1/tasks/{ids[date(2026, 10, 2)]}/repeat",
         json={"scheduled_date": "2026-09-29", "start_time": "15:00", "duration_minutes": 90},
         headers=headers,
     )
@@ -690,10 +690,11 @@ def test_this_and_following_on_the_same_or_an_earlier_day_only_retimes(
     body = backwards.json()
     assert (body["status"], body["scheduled_date"], body["occurrence_date"]) == (
         "PENDING",
-        "2026-09-30",
-        "2026-09-30",
+        "2026-10-02",
+        "2026-10-02",
     )
     assert (body["start_time"], body["end_time"]) == ("15:00", "16:30")
+    # Monday before the drop day keeps 17:00; Wednesday after it takes 15:00.
     assert shown(db_session, rule_id) == [
         (date(2026, 9, 23), time(17)),
         (date(2026, 9, 25), time(17)),
@@ -767,6 +768,125 @@ def test_this_and_following_moves_a_weekly_schedule_to_the_drop_day(
             UserRepository(db_session),
         ).add_tasks(user_id=user.id, from_date=date(2026, 9, 23), to_date=date(2026, 10, 13))
 
+    assert shown(db_session, rule_id) == [
+        (date(2026, 9, 30), time(15)),
+        (date(2026, 10, 7), time(15)),
+    ]
+
+
+def test_this_and_following_brings_back_skipped_sessions_but_never_deleted_ones(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    freeze_goal_service_time(monkeypatch)
+    headers, rule_id, ids = schedule_mon_wed_fri(
+        client, db_session, "following-restore@example.com"
+    )
+
+    # Next Wednesday's session deleted on its own; then next Monday's task dropped on Thursday,
+    # which skips Monday.
+    deleted = client.delete(f"/api/v1/tasks/{ids[date(2026, 9, 30)]}", headers=headers)
+    forwards = client.patch(
+        f"/api/v1/tasks/{ids[date(2026, 9, 28)]}/repeat",
+        json={"scheduled_date": "2026-10-01", "start_time": "15:00", "duration_minutes": 60},
+        headers=headers,
+    )
+
+    assert deleted.status_code == 204
+    assert forwards.status_code == 200
+    assert shown(db_session, rule_id)[:3] == [
+        (date(2026, 9, 23), time(17)),
+        (date(2026, 9, 25), time(17)),
+        (date(2026, 10, 2), time(15)),
+    ]
+    # The move drew Friday again, so it has a new id.
+    friday_id = db_session.scalar(
+        select(Task.id).where(Task.rule_id == rule_id, Task.occurrence_date == date(2026, 10, 2))
+    )
+    db_session.rollback()
+
+    # Friday dropped back on Monday starts the schedule there again: Monday comes back, and
+    # Wednesday stays deleted.
+    backwards = client.patch(
+        f"/api/v1/tasks/{friday_id}/repeat",
+        json={"scheduled_date": "2026-09-28", "start_time": "16:00", "duration_minutes": 60},
+        headers=headers,
+    )
+
+    assert backwards.status_code == 200
+    assert shown(db_session, rule_id) == [
+        (date(2026, 9, 23), time(17)),
+        (date(2026, 9, 25), time(17)),
+        (date(2026, 9, 28), time(16)),
+        (date(2026, 10, 2), time(16)),
+        (date(2026, 10, 5), time(16)),
+        (date(2026, 10, 7), time(16)),
+        (date(2026, 10, 9), time(16)),
+        (date(2026, 10, 12), time(16)),
+    ]
+    wednesday = db_session.scalar(
+        select(Task.status).where(
+            Task.rule_id == rule_id, Task.occurrence_date == date(2026, 9, 30)
+        )
+    )
+    assert wednesday == TaskStatus.DELETED.value
+
+
+def test_this_and_following_moves_a_weekly_schedule_onto_a_day_an_earlier_move_skipped(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Today is Wednesday 2026-09-23.
+    freeze_goal_service_time(monkeypatch)
+    headers = bearer(register(client, "following-weekly-back@example.com"))
+    area = create_area(client, headers)
+    goal = create_goal(client, headers, area_id=str(area["id"]))
+    rule = create_rule(
+        client,
+        headers,
+        goal_id=str(goal["id"]),
+        byweekday=[1],
+        start_time="17:00",
+        duration_minutes=60,
+    )
+    rule_id = int(str(rule["id"]))
+    ids = {
+        occurrence_date: task_id
+        for occurrence_date, task_id in db_session.execute(
+            select(Task.occurrence_date, Task.id).where(Task.rule_id == rule_id)
+        )
+    }
+    db_session.rollback()
+
+    # In the third week Monday's session moves to Wednesday. The two weeks before keep their
+    # Monday, so their Wednesdays are skipped.
+    third_week = client.patch(
+        f"/api/v1/tasks/{ids[date(2026, 10, 5)]}/repeat",
+        json={"scheduled_date": "2026-10-07", "start_time": "17:00", "duration_minutes": 60},
+        headers=headers,
+    )
+
+    assert third_week.status_code == 200
+    assert shown(db_session, rule_id) == [
+        (date(2026, 9, 28), time(17)),
+        (date(2026, 10, 7), time(17)),
+    ]
+    db_session.rollback()
+
+    # Next week, Monday's session moves onto the Wednesday that was skipped, and lands there.
+    next_week = client.patch(
+        f"/api/v1/tasks/{ids[date(2026, 9, 28)]}/repeat",
+        json={"scheduled_date": "2026-09-30", "start_time": "15:00", "duration_minutes": 60},
+        headers=headers,
+    )
+
+    assert next_week.status_code == 200
+    assert (next_week.json()["status"], next_week.json()["scheduled_date"]) == (
+        "PENDING",
+        "2026-09-30",
+    )
     assert shown(db_session, rule_id) == [
         (date(2026, 9, 30), time(15)),
         (date(2026, 10, 7), time(15)),
@@ -949,7 +1069,10 @@ def shown(db_session: Session, rule_id: int) -> list[tuple[date | None, time | N
     return sorted(
         (task.scheduled_date, task.start_time)
         for task in db_session.scalars(
-            select(Task).where(Task.rule_id == rule_id, Task.status != TaskStatus.DELETED.value)
+            select(Task).where(
+                Task.rule_id == rule_id,
+                Task.status.in_([TaskStatus.PENDING.value, TaskStatus.DONE.value]),
+            )
         )
     )
 

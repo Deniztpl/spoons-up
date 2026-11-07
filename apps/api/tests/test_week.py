@@ -57,12 +57,18 @@ def test_week_returns_seven_ordered_days_and_tasks(
             scheduled_date=date(2026, 9, 22),
             status=TaskStatus.DELETED,
         )
+        skipped = build_task(
+            user_id=user.id,
+            title="Skipped",
+            scheduled_date=date(2026, 9, 22),
+            status=TaskStatus.SKIPPED,
+        )
         strangers_task = build_task(
             user_id=stranger.id,
             title="Private",
             scheduled_date=date(2026, 9, 21),
         )
-        db_session.add_all([early, late, untimed, midweek, deleted, strangers_task])
+        db_session.add_all([early, late, untimed, midweek, deleted, skipped, strangers_task])
         db_session.flush()
         early_id = str(early.id)
 

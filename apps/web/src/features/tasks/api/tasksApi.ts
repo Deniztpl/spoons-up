@@ -24,7 +24,7 @@ export function deleteTask(taskId: string, scope: "task" | "repeat" = "task") {
   });
 }
 
-// This and following: the task's session and the later ones take the drop's time and length.
+// This and following: the schedule starts again on the drop day with the drop's time and length.
 export function changeRepeat(taskId: string, fields: ChangeRepeatFields) {
   return apiClient.PATCH("/api/v1/tasks/{task_id}/repeat", {
     params: { path: { task_id: taskId } },

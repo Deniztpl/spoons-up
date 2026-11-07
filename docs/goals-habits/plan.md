@@ -361,6 +361,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - Web: the question after moving, resizing or deleting a task that repeats; Enter picks Only this; the task shows at its new place while the question is open and Escape puts it back; a resize on an elapsed day skips the question
 - Revised after first use: All repeating became This and following. A one-day weekly schedule moves to the drop day; a daily or several-day schedule never moves its days, which change only in the goal's schedule. The schedule type is read from its weekdays; nothing new is stored
 - Also after first use: Week reaches a third week, and rules generate 21 days ahead so that week is always filled
+- Skipped sessions get their own status, `SKIPPED`, apart from `DELETED`: This and following starts the schedule again on the drop day, so skips from that day on come back, while a session deleted with Only this never does
 
 ### Block 7 — Hours panel shortcut (optional)
 

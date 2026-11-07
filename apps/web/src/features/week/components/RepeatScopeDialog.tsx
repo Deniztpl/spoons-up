@@ -14,7 +14,7 @@ const copy = {
   change: {
     heading: (title: string) => `Change “${title}”?`,
     detail:
-      "It repeats. This and following gives this session and the later ones the new time and length. A once-a-week schedule moves to the new day; one with more days keeps its days and skips this week's sessions up to the day you dropped it on.",
+      "It repeats. This and following starts the schedule again on the day you dropped it on, with the new time and length. A once-a-week schedule moves to that day; one with more days keeps its days, skips this week's sessions up to that day and brings back ones skipped after it.",
   },
   delete: {
     heading: (title: string) => `Delete “${title}”?`,
