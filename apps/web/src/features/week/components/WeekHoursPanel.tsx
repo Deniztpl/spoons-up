@@ -78,11 +78,33 @@ function GoalHoursRow({ goal }: { goal: WeekGoalHours }) {
         <span className="h-full bg-area" style={{ width: `${(goal.done / scale) * 100}%` }} />
         <span className="h-full bg-area/35" style={{ width: `${(goal.planned / scale) * 100}%` }} />
       </div>
-      <p className="text-[11px] leading-4 text-ink-soft tabular-nums">
-        {formatHours(goal.done)} done · {formatHours(goal.planned)} planned ·{" "}
-        {formatHours(notPlanned)} not planned
-      </p>
+      <div className="mt-0.5 grid grid-cols-3 gap-x-1.5">
+        <HoursFigure hours={goal.done} label="done" swatchClassName="bg-area" />
+        <HoursFigure hours={goal.planned} label="planned" swatchClassName="bg-area/35" />
+        <HoursFigure hours={notPlanned} label="not planned" swatchClassName="bg-track" />
+      </div>
     </li>
+  );
+}
+
+// One part of the bar: its colour, its hours and what they are, in an equal column.
+function HoursFigure({
+  hours,
+  label,
+  swatchClassName,
+}: {
+  hours: number;
+  label: string;
+  swatchClassName: string;
+}) {
+  return (
+    <p className="flex min-w-0 flex-col">
+      <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4 text-ink tabular-nums">
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-[3px] ${swatchClassName}`} />
+        {formatHours(hours)}
+      </span>{" "}
+      <span className="text-[11px] leading-4 text-ink-soft">{label}</span>
+    </p>
   );
 }
 

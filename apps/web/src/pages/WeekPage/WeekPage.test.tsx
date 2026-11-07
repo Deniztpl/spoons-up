@@ -37,6 +37,13 @@ function weekWith(date: string, extraTasks: ReturnType<typeof task>[]) {
   };
 }
 
+// A goal row's three figures in the hours panel, such as "8h done · 2h planned · 0h not planned".
+function hoursOf(row: HTMLElement) {
+  return ["done", "planned", "not planned"]
+    .map((label) => within(row).getByText(label).parentElement!.textContent)
+    .join(" · ");
+}
+
 function addDays(value: string, amount: number) {
   const date = new Date(`${value}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + amount);
@@ -183,15 +190,15 @@ describe("Week page", () => {
     expect(music).toHaveClass("area-green");
     const [beats, mixing] = within(music).getAllByRole("listitem");
     expect(beats).toHaveTextContent("Beats20h");
-    expect(beats).toHaveTextContent("8h done · 4h 30m planned · 7h 30m not planned");
+    expect(hoursOf(beats!)).toBe("8h done · 4h 30m planned · 7h 30m not planned");
     // Placing more than the target leaves nothing unplanned and shows the extra.
     expect(mixing).toHaveTextContent("+1h 30m");
-    expect(mixing).toHaveTextContent("1h 30m done · 2h planned · 0h not planned");
+    expect(hoursOf(mixing!)).toBe("1h 30m done · 2h planned · 0h not planned");
 
     // Checking work reads the week again, so the hours follow.
     await user.click(screen.getAllByRole("checkbox", { name: "Plan sprint" })[0]!);
     await waitFor(() =>
-      expect(within(panel).getAllByRole("listitem")[0]).toHaveTextContent(
+      expect(hoursOf(within(panel).getAllByRole("listitem")[0]!)).toBe(
         "9h done · 4h 30m planned · 6h 30m not planned",
       ),
     );
