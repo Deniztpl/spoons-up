@@ -19,6 +19,9 @@ from app.schemas.week import (
 )
 from app.services.today import scheduled_task_responses
 
+# Week shows the current week and the two after it, all inside the generated window.
+WEEKS_AHEAD = 2
+
 
 class WeekService:
     def __init__(
@@ -46,14 +49,16 @@ class WeekService:
                 today,
                 week_start_day=user.week_start_day,
             )
-            following_week_start = current_week_start + timedelta(days=7)
+            last_week_start = current_week_start + timedelta(weeks=WEEKS_AHEAD)
             period_start = (
                 current_week_start
                 if target_date is None
                 else get_week_start(target_date, week_start_day=user.week_start_day)
             )
-            if period_start not in {current_week_start, following_week_start}:
-                raise ValidationAppError({"start": "Week must be the current or following week"})
+            if not current_week_start <= period_start <= last_week_start:
+                raise ValidationAppError(
+                    {"start": "Week must be the current week or one of the next two"}
+                )
 
             period_end = period_start + timedelta(days=6)
             tasks = self.task_repository.list_for_week(
@@ -61,10 +66,9 @@ class WeekService:
                 week_start=period_start,
                 week_end=period_end,
             )
-            following_week_end = following_week_start + timedelta(days=6)
             later_tasks = self.task_repository.list_later_tasks(
                 user_id=user_id,
-                cutoff_date=following_week_end,
+                cutoff_date=last_week_start + timedelta(days=6),
             )
             # The week and the later list share one read of their Journal items' steps.
             responses = scheduled_task_responses(

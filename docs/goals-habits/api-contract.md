@@ -815,13 +815,13 @@ Rows are ordered by `scheduled_date`, non-null time before null time, then id. `
 
 #### GET /week
 
-The calendar screen: seven days side by side. It can show only the user's current week and the following week; the client offers no navigation before the current week or beyond the following week.
+The calendar screen: seven days side by side. It can show the user's current week and the two weeks after it; the client offers no navigation before the current week or beyond the third.
 
 | Query | Default |
 |---|---|
 | `start` | the current week's `period_start` |
 
-Any date inside the current or following week works — the server resolves it to `period_start`. A past week or a week after the following week is rejected. The boundary uses today and `week_start_day` in the user's timezone.
+Any date inside these three weeks works — the server resolves it to `period_start`. A past week or a week after the third is rejected. The boundary uses today and `week_start_day` in the user's timezone.
 
 **200**
 
@@ -852,7 +852,7 @@ Any date inside the current or following week works — the server resolves it t
 
 `done` and `planned` never overlap. The client derives the hours not planned as `max(target - done - planned, 0)` and shows anything past the target as extra. Because both follow `period_start`, a task moved into the following week still counts for the week it came from.
 
-`later_tasks` makes tasks after the following week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They are full task objects, the same shape as in `days`, so the client can open one in the task form to edit or delete it.
+`later_tasks` makes tasks after the third week's end visible without letting the calendar navigate there. `count` and `items` come from this one read, and `count` always equals the number of items. Items are ordered by `scheduled_date`, then timed tasks by `start_time`, then untimed tasks. They are full task objects, the same shape as in `days`, so the client can open one in the task form to edit or delete it.
 
 The list includes non-deleted ad-hoc tasks (`occurrence_date` is null) and rule-generated tasks the user moved there (`scheduled_date != occurrence_date`). Untouched occurrences generated automatically by rules are excluded. The normal visibility rule still applies: tasks under an archived area are excluded.
 
@@ -860,13 +860,13 @@ Today and Week have separate Goal and Journal task components. On Today the date
 
 Week's direct edits use the task endpoints: a move or resize is `PATCH /tasks/{id}` with `scheduled_date`, `start_time` and `duration_minutes` (only `duration_minutes` for a resize on an elapsed day), or `PATCH /tasks/{id}/repeat` for This and following; a paste and a block from the hours panel are `POST /tasks`; a delete is `DELETE /tasks/{id}`, with `scope=repeat` for This and following. The client shows each change before the response arrives and reads the week again afterwards, since a rule change redraws other tasks.
 
-Tasks with a null `scheduled_date` are absent. A Journal item put after the following week by its due date or a planning action participates in `later_tasks` like any other manually placed task. A top-level item with steps is not selectable from the Journal planning component; its open steps are selected individually.
+Tasks with a null `scheduled_date` are absent. A Journal item put after the third week by its due date or a planning action participates in `later_tasks` like any other manually placed task. A top-level item with steps is not selectable from the Journal planning component; its open steps are selected individually.
 
 Habits are not in this response — the calendar shows scheduled work only.
 
 | Error | When |
 |---|---|
-| 422 `validation_error` | `start` resolves to a past week or a week after the following week |
+| 422 `validation_error` | `start` resolves to a past week or a week after the third |
 
 ---
 

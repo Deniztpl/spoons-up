@@ -11,7 +11,8 @@ from app.repositories.tasks import TaskRepository
 from app.repositories.users import UserRepository
 from app.schemas.tasks import CreateTaskRequest, TaskResponse, UpdateTaskRequest
 
-TASK_GENERATION_DAYS = 14
+# Three weeks from today, so the last week Week shows is filled even on its first day.
+TASK_GENERATION_DAYS = 21
 
 
 class TaskService:

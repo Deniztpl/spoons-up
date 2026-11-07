@@ -18,7 +18,11 @@ import {
 import { RepeatScopeDialog } from "../../features/week/components/RepeatScopeDialog";
 import { WeekCalendar } from "../../features/week/components/WeekCalendar";
 import { WeekHoursPanel } from "../../features/week/components/WeekHoursPanel";
-import { type TaskPlacement, useWeek } from "../../features/week/hooks/useWeek";
+import {
+  LAST_WEEK_OFFSET,
+  type TaskPlacement,
+  useWeek,
+} from "../../features/week/hooks/useWeek";
 
 const weekFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
 const hoursPanelKey = "spoons-up:week-hours-panel";
@@ -135,9 +139,9 @@ export function WeekPage({
               <button
                 type="button"
                 aria-label="Previous week"
-                disabled={weekState.position === "current" || !todayDate || weekState.isLoading}
+                disabled={weekState.weekOffset === 0 || !todayDate || weekState.isLoading}
                 className="grid size-[30px] place-items-center rounded-lg border border-ink/14 bg-card text-ink-soft transition enabled:hover:bg-well enabled:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:border-ink/7 disabled:text-muted-light"
-                onClick={weekState.showCurrentWeek}
+                onClick={weekState.showPreviousWeek}
               >
                 <ChevronIcon direction="left" />
               </button>
@@ -147,9 +151,11 @@ export function WeekPage({
               <button
                 type="button"
                 aria-label="Next week"
-                disabled={weekState.position === "following" || !todayDate || weekState.isLoading}
+                disabled={
+                  weekState.weekOffset === LAST_WEEK_OFFSET || !todayDate || weekState.isLoading
+                }
                 className="grid size-[30px] place-items-center rounded-lg border border-ink/14 bg-card text-ink-soft transition enabled:hover:bg-well enabled:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:border-ink/7 disabled:text-muted-light"
-                onClick={weekState.showFollowingWeek}
+                onClick={weekState.showNextWeek}
               >
                 <ChevronIcon direction="right" />
               </button>
@@ -157,7 +163,7 @@ export function WeekPage({
 
             <button
               type="button"
-              disabled={weekState.position === "current" || weekState.isLoading}
+              disabled={weekState.weekOffset === 0 || weekState.isLoading}
               className="h-8 rounded-lg border border-accent/35 bg-card px-3 text-[12.5px] font-medium text-accent transition enabled:hover:bg-well focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:border-ink/8 disabled:text-muted-light"
               onClick={weekState.showCurrentWeek}
             >

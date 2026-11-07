@@ -37,42 +37,34 @@ function weekWith(date: string, extraTasks: ReturnType<typeof task>[]) {
   };
 }
 
+function addDays(value: string, amount: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+}
+
+// The Monday of the week holding a date, as the server resolves `start`.
+function mondayOf(value: string) {
+  return addDays(value, -((new Date(`${value}T00:00:00Z`).getUTCDay() + 6) % 7));
+}
+
 function weekResponse(start = "2026-09-21") {
-  const startsFollowingWeek = start === "2026-09-28";
-  const dates = startsFollowingWeek
-    ? [
-        "2026-09-28",
-        "2026-09-29",
-        "2026-09-30",
-        "2026-10-01",
-        "2026-10-02",
-        "2026-10-03",
-        "2026-10-04",
-      ]
-    : [
-        "2026-09-21",
-        "2026-09-22",
-        "2026-09-23",
-        "2026-09-24",
-        "2026-09-25",
-        "2026-09-26",
-        "2026-09-27",
-      ];
+  const dates = Array.from({ length: 7 }, (_, offset) => addDays(start, offset));
 
   return {
     period_start: dates[0],
     days: dates.map((date) => ({
       date,
       tasks:
-        !startsFollowingWeek && date === "2026-09-24"
+        date === "2026-09-24"
           ? [task("41", "Plan sprint", date), task("42", "Call dentist", date, null)]
           : [],
     })),
     later_tasks: {
       count: 2,
       items: [
-        task("51", "Tax meeting", "2026-10-08", "14:30"),
-        task("52", "Renew passport", "2026-10-12", null),
+        task("51", "Tax meeting", "2026-10-15", "14:30"),
+        task("52", "Renew passport", "2026-10-19", null),
       ],
     },
     goals: [] as Array<Record<string, unknown>>,
@@ -97,9 +89,8 @@ function defaultFetch() {
       return Response.json(todayResponse());
     }
     if (request.method === "GET" && url.pathname === "/api/v1/week") {
-      return Response.json(
-        weekResponse(url.searchParams.has("start") ? "2026-09-28" : "2026-09-21"),
-      );
+      const start = url.searchParams.get("start");
+      return Response.json(weekResponse(start ? mondayOf(start) : "2026-09-21"));
     }
     if (request.method === "GET" && url.pathname === "/api/v1/areas") {
       return Response.json({ areas: [] });
@@ -232,17 +223,22 @@ describe("Week page", () => {
     expect(screen.getByRole("button", { name: "Add a task on 2026-09-24" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next week" }));
-
     expect(await screen.findByText("Sep 28 – Oct 4")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next week" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next week" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Previous week" })).toBeEnabled();
-    const followingRequest = fetchMock.mock.calls
-      .map(([request]) => request as Request)
-      .find((request) => {
-        const url = new URL(request.url);
-        return url.pathname === "/api/v1/week" && url.searchParams.has("start");
-      });
-    expect(new URL(followingRequest!.url).searchParams.get("start")).toBe("2026-10-01");
+
+    // The third week is the last one.
+    await user.click(screen.getByRole("button", { name: "Next week" }));
+    expect(await screen.findByText("Oct 5 – 11")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next week" })).toBeDisabled();
+    const starts = fetchMock.mock.calls
+      .map(([request]) => new URL((request as Request).url))
+      .filter((url) => url.pathname === "/api/v1/week" && url.searchParams.has("start"))
+      .map((url) => url.searchParams.get("start"));
+    expect(starts).toEqual(["2026-10-01", "2026-10-08"]);
+
+    await user.click(screen.getByRole("button", { name: "Previous week" }));
+    expect(await screen.findByText("Sep 28 – Oct 4")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Today" }));
     expect(await screen.findByText("Sep 21 – 27")).toBeInTheDocument();
@@ -473,7 +469,7 @@ describe("Week page", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Later tasks" });
     expect(within(dialog).getByText("Tax meeting")).toBeInTheDocument();
-    expect(within(dialog).getByText("Oct 8, 2026", { exact: false })).toBeInTheDocument();
+    expect(within(dialog).getByText("Oct 15, 2026", { exact: false })).toBeInTheDocument();
     expect(within(dialog).getByText("14:30")).toBeInTheDocument();
     expect(within(dialog).getByText("Renew passport")).toBeInTheDocument();
     expect(within(dialog).getByText("No time")).toBeInTheDocument();
@@ -504,7 +500,7 @@ describe("Week page", () => {
       }),
     );
     const dialog = screen.getByRole("dialog", { name: "Edit task" });
-    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-08");
+    expect(within(dialog).getByLabelText("Date")).toHaveValue("2026-10-15");
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await user.click(within(dialog).getByRole("button", { name: "Delete task" }));
 

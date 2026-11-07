@@ -111,7 +111,7 @@ def test_week_returns_seven_ordered_days_and_tasks(
     assert client.get("/api/v1/week", headers=stranger_headers).status_code == 200
 
 
-def test_week_defaults_to_current_allows_next_and_rejects_other_weeks(
+def test_week_defaults_to_current_allows_the_next_two_and_rejects_other_weeks(
     client: TestClient,
 ) -> None:
     headers = bearer(register(client, "week-range@example.com"))
@@ -122,14 +122,19 @@ def test_week_defaults_to_current_allows_next_and_rejects_other_weeks(
         params={"start": "2026-10-01"},
         headers=headers,
     )
+    third = client.get(
+        "/api/v1/week",
+        params={"start": "2026-10-11"},
+        headers=headers,
+    )
     past = client.get(
         "/api/v1/week",
         params={"start": "2026-09-20"},
         headers=headers,
     )
-    third = client.get(
+    fourth = client.get(
         "/api/v1/week",
-        params={"start": "2026-10-05"},
+        params={"start": "2026-10-12"},
         headers=headers,
     )
     invalid = client.get(
@@ -143,10 +148,13 @@ def test_week_defaults_to_current_allows_next_and_rejects_other_weeks(
     assert current.json()["period_start"] == "2026-09-21"
     assert following.status_code == 200
     assert following.json()["period_start"] == "2026-09-28"
+    assert third.status_code == 200
+    assert third.json()["period_start"] == "2026-10-05"
+    range_error = {"start": "Week must be the current week or one of the next two"}
     assert past.status_code == 422
-    assert past.json()["fields"] == {"start": "Week must be the current or following week"}
-    assert third.status_code == 422
-    assert third.json()["fields"] == {"start": "Week must be the current or following week"}
+    assert past.json()["fields"] == range_error
+    assert fourth.status_code == 422
+    assert fourth.json()["fields"] == range_error
     assert invalid.status_code == 422
     assert "start" in invalid.json()["fields"]
     assert unauthorized.status_code == 401
@@ -176,7 +184,7 @@ def test_week_uses_the_users_timezone_and_week_start_day(
     assert sunday_start.json()["period_start"] == "2026-09-27"
 
 
-def test_week_returns_only_manually_placed_tasks_after_the_following_week(
+def test_week_returns_only_manually_placed_tasks_after_the_third_week(
     client: TestClient,
     db_session: Session,
 ) -> None:
@@ -206,13 +214,13 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
                 build_task(
                     user_id=user.id,
                     title="Timed manual",
-                    scheduled_date=date(2026, 10, 5),
+                    scheduled_date=date(2026, 10, 12),
                     start_time=time(9),
                 ),
                 build_task(
                     user_id=user.id,
                     title="Untimed manual",
-                    scheduled_date=date(2026, 10, 5),
+                    scheduled_date=date(2026, 10, 12),
                 ),
                 build_task(
                     user_id=user.id,
@@ -220,7 +228,7 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
                     rule_id=rule.id,
                     title="Moved generated",
                     occurrence_date=date(2026, 9, 28),
-                    scheduled_date=date(2026, 10, 6),
+                    scheduled_date=date(2026, 10, 13),
                     start_time=time(8),
                 ),
                 build_task(
@@ -228,24 +236,24 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
                     goal_id=int(str(goal["id"])),
                     rule_id=rule.id,
                     title="Untouched generated",
-                    occurrence_date=date(2026, 10, 7),
-                    scheduled_date=date(2026, 10, 7),
+                    occurrence_date=date(2026, 10, 14),
+                    scheduled_date=date(2026, 10, 14),
                 ),
                 build_task(
                     user_id=user.id,
-                    title="Still next week",
-                    scheduled_date=date(2026, 10, 4),
+                    title="Still in the third week",
+                    scheduled_date=date(2026, 10, 11),
                 ),
                 build_task(
                     user_id=user.id,
                     title="Deleted manual",
-                    scheduled_date=date(2026, 10, 5),
+                    scheduled_date=date(2026, 10, 12),
                     status=TaskStatus.DELETED,
                 ),
                 build_task(
                     user_id=stranger.id,
                     title="Someone else's task",
-                    scheduled_date=date(2026, 10, 5),
+                    scheduled_date=date(2026, 10, 12),
                 ),
             ]
         )
@@ -258,9 +266,9 @@ def test_week_returns_only_manually_placed_tasks_after_the_following_week(
     assert [
         (item["scheduled_date"], item["start_time"], item["title"]) for item in later_tasks["items"]
     ] == [
-        ("2026-10-05", "09:00", "Timed manual"),
-        ("2026-10-05", None, "Untimed manual"),
-        ("2026-10-06", "08:00", "Moved generated"),
+        ("2026-10-12", "09:00", "Timed manual"),
+        ("2026-10-12", None, "Untimed manual"),
+        ("2026-10-13", "08:00", "Moved generated"),
     ]
     assert all(item["id"] for item in later_tasks["items"])
     assert later_tasks["items"][2]["occurrence_date"] == "2026-09-28"
@@ -278,7 +286,7 @@ def test_week_leaves_unscheduled_journal_work_out_and_lists_far_due_items_later(
             [
                 build_task(user_id=user.id, title="Someday", scheduled_date=None),
                 build_task(user_id=user.id, title="Dentist", scheduled_date=date(2026, 9, 25)),
-                # A due date schedules the item on that day, after the following week here.
+                # A due date schedules the item on that day, after the third week here.
                 build_task(
                     user_id=user.id,
                     title="Passport",

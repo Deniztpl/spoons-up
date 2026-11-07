@@ -50,6 +50,9 @@ def test_rule_creation_adds_the_current_window_idempotently(
         date(2026, 9, 30),
         date(2026, 10, 2),
         date(2026, 10, 5),
+        date(2026, 10, 7),
+        date(2026, 10, 9),
+        date(2026, 10, 12),
     ]
     tasks = list(
         db_session.scalars(
@@ -63,7 +66,7 @@ def test_rule_creation_adds_the_current_window_idempotently(
     assert all(task.end_time == time(1) for task in tasks)
     assert all(task.duration_minutes == 90 for task in tasks)
     assert tasks[0].period_start == date(2026, 9, 20)
-    assert tasks[-1].period_start == date(2026, 10, 4)
+    assert tasks[-1].period_start == date(2026, 10, 11)
 
     db_session.rollback()
     with db_session.begin():
@@ -76,7 +79,7 @@ def test_rule_creation_adds_the_current_window_idempotently(
         task_service.add_tasks(
             user_id=user.id,
             from_date=date(2026, 9, 23),
-            to_date=date(2026, 10, 6),
+            to_date=date(2026, 10, 13),
         )
 
     repeated_tasks = list(
@@ -344,6 +347,8 @@ def test_repeat_from_a_task_makes_it_the_new_rule_occurrence(
         date(2026, 9, 26),
         date(2026, 10, 1),
         date(2026, 10, 3),
+        date(2026, 10, 8),
+        date(2026, 10, 10),
     ]
     assert rule_tasks[0].id == task_id
     assert all(task.start_time == time(19) for task in rule_tasks)
@@ -554,7 +559,7 @@ def test_area_archive_hard_deletes_only_future_pending_tasks(
         other_task_ids = set(
             db_session.scalars(select(Task.id).where(Task.rule_id == other_rule_id))
         )
-        assert len(other_task_ids) == 14
+        assert len(other_task_ids) == 21
 
     restored = client.post(
         f"/api/v1/areas/{area['id']}/archive",
@@ -603,6 +608,9 @@ def test_this_and_following_skips_the_week_up_to_a_later_drop_and_retimes_from_t
         (date(2026, 9, 30), time(15)),
         (date(2026, 10, 2), time(15)),
         (date(2026, 10, 5), time(15)),
+        (date(2026, 10, 7), time(15)),
+        (date(2026, 10, 9), time(15)),
+        (date(2026, 10, 12), time(15)),
     ]
 
 
@@ -628,6 +636,9 @@ def test_this_and_following_keeps_earlier_sessions_and_can_skip_a_whole_week(
         (date(2026, 9, 28), time(17)),
         (date(2026, 10, 2), time(15)),
         (date(2026, 10, 5), time(15)),
+        (date(2026, 10, 7), time(15)),
+        (date(2026, 10, 9), time(15)),
+        (date(2026, 10, 12), time(15)),
     ]
 
     # Finished work is never skipped.
@@ -653,6 +664,9 @@ def test_this_and_following_keeps_earlier_sessions_and_can_skip_a_whole_week(
         (date(2026, 9, 25), time(17)),
         (date(2026, 10, 2), time(15)),
         (date(2026, 10, 5), time(15)),
+        (date(2026, 10, 7), time(15)),
+        (date(2026, 10, 9), time(15)),
+        (date(2026, 10, 12), time(15)),
     ]
 
 
@@ -687,6 +701,9 @@ def test_this_and_following_on_the_same_or_an_earlier_day_only_retimes(
         (date(2026, 9, 30), time(15)),
         (date(2026, 10, 2), time(15)),
         (date(2026, 10, 5), time(15)),
+        (date(2026, 10, 7), time(15)),
+        (date(2026, 10, 9), time(15)),
+        (date(2026, 10, 12), time(15)),
     ]
 
 
@@ -695,7 +712,7 @@ def test_this_and_following_moves_a_weekly_schedule_to_the_drop_day(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Today is Wednesday 2026-09-23; the window runs to Tuesday 2026-10-06.
+    # Today is Wednesday 2026-09-23; the window runs to Tuesday 2026-10-13.
     freeze_goal_service_time(monkeypatch)
     headers = bearer(register(client, "following-weekly@example.com"))
     area = create_area(client, headers)
@@ -733,7 +750,10 @@ def test_this_and_following_moves_a_weekly_schedule_to_the_drop_day(
     assert stored_rule is not None
     assert (stored_rule.byweekday, stored_rule.start_time) == ([3], time(15))
     # Today is a Wednesday too, but this week already had its session, so it stays empty.
-    assert shown(db_session, rule_id) == [(date(2026, 9, 30), time(15))]
+    assert shown(db_session, rule_id) == [
+        (date(2026, 9, 30), time(15)),
+        (date(2026, 10, 7), time(15)),
+    ]
 
     # A later generation run leaves it that way.
     db_session.rollback()
@@ -745,9 +765,12 @@ def test_this_and_following_moves_a_weekly_schedule_to_the_drop_day(
             TaskRepository(db_session),
             GoalRepository(db_session),
             UserRepository(db_session),
-        ).add_tasks(user_id=user.id, from_date=date(2026, 9, 23), to_date=date(2026, 10, 6))
+        ).add_tasks(user_id=user.id, from_date=date(2026, 9, 23), to_date=date(2026, 10, 13))
 
-    assert shown(db_session, rule_id) == [(date(2026, 9, 30), time(15))]
+    assert shown(db_session, rule_id) == [
+        (date(2026, 9, 30), time(15)),
+        (date(2026, 10, 7), time(15)),
+    ]
 
 
 def test_this_and_following_needs_a_repeating_task_and_deletes_from_the_task_on(

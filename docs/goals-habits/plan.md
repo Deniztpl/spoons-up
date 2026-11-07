@@ -360,6 +360,7 @@ Hours replace blocks as the one measure of work: a task's duration is its size, 
 - API: `PATCH /tasks/{id}/repeat` and `DELETE /tasks/{id}?scope=repeat`, each one transaction; tests cover a later drop skipping the week's open sessions up to the drop day, a whole skipped week, earlier sessions keeping their time, a same-day or earlier drop only retiming, finished work never being skipped, and the delete taking the later sessions and ending the schedule
 - Web: the question after moving, resizing or deleting a task that repeats; Enter picks Only this; the task shows at its new place while the question is open and Escape puts it back; a resize on an elapsed day skips the question
 - Revised after first use: All repeating became This and following. A one-day weekly schedule moves to the drop day; a daily or several-day schedule never moves its days, which change only in the goal's schedule. The schedule type is read from its weekdays; nothing new is stored
+- Also after first use: Week reaches a third week, and rules generate 21 days ahead so that week is always filled
 
 ### Block 7 — Hours panel shortcut (optional)
 

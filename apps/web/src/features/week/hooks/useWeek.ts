@@ -12,7 +12,8 @@ import { endTime } from "../calendarTime";
 import { getToday } from "../../today/api/todayApi";
 import { getWeek, type WeekResponse, type WeekTask } from "../api/weekApi";
 
-export type WeekPosition = "current" | "following";
+// Week reaches the current week and the two after it, as far as rules generate tasks.
+export const LAST_WEEK_OFFSET = 2;
 
 // Where a task sits on the calendar: its day, its time (null for untimed) and its hours.
 export type TaskPlacement = {
@@ -45,7 +46,8 @@ function addDays(dateValue: string, amount: number) {
 export function useWeek() {
   const [week, setWeek] = useState<WeekResponse | null>(null);
   const [todayDate, setTodayDate] = useState<string | null>(null);
-  const [position, setPosition] = useState<WeekPosition>("current");
+  // Weeks after the current one: 0 is this week, LAST_WEEK_OFFSET the last one shown.
+  const [weekOffset, setWeekOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -83,14 +85,14 @@ export function useWeek() {
     };
   }, []);
 
-  async function loadWeek(target: WeekPosition, showLoading = true) {
-    if (!todayDate) return;
+  async function loadWeek(offset: number, showLoading = true) {
+    if (!todayDate || offset < 0 || offset > LAST_WEEK_OFFSET) return;
 
     const requestId = ++requestIdRef.current;
     if (showLoading) setIsLoading(true);
     try {
       const { data, error } = await getWeek(
-        target === "following" ? addDays(todayDate, 7) : undefined,
+        offset === 0 ? undefined : addDays(todayDate, 7 * offset),
       );
       if (requestId !== requestIdRef.current) return;
 
@@ -98,7 +100,7 @@ export function useWeek() {
         setLoadError(errorMessage(error, "Week could not be loaded."));
       } else {
         setWeek(data);
-        setPosition(target);
+        setWeekOffset(offset);
         setLoadError(null);
       }
     } catch {
@@ -111,7 +113,7 @@ export function useWeek() {
   }
 
   function reload() {
-    void loadWeek(position, false);
+    void loadWeek(weekOffset, false);
   }
 
   async function toggleTask(task: WeekTask) {
@@ -194,7 +196,7 @@ export function useWeek() {
         setActionError(errorMessage(error, "Task could not be moved."));
       } else {
         // A move can change other numbers, such as the week's hours, so read the week again.
-        await loadWeek(position, false);
+        await loadWeek(weekOffset, false);
       }
     } catch {
       setWeek((current) => (current ? withTask(current, task) : current));
@@ -223,7 +225,7 @@ export function useWeek() {
         setActionError(errorMessage(error, "Task could not be pasted."));
         return;
       }
-      await loadWeek(position, false);
+      await loadWeek(weekOffset, false);
     } catch {
       setActionError("We couldn't reach Spoons Up. Please try again.");
     }
@@ -243,7 +245,7 @@ export function useWeek() {
         setWeek((current) => (current ? withTask(current, task) : current));
         setActionError(errorMessage(error, "Task could not be deleted."));
       } else {
-        await loadWeek(position, false);
+        await loadWeek(weekOffset, false);
       }
     } catch {
       setWeek((current) => (current ? withTask(current, task) : current));
@@ -260,13 +262,14 @@ export function useWeek() {
   return {
     week,
     todayDate,
-    position,
+    weekOffset,
     isLoading,
     loadError,
     actionError,
     pendingTaskIds,
-    showCurrentWeek: () => void loadWeek("current"),
-    showFollowingWeek: () => void loadWeek("following"),
+    showCurrentWeek: () => void loadWeek(0),
+    showPreviousWeek: () => void loadWeek(weekOffset - 1),
+    showNextWeek: () => void loadWeek(weekOffset + 1),
     reload,
     toggleTask,
     previewPlacement,

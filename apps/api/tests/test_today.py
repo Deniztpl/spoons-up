@@ -514,7 +514,7 @@ def test_scheduled_journal_work_carries_its_item_and_step_progress(client: TestC
         "Deep work": (None, None, None),
         "Pay the invoice": (None, None, None),
     }
-    # Work placed after the following week reads the same in Week's later list.
+    # Work placed after the third week reads the same in Week's later list.
     later = {task["title"]: task for task in week.json()["later_tasks"]["items"]}
     assert later["Prepare the slides"]["parent"] == parent
     assert later["Conference"]["step_progress"] == progress
