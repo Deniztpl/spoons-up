@@ -2,7 +2,7 @@ import { useId } from "react";
 
 import { CloseIcon } from "../../../components/ui/CloseIcon";
 import { DurationField } from "../../../components/ui/DurationField";
-import { formatDuration } from "../../../lib/duration";
+import { formatDuration, planEndLabel } from "../../../lib/duration";
 import type { GoalRuleDraft, GoalRuleValues } from "../hooks/useGoalForm";
 
 type GoalRuleFieldsProps = {
@@ -76,27 +76,34 @@ export function GoalRuleFields({ label, rule, onChange, onRemove }: GoalRuleFiel
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="time"
-          aria-label="Start time"
-          value={rule.startTime ?? ""}
-          className={`${controlClassName} w-28`}
-          onChange={(event) => onChange({ startTime: event.target.value || null })}
-        />
-        <span id={durationLabelId} className="sr-only">
-          Duration
-        </span>
-        <DurationField
-          labelledBy={durationLabelId}
-          value={rule.durationMinutes}
-          size="compact"
-          onChange={(value) => {
-            if (value !== null) {
-              onChange({ durationMinutes: value });
-            }
-          }}
-        />
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <input
+            type="time"
+            aria-label="Start time"
+            value={rule.startTime ?? ""}
+            className={`${controlClassName} h-8 w-full`}
+            onChange={(event) => onChange({ startTime: event.target.value || null })}
+          />
+          <p className="flex h-6 items-center text-[11px] text-ink-soft tabular-nums">
+            {planEndLabel(rule.startTime, rule.durationMinutes)}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <span id={durationLabelId} className="sr-only">
+            Duration
+          </span>
+          <DurationField
+            labelledBy={durationLabelId}
+            value={rule.durationMinutes}
+            size="compact"
+            onChange={(value) => {
+              if (value !== null) {
+                onChange({ durationMinutes: value });
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );

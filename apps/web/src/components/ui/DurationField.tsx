@@ -17,9 +17,10 @@ type DurationFieldProps = {
   onChange: (value: number | null) => void;
 };
 
-const shortcuts = [30, 60, 120, 240];
+const presets = [30, 60, 120, 240];
 
-// A stepper in 15-minute steps up to a day, with shortcuts for the usual lengths.
+// A stepper in 15-minute steps up to a day, as tall and wide as the fields beside it, with the
+// usual lengths in an even row under it.
 export function DurationField({
   labelledBy,
   value,
@@ -27,7 +28,7 @@ export function DurationField({
   size = "regular",
   onChange,
 }: DurationFieldProps) {
-  const height = size === "compact" ? "h-8" : "h-9";
+  const isCompact = size === "compact";
   const canShorten = value !== null && (isOptional || value > DURATION_STEP_MINUTES);
   const canLengthen = value === null || value < MAX_DURATION_MINUTES;
 
@@ -56,21 +57,29 @@ export function DurationField({
     }
   };
 
-  const stepButtonClassName = `grid ${height} w-8 place-items-center text-base text-ink-soft transition enabled:hover:bg-well enabled:hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:text-muted-light`;
-  const choiceClassName = `${height} rounded-[7px] border px-2 text-xs font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`;
+  const stepClassName = `grid shrink-0 place-items-center text-ink-soft transition enabled:hover:bg-well enabled:hover:text-ink disabled:text-muted-light ${
+    isCompact ? "w-8" : "w-10"
+  }`;
+  const presetClassName = `rounded-md border font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+    isCompact ? "h-6 text-[11px]" : "h-7 text-[11.5px]"
+  }`;
 
   return (
-    <div role="group" aria-labelledby={labelledBy} className="flex flex-wrap items-center gap-1.5">
-      <div className="flex items-center overflow-hidden rounded-lg border border-ink/14 bg-card focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/15">
+    <div role="group" aria-labelledby={labelledBy} className="flex min-w-0 flex-col gap-1.5">
+      <div
+        className={`flex items-stretch overflow-hidden border border-ink/14 bg-card transition focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/15 ${
+          isCompact ? "h-8 rounded-[7px]" : "h-10 rounded-lg"
+        }`}
+      >
         <button
           type="button"
           aria-label="Shorter"
           tabIndex={-1}
           disabled={!canShorten}
-          className={stepButtonClassName}
+          className={stepClassName}
           onClick={shorten}
         >
-          −
+          <StepIcon sign="minus" />
         </button>
         <span
           role="spinbutton"
@@ -80,41 +89,43 @@ export function DurationField({
           aria-valuemax={MAX_DURATION_MINUTES}
           aria-valuenow={value ?? 0}
           aria-valuetext={value === null ? "No duration" : describeDuration(value)}
-          className={`grid ${height} min-w-[66px] place-items-center border-x border-line px-1.5 text-sm font-medium text-ink outline-none tabular-nums`}
+          className={`flex min-w-0 flex-1 items-center justify-center whitespace-nowrap px-1 font-medium outline-none tabular-nums ${
+            isCompact ? "text-[13px]" : "text-sm"
+          } ${value === null ? "text-ink-soft" : "text-ink"}`}
           onKeyDown={handleKeyDown}
         >
-          {value === null ? "—" : formatDuration(value)}
+          {value === null ? "None" : formatDuration(value)}
         </span>
         <button
           type="button"
           aria-label="Longer"
           tabIndex={-1}
           disabled={!canLengthen}
-          className={stepButtonClassName}
+          className={stepClassName}
           onClick={lengthen}
         >
-          +
+          <StepIcon sign="plus" />
         </button>
       </div>
 
-      <div className="flex gap-1">
+      <div className={`grid gap-1 ${isOptional ? "grid-cols-5" : "grid-cols-4"}`}>
         {isOptional ? (
           <button
             type="button"
             aria-pressed={value === null}
-            className={`${choiceClassName} ${choiceTone(value === null)}`}
+            className={`${presetClassName} ${presetTone(value === null)}`}
             onClick={() => onChange(null)}
           >
             None
           </button>
         ) : null}
-        {shortcuts.map((minutes) => (
+        {presets.map((minutes) => (
           <button
             key={minutes}
             type="button"
             aria-pressed={value === minutes}
             aria-label={describeDuration(minutes)}
-            className={`${choiceClassName} ${choiceTone(value === minutes)}`}
+            className={`${presetClassName} ${presetTone(value === minutes)}`}
             onClick={() => onChange(minutes)}
           >
             {formatDuration(minutes)}
@@ -125,8 +136,21 @@ export function DurationField({
   );
 }
 
-function choiceTone(isSelected: boolean) {
+function presetTone(isSelected: boolean) {
   return isSelected
-    ? "border-accent bg-accent text-white"
-    : "border-ink/12 bg-card text-ink-soft hover:text-ink";
+    ? "border-accent/45 bg-accent/10 text-accent-strong"
+    : "border-ink/10 bg-card text-ink-soft hover:border-ink/20 hover:text-ink";
+}
+
+function StepIcon({ sign }: { sign: "minus" | "plus" }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none">
+      <path
+        d={sign === "minus" ? "M2.5 6h7" : "M2.5 6h7M6 2.5v7"}
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
 }

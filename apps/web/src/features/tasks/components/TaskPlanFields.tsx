@@ -1,6 +1,7 @@
 import { type RefObject, useId } from "react";
 
 import { DurationField } from "../../../components/ui/DurationField";
+import { planEndLabel } from "../../../lib/duration";
 
 type TaskPlanFieldsProps = {
   startTime: string;
@@ -15,9 +16,10 @@ type TaskPlanFieldsProps = {
 const fieldLabelClassName =
   "text-[10px] font-semibold uppercase tracking-[0.09em] text-ink-soft";
 const fieldClassName =
-  "w-full rounded-lg border border-ink/14 bg-card px-[11px] py-[9px] text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-accent focus:ring-3 focus:ring-accent/15";
+  "h-10 w-full rounded-lg border border-ink/14 bg-card px-[11px] text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-accent focus:ring-3 focus:ring-accent/15";
 
-// The plan values a task takes when it is put on a day: an optional time and its hours.
+// The plan values a task takes when it is put on a day: an optional time and its hours. The two
+// sit side by side at the same height, stacked on a phone; under the time, where the work ends.
 export function TaskPlanFields({
   startTime,
   durationMinutes,
@@ -27,26 +29,35 @@ export function TaskPlanFields({
   onDurationChange,
 }: TaskPlanFieldsProps) {
   const durationLabelId = useId();
+  const duration = durationMinutes === "" ? null : Number(durationMinutes);
+  const endLabel = planEndLabel(startTime, duration);
 
   return (
-    <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2.5">
-      <label className="flex flex-col gap-1.5">
-        <span className={fieldLabelClassName}>Start time</span>
-        <input
-          ref={startTimeRef}
-          type="time"
-          value={startTime}
-          className={fieldClassName}
-          onChange={(event) => onStartTimeChange(event.target.value)}
-        />
-      </label>
-      <div className="flex flex-col gap-1.5">
+    <div className="grid gap-2.5 sm:grid-cols-2">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <label className="flex flex-col gap-1.5">
+          <span className={fieldLabelClassName}>Start time</span>
+          <input
+            ref={startTimeRef}
+            type="time"
+            value={startTime}
+            className={fieldClassName}
+            onChange={(event) => onStartTimeChange(event.target.value)}
+          />
+        </label>
+        {endLabel ? (
+          <p className="flex h-7 items-center text-[11.5px] text-ink-soft tabular-nums">
+            {endLabel}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 flex-col gap-1.5">
         <span id={durationLabelId} className={fieldLabelClassName}>
           Duration
         </span>
         <DurationField
           labelledBy={durationLabelId}
-          value={durationMinutes === "" ? null : Number(durationMinutes)}
+          value={duration}
           isOptional={!isDurationRequired}
           onChange={(value) => onDurationChange(value === null ? "" : String(value))}
         />

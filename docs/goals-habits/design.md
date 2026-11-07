@@ -61,7 +61,7 @@ Task fields follow the screen that owns the decision:
 | Today, Goal or Journal plan | today, fixed | optional | goal: required, one hour to start; Journal: optional |
 | Week, Goal or Journal plan | today or later | optional | goal: required, one hour to start; Journal: optional |
 
-Duration is assigned only while planning work onto a day. One duration control serves the task, Journal and schedule forms: a stepper in 15-minute steps up to 24 hours, with 30 min, 1 h, 2 h and 4 h shortcuts. A Journal duration is a size indicator and never contributes to an area quota. There is no progress slider, continue-tomorrow action or remove-from-plan action in this slice.
+Duration is assigned only while planning work onto a day. One duration control serves the task, Journal and schedule forms: a stepper in 15-minute steps up to 24 hours, as tall as the time field beside it, with 30 min, 1 h, 2 h and 4 h shortcuts in an even row under it. Under the time field the form says where the work ends, such as Ends 21:00, or Untimed when it has no time. A Journal duration is a size indicator and never contributes to an area quota. There is no progress slider, continue-tomorrow action or remove-from-plan action in this slice.
 
 **Today Journal entry** — the Today header has separate `+ Goal` and `+ Journal` actions. The Journal picker starts with `+ New task`, then shows the first five rows ordered overdue, dated and undated, with `Show all (N)` when more exist. Choosing an existing item or step updates that task instead of creating another row. Steps render as normal full-width task cards ordered with everything else; a step card carries its parent's title and step progress as secondary text.
 
